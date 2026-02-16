@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:      { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
+            gold:      { DEFAULT: '#C4972F', light: '#D4AD4E' },
+            surface:   '#F8F7F4',
+            cardwhite: '#FFFFFF',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Shared styles -->
+  <?!= include('styles') ?>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4"
+      x-data="landingApp()"
+      x-init="init()">
+
+  <!-- ─── Admin Floating Button ─── -->
+  <div x-show="state === 'authenticated' && profile.role === 'admin'" 
+       x-transition 
+       class="fixed top-4 right-4 z-50">
+    <a href="<?= appUrl ?>?page=admin" 
+       class="bg-white text-navy px-4 py-2 rounded-lg shadow-md font-medium text-sm hover:bg-gray-50 hover:scale-105 transition-all border border-gray-200 flex items-center gap-2">
+       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+       Admin Console
+    </a>
+  </div>
+
+  <!-- ─── Loading State ─── -->
+  <div x-show="state === 'loading'" x-transition class="text-center animate-fade-in">
+    <div class="flex flex-col items-center gap-5">
+      <!-- University crest placeholder -->
+      <div class="w-16 h-16 rounded-full bg-navy flex items-center justify-center shadow-lg">
+        <svg class="w-8 h-8 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+        </svg>
+      </div>
+      <div class="spinner mx-auto"></div>
+      <p class="text-sm text-gray-500 font-medium tracking-wide">Verifying your account…</p>
+    </div>
+  </div>
+
+  <!-- ─── Access Denied ─── -->
+  <div x-show="state === 'denied'" x-transition class="card animate-fade-in">
+    <div class="text-center">
+      <div class="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-gray-800 mb-2">Access Restricted</h2>
+      <p class="text-sm text-gray-500 leading-relaxed mb-4">
+        This application is available only to
+        <span class="font-medium text-navy">@rsu.ac.th</span> accounts.
+      </p>
+      <div class="bg-gray-50 rounded-lg p-3 text-xs text-gray-400" x-show="userEmail">
+        Signed in as <span class="font-medium text-gray-600" x-text="userEmail"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── User Not Found ─── -->
+  <div x-show="state === 'not_found'" x-transition class="card animate-fade-in">
+    <div class="text-center">
+      <div class="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-gray-800 mb-2">Account Not Registered</h2>
+      <p class="text-sm text-gray-500 leading-relaxed mb-4">
+        Your account is not yet registered in the system.<br />
+        Please contact your program administrator.
+      </p>
+      <div class="bg-gray-50 rounded-lg p-3 text-xs text-gray-400">
+        <span class="font-medium text-gray-600" x-text="userEmail"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Inactive Account ─── -->
+  <div x-show="state === 'inactive'" x-transition class="card animate-fade-in">
+    <div class="text-center">
+      <div class="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-gray-800 mb-2">Account Deactivated</h2>
+      <p class="text-sm text-gray-500 leading-relaxed mb-4">
+        Your account has been deactivated.<br />
+        Please contact your administrator to restore access.
+      </p>
+      <div class="bg-gray-50 rounded-lg p-3 text-xs text-gray-400">
+        <span class="font-medium text-gray-600" x-text="profile.email"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Error State ─── -->
+  <div x-show="state === 'error'" x-transition class="card animate-fade-in">
+    <div class="text-center">
+      <div class="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <h2 class="text-lg font-semibold text-gray-800 mb-2">Something Went Wrong</h2>
+      <p class="text-sm text-gray-500 leading-relaxed mb-4" x-text="errorMessage"></p>
+      <button @click="init()"
+              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-navy text-white text-sm font-medium hover:bg-navy-light transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Retry
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Profile Card (Authenticated) ─── -->
+  <div x-show="state === 'authenticated'" x-transition class="w-full max-w-md animate-fade-in">
+
+    <!-- Header / Branding strip -->
+    <div class="bg-navy rounded-t-2xl px-6 py-5 text-center">
+      <div class="flex items-center justify-center gap-3 mb-2">
+        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+          <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                  d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-white text-base font-semibold tracking-tight">Clinic Progress Report</h1>
+          <p class="text-white/50 text-xs">Rangsit University — College of Dental Medicine</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile body -->
+    <div class="bg-white rounded-b-2xl border border-t-0 border-gray-200 shadow-lg">
+
+      <!-- Avatar + Name + Badge -->
+      <div class="px-6 pt-6 pb-4 text-center border-b border-gray-100">
+        <!-- Avatar circle with initials -->
+        <div class="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-xl font-bold text-white"
+             :class="{
+               'bg-gradient-to-br from-gold to-yellow-600': profile.role === 'admin',
+               'bg-gradient-to-br from-blue-500 to-blue-700': profile.role === 'instructor',
+               'bg-gradient-to-br from-emerald-500 to-emerald-700': profile.role === 'student',
+             }"
+             x-text="initials">
+        </div>
+        <h2 class="text-lg font-semibold text-gray-800" x-text="profile.name || 'Unknown'"></h2>
+        <p class="text-sm text-gray-400 mt-0.5" x-text="profile.email"></p>
+        <div class="mt-3">
+          <span class="badge"
+                :class="{
+                  'badge-admin':      profile.role === 'admin',
+                  'badge-instructor': profile.role === 'instructor',
+                  'badge-student':    profile.role === 'student',
+                }">
+            <template x-if="profile.role === 'admin'">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </template>
+            <template x-if="profile.role === 'instructor'">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+            </template>
+            <template x-if="profile.role === 'student'">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+              </svg>
+            </template>
+            <span x-text="profile.role"></span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Details section -->
+      <div class="px-6 py-4 space-y-0">
+
+        <!-- Status -->
+        <div class="detail-row">
+          <span class="detail-label">Status</span>
+          <span class="detail-value flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full"
+                  :class="profile.status === 'active' ? 'bg-emerald-500' : 'bg-gray-300'"></span>
+            <span x-text="profile.status" class="capitalize"></span>
+          </span>
+        </div>
+
+        <!-- Role-specific: Student -->
+        <template x-if="profile.role === 'student'">
+          <div>
+            <div class="detail-row" x-show="profile.first_clinic_year">
+              <span class="detail-label">First Clinic Year</span>
+              <span class="detail-value" x-text="profile.first_clinic_year"></span>
+            </div>
+          </div>
+        </template>
+
+        <!-- Role-specific: Instructor / Admin -->
+        <template x-if="profile.role === 'instructor' || profile.role === 'admin'">
+          <div>
+            <div class="detail-row" x-show="profile.division">
+              <span class="detail-label">Division</span>
+              <span class="detail-value" x-text="profile.division ? profile.division.name : '—'"></span>
+            </div>
+            <div class="detail-row" x-show="profile.teamleader_role">
+              <span class="detail-label">Team Leader</span>
+              <span class="detail-value">
+                <span class="inline-flex items-center gap-1 text-gold text-xs font-semibold">
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  Yes
+                </span>
+              </span>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Footer: data source indicator -->
+      <div class="px-6 py-3 bg-gray-50 rounded-b-2xl border-t border-gray-100 flex flex-col gap-3">
+        
+        <!-- Admin Link -->
+        <div x-show="profile.role === 'admin'" class="w-full">
+           <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin" 
+              class="flex items-center justify-center gap-2 w-full py-2 bg-white border border-gray-200 text-navy text-sm font-medium rounded-lg hover:bg-navy hover:text-white transition shadow-sm">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+             Admin Console
+           </a>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-[0.65rem] text-gray-400 uppercase tracking-wider font-medium">Data Source</span>
+          <span class="flex items-center gap-1.5 text-[0.65rem] font-medium"
+                :class="profile.source === 'supabase' ? 'text-emerald-600' : 'text-amber-600'">
+            <span class="source-dot" :class="profile.source"></span>
+            <span x-text="profile.source === 'supabase' ? 'Supabase' : 'Google Sheets'"></span>
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Alpine.js App Logic ─── -->
+  <script>
+    function landingApp() {
+      return {
+        state: 'loading',     // loading | denied | not_found | inactive | authenticated | error
+        userEmail: '',
+        profile: {},
+        initials: '',
+        errorMessage: '',
+
+        init() {
+          this.state = 'loading';
+
+          // Step 1: Get current user's email
+          google.script.run
+            .withSuccessHandler((result) => {
+              this.userEmail = result.email;
+
+              if (!result.allowed) {
+                this.state = 'denied';
+                return;
+              }
+
+              // Step 2: Fetch full profile
+              google.script.run
+                .withSuccessHandler((profile) => {
+                  if (!profile.found) {
+                    if (profile.reason === 'user_not_found') {
+                      this.state = 'not_found';
+                    } else if (profile.reason === 'access_denied') {
+                      this.state = 'denied';
+                    } else {
+                      this.errorMessage = profile.message || 'An unexpected error occurred.';
+                      this.state = 'error';
+                    }
+                    return;
+                  }
+
+                  if (!profile.active) {
+                    this.profile = profile;
+                    this.state = 'inactive';
+                    return;
+                  }
+
+                  // Success
+                  this.profile = profile;
+                  this.initials = this._getInitials(profile.name);
+                  this.state = 'authenticated';
+                })
+                .withFailureHandler((err) => {
+                  this.errorMessage = err.message || 'Failed to load profile.';
+                  this.state = 'error';
+                })
+                .getUserProfile(result.email);
+            })
+            .withFailureHandler((err) => {
+              this.errorMessage = err.message || 'Failed to verify account.';
+              this.state = 'error';
+            })
+            .getCurrentUser();
+        },
+
+        _getInitials(name) {
+          if (!name) return '?';
+          var parts = name.trim().split(/\s+/);
+          if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+          }
+          return parts[0][0].toUpperCase();
+        }
+      };
+    }
+  </script>
+
+</body>
+</html>

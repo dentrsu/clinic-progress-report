@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:      { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
+            gold:      { DEFAULT: '#C4972F', light: '#D4AD4E' },
+            bg:        '#F8F7F4',
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+        },
+      },
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <?!= include('styles') ?>
+</head>
+<body class="bg-bg text-gray-800 min-h-screen flex flex-col" x-data="adminApp()" x-init="init()">
+
+  <!-- Navbar -->
+  <nav class="bg-navy text-white px-6 py-4 flex justify-between items-center shadow-md">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gold">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+      </div>
+      <span class="font-semibold tracking-tight">Admin Console</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <a href="<?= appUrl ?>" class="text-sm text-gray-300 hover:text-white transition">Back to Home</a>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6">
+    
+    <!-- Title & Search -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+      <div>
+        <h1 class="text-2xl font-bold text-navy">User Management</h1>
+        <p class="text-sm text-gray-500">Manage students, instructors, and administrators.</p>
+      </div>
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <input type="text" x-model="search" placeholder="Search name or email..." 
+               class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent w-full sm:w-64">
+        <button @click="openModal('create')" 
+                class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Add User
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div x-show="loading" class="flex justify-center py-12">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Table -->
+    <div x-show="!loading" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
+            <th class="px-6 py-4">Name / Email</th>
+            <th class="px-6 py-4">Role</th>
+            <th class="px-6 py-4">Status</th>
+            <th class="px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <template x-for="user in filteredUsers" :key="user.user_id">
+            <tr class="hover:bg-gray-50/50 transition">
+              <td class="px-6 py-4">
+                <div class="font-medium text-navy" x-text="user.name || 'Unknown'"></div>
+                <div class="text-xs text-gray-500" x-text="user.email"></div>
+              </td>
+              <td class="px-6 py-4">
+                <span class="badge" 
+                      :class="{ 'badge-admin': user.role==='admin', 'badge-instructor': user.role==='instructor', 'badge-student': user.role==='student' }"
+                      x-text="user.role"></span>
+              </td>
+              <td class="px-6 py-4">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                      :class="user.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'">
+                  <span class="w-1.5 h-1.5 rounded-full" :class="user.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                  <span x-text="user.status"></span>
+                </span>
+              </td>
+              <td class="px-6 py-4 text-right">
+                <button @click="editUser(user)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                <button x-show="user.role !== 'admin'" 
+                        @click="deleteUser(user, $event)" 
+                        class="text-red-300 hover:text-red-600 transition mx-1"
+                        title="Delete User">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="filteredUsers.length === 0">
+            <td colspan="4" class="px-6 py-12 text-center text-gray-500 italic">No users found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <!-- Modal -->
+  <div x-show="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" style="display: none;">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-navy/20 backdrop-blur-sm transition-opacity" @click="closeModal()"></div>
+    
+    <!-- Panel -->
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative z-10 animate-fade-in">
+      <h2 class="text-xl font-bold text-navy mb-6" x-text="mode === 'create' ? 'Add New User' : 'Edit User'"></h2>
+      
+      <!-- Form -->
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Email</label>
+          <input type="email" x-model="form.email" :disabled="mode === 'edit'"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500">
+        </div>
+        
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Full Name</label>
+          <input type="text" x-model="form.name"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Role</label>
+            <select x-model="form.role"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy disabled:bg-gray-50">
+              <option value="student">Student</option>
+              <option value="instructor">Instructor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Status</label>
+            <select x-model="form.status"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Role Specific Fields -->
+        <div x-show="form.role === 'student'" class="pt-2 border-t border-gray-100 mt-2">
+          <p class="text-xs text-navy font-semibold mb-3">Student Details</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">First Clinic Year</label>
+              <input type="number" x-model="form.first_clinic_year" 
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+            </div>
+          </div>
+        </div>
+
+        <div x-show="form.role === 'instructor'" class="pt-2 border-t border-gray-100 mt-2">
+          <p class="text-xs text-navy font-semibold mb-3">Instructor Details</p>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="teamleader" x-model="form.teamleader_role" class="rounded text-navy focus:ring-navy">
+            <label for="teamleader" class="text-sm text-gray-700">Team Leader</label>
+          </div>
+        </div>
+
+        <!-- Error Message -->
+        <div x-show="errorMsg" class="text-red-600 text-sm bg-red-50 p-3 rounded-lg flex items-start gap-2">
+          <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span x-text="errorMsg"></span>
+        </div>
+
+      </div>
+
+      <!-- Actions -->
+      <div class="mt-8 flex justify-end gap-3">
+        <button @click="closeModal()" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 font-medium">Cancel</button>
+        <button @click="saveUser()" :disabled="saving"
+                class="px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light disabled:opacity-50 flex items-center gap-2">
+          <span x-show="saving" class="spinner w-3 h-3 border-2"></span>
+          <span x-text="saving ? 'Saving...' : 'Save User'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function adminApp() {
+      return {
+        users: [],
+        filteredUsers: [],
+        search: '',
+        loading: true,
+        modalOpen: false,
+        mode: 'create', // create | edit
+        saving: false,
+        errorMsg: '',
+        
+        form: {
+          user_id: null,
+          email: '',
+          name: '',
+          role: 'student',
+          status: 'active',
+          first_clinic_year: new Date().getFullYear(),
+          teamleader_role: false
+        },
+
+        init() {
+          this.loadUsers();
+          this.$watch('search', () => this.filterUsers());
+          this.$watch('users', () => this.filterUsers());
+        },
+
+        filterUsers() {
+          if (!this.users) return;
+          if (!this.search) {
+            this.filteredUsers = this.users;
+            return;
+          }
+          const q = this.search.toLowerCase();
+          this.filteredUsers = this.users.filter(u => 
+            (u.name && u.name.toLowerCase().includes(q)) || 
+            (u.email && u.email.toLowerCase().includes(q))
+          );
+        },
+
+        loadUsers() {
+          this.loading = true;
+          google.script.run
+            .withSuccessHandler(data => {
+              this.users = data;
+              this.loading = false;
+            })
+            .withFailureHandler(err => {
+              alert('Failed to load users: ' + err.message);
+              this.loading = false;
+            })
+            .adminListUsers();
+        },
+
+        openModal(mode) {
+          this.mode = mode;
+          this.errorMsg = '';
+          if (mode === 'create') {
+            this.form = {
+              user_id: null,
+              email: '',
+              name: '',
+              role: 'student',
+              status: 'active',
+              first_clinic_year: new Date().getFullYear(),
+              teamleader_role: false
+            };
+          }
+          this.modalOpen = true;
+        },
+
+        editUser(user) {
+          // Optimistic set (base data)
+          this.form = { 
+            ...user,
+            first_clinic_year: new Date().getFullYear(),
+            teamleader_role: false 
+          };
+          
+          this.mode = 'edit';
+          this.modalOpen = true;
+          this.saving = true; // Show loading state on save button (or add dedicated loader)
+          this.errorMsg = 'Loading details...'; // Use error msg area for status or add status field
+
+          google.script.run
+            .withSuccessHandler(fullUser => {
+               this.form = { 
+                 ...fullUser,
+                 // Ensure defaults if null
+                 first_clinic_year: fullUser.first_clinic_year || new Date().getFullYear(),
+                 teamleader_role: !!fullUser.teamleader_role
+               };
+               this.saving = false;
+               this.errorMsg = '';
+            })
+            .withFailureHandler(err => {
+               this.errorMsg = 'Failed to load details: ' + err.message;
+               this.saving = false;
+            })
+            .adminGetUserDetail(user.email);
+        },
+
+        closeModal() {
+          this.modalOpen = false;
+        },
+
+        saveUser() {
+          this.saving = true;
+          this.errorMsg = '';
+          
+          const handler = (res) => {
+            this.saving = false;
+            if (res.success) {
+              this.closeModal();
+              this.loadUsers(); // Refresh list
+            } else {
+              this.errorMsg = res.error || 'Unknown error occurred.';
+            }
+          };
+
+          if (this.mode === 'create') {
+            google.script.run
+              .withSuccessHandler(handler)
+              .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
+              .adminCreateUser(this.form);
+          } else {
+            google.script.run
+              .withSuccessHandler(handler)
+              .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
+              .adminUpdateUser(this.form.user_id, this.form);
+          }
+        },
+
+        deleteUser(user, event) {
+          if (!confirm('Are you sure you want to delete ' + (user.name || user.email) + '?\nThis action cannot be undone.')) return;
+          
+          const btn = event.currentTarget;
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '<span class="spinner w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin inline-block"></span>';
+          btn.disabled = true;
+          
+          google.script.run
+            .withSuccessHandler(res => {
+               if (res.success) {
+                 this.users = this.users.filter(u => u.user_id !== user.user_id);
+               } else {
+                 alert('Failed to delete: ' + res.error);
+                 btn.innerHTML = originalText;
+                 btn.disabled = false;
+               }
+            })
+            .withFailureHandler(err => {
+               alert('Error: ' + err.message);
+               btn.innerHTML = originalText;
+               btn.disabled = false;
+            })
+            .adminDeleteUser(user.user_id);
+        }
+      }
+    }
+  </script>
+</body>
+</html>
