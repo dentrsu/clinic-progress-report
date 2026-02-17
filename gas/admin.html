@@ -21,7 +21,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <?!= include('styles') ?>
 </head>
-<body class="bg-bg text-gray-800 min-h-screen flex flex-col" x-data="adminApp()" x-init="init()">
+<body class="bg-bg text-gray-800 min-h-screen flex flex-col md:pl-64" x-data="adminApp()" x-init="init()">
 
   <!-- Navbar -->
   <nav class="bg-navy text-white px-6 py-4 flex justify-between items-center shadow-md">
@@ -36,33 +36,130 @@
     </div>
   </nav>
 
+  <!-- Sidebar (New) -->
+  <aside class="fixed top-0 left-0 h-full w-64 bg-navy-dark text-white shadow-lg transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-40"
+         :class="{'translate-x-0': sidebarOpen}"
+         @click.away="sidebarOpen = false">
+    <div class="p-6 flex items-center justify-between border-b border-navy-700">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gold">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+        </div>
+        <span class="font-semibold tracking-tight">Admin Console</span>
+      </div>
+      <button @click="sidebarOpen = false" class="md:hidden text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <nav class="flex-1 px-4 py-6 space-y-2">
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.165-1.294-.478-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.165-1.294.478-1.857m0 0A5.002 5.002 0 0112 16a5.002 5.002 0 014.522 2.143M12 16V9m-2 2V9m4 2V9m-4-4h.01M12 4h.01"/></svg>
+        Users
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        Divisions
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
+        Floors
+      </a>
+    </nav>
+
+    <!-- User Profile -->
+      <div class="p-4 border-t border-navy-700">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center text-xs font-bold text-white">
+            AD
+          </div>
+          <div>
+            <div class="text-sm font-medium text-white">Admin User</div>
+            <div class="text-xs text-gray-400">admin@rsu.ac.th</div>
+          </div>
+        </div>
+
+        <!-- Maintenance Mode Toggle -->
+        <div class="border-t border-navy-700 pt-3">
+          <label class="flex items-center justify-between cursor-pointer">
+             <span class="text-xs font-medium text-gray-300">Maintenance Mode</span>
+             <div class="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in">
+                <input type="checkbox" x-model="maintenanceMode" @change="toggleMaintenance" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer duration-200 ease-in placeholder-shown:bg-gray-300 focus:outline-none"/>
+                <label class="toggle-label block overflow-hidden h-4 rounded-full bg-gray-600 cursor-pointer"></label>
+            </div>
+          </label>
+           
+           <!-- System Health Status -->
+           <div class="mt-3 pt-3 border-t border-navy-700">
+             <div class="flex items-center justify-between text-[10px] text-gray-400 mb-1">
+               <span>Active Source:</span>
+               <span class="font-bold" :class="health.source === 'supabase' ? 'text-emerald-400' : 'text-gold'" x-text="health.source === 'supabase' ? 'Supabase' : 'Sheets (Fallback)'"></span>
+             </div>
+             <div class="flex items-center justify-between text-[10px] text-gray-400">
+               <span>Connection:</span>
+               <span :class="health.healthy ? 'text-emerald-400' : 'text-red-400'" x-text="health.healthy ? 'OK' : 'Error/Offline'"></span>
+             </div>
+           </div>
+        </div>
+      </div>
+  </aside>
+
   <!-- Main Content -->
   <main class="flex-1 max-w-7xl w-full mx-auto p-6">
     
-    <!-- Title & Search -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-      <div>
-        <h1 class="text-2xl font-bold text-navy">User Management</h1>
-        <p class="text-sm text-gray-500">Manage students, instructors, and administrators.</p>
+    <!-- Title & Search & Tabs -->
+    <div class="flex flex-col gap-6 mb-8">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 class="text-2xl font-bold text-navy">Admin Console</h1>
+          <p class="text-sm text-gray-500">Manage system users and configurations.</p>
+        </div>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <input type="text" x-model="search" placeholder="Search..." 
+                 class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent w-full sm:w-64">
+          <button @click="activeTab === 'floors' ? openFloorModal() : openModal('create')" 
+                  x-show="activeTab !== 'patients'"
+                  class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 whitespace-nowrap">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span x-text="activeTab === 'users' ? 'Add User' : (activeTab === 'divisions' ? 'Add Division' : 'Add Floor')"></span>
+          </button>
+        </div>
       </div>
-      <div class="flex items-center gap-3 w-full sm:w-auto">
-        <input type="text" x-model="search" placeholder="Search name or email..." 
-               class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent w-full sm:w-64">
-        <button @click="openModal('create')" 
-                class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Add User
-        </button>
-      </div>
-    </div>
 
-    <!-- Loading -->
+      <!-- Tabs -->
+      <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+          <button @click="switchTab('users')" 
+                  class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition"
+                  :class="activeTab === 'users' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+            Users
+          </button>
+          <button @click="switchTab('divisions')" 
+                  class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition"
+                  :class="activeTab === 'divisions' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+            Divisions
+          </button>
+          <button @click="activeTab = 'floors'" 
+                  class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition"
+                  :class="activeTab === 'floors' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+            Floors
+          </button>
+          <button @click="activeTab = 'patients'" 
+                  class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition"
+                  :class="activeTab === 'patients' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+            Patients
+          </button>
+        </nav>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+           <!-- Maintenance Toggle -->
     <div x-show="loading" class="flex justify-center py-12">
       <div class="spinner"></div>
     </div>
 
-    <!-- Table -->
-    <div x-show="!loading" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <!-- Users Table -->
+    <div x-show="!loading && activeTab === 'users'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
       <table class="w-full text-left border-collapse">
         <thead>
           <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
@@ -92,7 +189,7 @@
                 </span>
               </td>
               <td class="px-6 py-4 text-right">
-                <button @click="editUser(user)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                <button @click="openModal('edit', user)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                 <button x-show="user.role !== 'admin'" 
                         @click="deleteUser(user, $event)" 
                         class="text-red-300 hover:text-red-600 transition mx-1"
@@ -109,6 +206,82 @@
       </table>
     </div>
 
+    <!-- Divisions Table -->
+    <div x-show="!loading && activeTab === 'divisions'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in" style="display: none;">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
+            <th class="px-6 py-4">Code</th>
+            <th class="px-6 py-4">Name</th>
+            <th class="px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <template x-for="div in filteredDivisions" :key="div.division_id">
+            <tr class="hover:bg-gray-50/50 transition">
+              <td class="px-6 py-4 font-mono text-xs text-navy font-bold" x-text="div.code"></td>
+              <td class="px-6 py-4 text-sm text-gray-700" x-text="div.name"></td>
+              <td class="px-6 py-4 text-right">
+                <button @click="openModal('edit', div)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+              </td>
+            </tr>
+          </template>
+          <tr x-show="filteredDivisions.length === 0">
+            <td colspan="3" class="px-6 py-12 text-center text-gray-500 italic">No divisions found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Floors Tab Content -->
+    <div x-show="!loading && activeTab === 'floors'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+       <table class="w-full text-left border-collapse">
+         <thead class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
+           <tr>
+             <th class="px-6 py-4">Label</th>
+             <th class="px-6 py-4 text-right">Actions</th>
+           </tr>
+         </thead>
+         <tbody class="divide-y divide-gray-100">
+           <template x-for="floor in floors" :key="floor.floor_id">
+             <tr class="hover:bg-gray-50 transition-colors">
+               <td class="px-6 py-4 whitespace-nowrap">
+                 <span class="text-sm font-medium text-gray-900" x-text="floor.label"></span>
+               </td>
+               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                 <button @click="editFloor(floor)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+               </td>
+             </tr>
+           </template>
+           <tr x-show="floors.length === 0">
+             <td colspan="2" class="px-6 py-8 text-center text-gray-500">No floors found.</td>
+           </tr>
+         </tbody>
+       </table>
+    </div>
+
+       <!-- Patients Tab Content -->
+      <div x-show="activeTab === 'patients'" class="space-y-6">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <h2 class="text-xl font-bold text-gray-800 mb-4">External Patient Sync</h2>
+          <p class="text-gray-600 mb-6">
+            Sync patient data from the configured Google Sheet (<code>PATIENT_SHEET_ID</code>). 
+            This will update existing patients (by HN) and create new ones.
+          </p>
+          
+          <div class="flex items-center space-x-4">
+             <button @click="syncPatients" :disabled="syncing" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+               <i class="fas fa-sync-alt mr-2" :class="{'animate-spin': syncing}"></i>
+               <span x-text="syncing ? 'Syncing...' : 'Sync Patients Now'"></span>
+             </button>
+             
+             <div x-show="syncResult" class="text-sm" :class="{'text-green-600': syncResult && syncResult.success, 'text-red-600': syncResult && !syncResult.success}">
+                <span x-text="syncResultMessage"></span>
+             </div>
+          </div>
+        </div>
+      </div>
+
   </main>
 
   <!-- Modal -->
@@ -118,26 +291,26 @@
     
     <!-- Panel -->
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative z-10 animate-fade-in">
-      <h2 class="text-xl font-bold text-navy mb-6" x-text="mode === 'create' ? 'Add New User' : 'Edit User'"></h2>
+      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'divisions' ? 'Division' : 'Floor'))"></h2>
       
-      <!-- Form -->
-      <div class="space-y-4">
+      <!-- User Form -->
+      <div x-show="activeTab === 'users'" class="space-y-4">
         <div>
           <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Email</label>
-          <input type="email" x-model="form.email" :disabled="mode === 'edit'"
+          <input type="email" x-model="userForm.email" :disabled="mode === 'edit'"
                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500">
         </div>
         
         <div>
           <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Full Name</label>
-          <input type="text" x-model="form.name"
+          <input type="text" x-model="userForm.name"
                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Role</label>
-            <select x-model="form.role"
+            <select x-model="userForm.role"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy disabled:bg-gray-50">
               <option value="student">Student</option>
               <option value="instructor">Instructor</option>
@@ -146,7 +319,7 @@
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Status</label>
-            <select x-model="form.status"
+            <select x-model="userForm.status"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
@@ -154,42 +327,195 @@
           </div>
         </div>
 
-        <!-- Role Specific Fields -->
-        <div x-show="form.role === 'student'" class="pt-2 border-t border-gray-100 mt-2">
+        <div x-show="userForm.role === 'student'" class="pt-2 border-t border-gray-100 mt-2">
           <p class="text-xs text-navy font-semibold mb-3">Student Details</p>
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1">First Clinic Year</label>
-              <input type="number" x-model="form.first_clinic_year" 
+              <input type="number" x-model="userForm.first_clinic_year" 
                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Academic ID</label>
+              <input type="text" x-model="userForm.academic_id"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy"
+                     placeholder="e.g. 12345678">
+            </div>
+             <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Unit ID</label>
+              <input type="text" x-model="userForm.unit_id"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy"
+                     placeholder="e.g. U-123">
+            </div>
+             <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Floor</label>
+              <select x-model="userForm.floor_id"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+                <option value="">(None)</option>
+                <template x-for="floor in floors" :key="floor.floor_id">
+                  <option :value="floor.floor_id" x-text="floor.label"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          
+           <div class="grid grid-cols-2 gap-4 mt-3">
+             <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">1st Team Leader</label>
+              <select x-model="userForm.team_leader_1_id"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+                <option value="">(None)</option>
+                <template x-for="tl in teamLeaders" :key="tl.instructor_id || tl.user_id">
+                  <option :value="tl.instructor_id" x-text="tl.name"></option>
+                </template>
+              </select>
+            </div>
+             <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">2nd Team Leader</label>
+              <select x-model="userForm.team_leader_2_id"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+                <option value="">(None)</option>
+                <template x-for="tl in teamLeaders" :key="tl.instructor_id || tl.user_id">
+                  <option :value="tl.instructor_id" x-text="tl.name"></option>
+                </template>
+              </select>
+            </div>
+           </div>
+        </div>
+
+        <div x-show="userForm.role === 'instructor' || userForm.role === 'admin'" class="pt-2 border-t border-gray-100 mt-2">
+          <p class="text-xs text-navy font-semibold mb-3">Instructor Details</p>
+          
+          <div class="grid grid-cols-2 gap-4 mb-3">
+             <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Division</label>
+              <select x-model="userForm.division_id" 
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+                <option value="">(None)</option>
+                <template x-for="div in divisions" :key="div.division_id">
+                  <option :value="div.division_id" x-text="div.name"></option>
+                </template>
+              </select>
+            </div>
+            
+             <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Floor</label>
+              <select x-model="userForm.floor_id"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+                <option value="">(None)</option>
+                <template x-for="floor in floors" :key="floor.floor_id">
+                  <option :value="floor.floor_id" x-text="floor.label"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+             <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Bay</label>
+              <input type="text" x-model="userForm.bay" placeholder="e.g. A, AB" maxlength="2"
+                     @input="userForm.bay = $event.target.value.toUpperCase().replace(/[^A-Z]/g, '')"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+            </div>
+            <div class="flex items-center pt-5">
+              <input type="checkbox" id="teamleader" x-model="userForm.teamleader_role" class="rounded text-navy focus:ring-navy w-4 h-4 text-navy">
+              <label for="teamleader" class="text-sm text-gray-700 ml-2 select-none">Team Leader</label>
             </div>
           </div>
         </div>
+      </div>
 
-        <div x-show="form.role === 'instructor'" class="pt-2 border-t border-gray-100 mt-2">
-          <p class="text-xs text-navy font-semibold mb-3">Instructor Details</p>
-          <div class="flex items-center gap-2">
-            <input type="checkbox" id="teamleader" x-model="form.teamleader_role" class="rounded text-navy focus:ring-navy">
-            <label for="teamleader" class="text-sm text-gray-700">Team Leader</label>
-          </div>
+
+      <!-- Division Form -->
+      <div x-show="activeTab === 'divisions'" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Division Code</label>
+          <input type="text" x-model="divForm.code" placeholder="e.g. OPER, ENDO"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          <p class="text-xs text-gray-400 mt-1">Short identifier, unique.</p>
         </div>
-
-        <!-- Error Message -->
-        <div x-show="errorMsg" class="text-red-600 text-sm bg-red-50 p-3 rounded-lg flex items-start gap-2">
-          <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <span x-text="errorMsg"></span>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Division Name</label>
+          <input type="text" x-model="divForm.name" placeholder="e.g. Operative Dentistry"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
         </div>
+      </div>
 
+      <!-- Floor Form -->
+      <div x-show="activeTab === 'floors'" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Floor Label</label>
+          <input type="text" x-model="floorForm.label" placeholder="e.g. 2nd Floor"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+        </div>
+      </div>
+
+      <!-- Error Message -->
+      <div x-show="errorMsg" class="text-red-600 text-sm bg-red-50 p-3 rounded-lg flex items-start gap-2 mt-4">
+        <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span x-text="errorMsg"></span>
       </div>
 
       <!-- Actions -->
-      <div class="mt-8 flex justify-end gap-3">
+      <div class="mt-8 flex justify-end gap-3 pt-4 border-t border-gray-100">
         <button @click="closeModal()" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 font-medium">Cancel</button>
-        <button @click="saveUser()" :disabled="saving"
-                class="px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light disabled:opacity-50 flex items-center gap-2">
-          <span x-show="saving" class="spinner w-3 h-3 border-2"></span>
-          <span x-text="saving ? 'Saving...' : 'Save User'"></span>
+        <button @click="saveData()" :disabled="saving"
+                class="px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light disabled:opacity-50 flex items-center gap-2 shadow-sm">
+          <span x-show="saving" class="spinner w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          <span x-text="saving ? 'Saving...' : (mode === 'create' ? 'Create' : 'Save Changes')"></span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Warning/Error Modal -->
+  <div x-show="warningOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4" style="display: none;">
+    <div class="fixed inset-0 bg-navy/20 backdrop-blur-sm transition-opacity" @click="warningOpen = false"></div>
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative z-10 animate-fade-in border-l-4"
+         :class="warningType === 'error' ? 'border-red-500' : 'border-gold'">
+      <div class="flex items-start gap-4">
+        <div class="p-2 rounded-full shrink-0"
+             :class="warningType === 'error' ? 'bg-red-100 text-red-500' : 'bg-gold/10 text-gold'">
+          <!-- Error Icon -->
+          <svg x-show="warningType === 'error'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <!-- Warning Icon -->
+          <svg x-show="warningType !== 'error'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-navy mb-2" x-text="warningType === 'error' ? 'Error' : 'Notice'"></h3>
+          <p class="text-sm text-gray-600 whitespace-pre-line" x-text="warningMessage"></p>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end">
+        <button @click="warningOpen = false" 
+                class="px-4 py-2 text-white rounded-lg text-sm font-medium transition shadow-sm"
+                :class="warningType === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-navy hover:bg-navy-light'">
+          Acknowledge
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div x-show="confirmOpen" class="fixed inset-0 z-[70] flex items-center justify-center p-4" style="display: none;">
+    <div class="fixed inset-0 bg-navy/20 backdrop-blur-sm transition-opacity" @click="confirmOpen = false"></div>
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative z-10 animate-fade-in">
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+          <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-navy mb-2">Confirm Action</h3>
+        <p class="text-sm text-gray-500 mb-6" x-text="confirmMessage"></p>
+        <div class="flex justify-center gap-3">
+          <button @click="confirmOpen = false" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
+            Cancel
+          </button>
+          <button @click="confirmAction()" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition shadow-sm">
+            Confirm
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -197,31 +523,189 @@
   <script>
     function adminApp() {
       return {
+        activeTab: 'users', // users | divisions | floors
+        
+        // Users Data
         users: [],
         filteredUsers: [],
+        
+        // Instructors Data (for TL dropdown)
+        instructors: [],
+
+        // Divisions Data
+        divisions: [],
+        filteredDivisions: [],
+
+        // Floors Data
+        floors: [],
+        
         search: '',
         loading: true,
         modalOpen: false,
+        sidebarOpen: false, // Fix ReferenceError
+        maintenanceMode: false,
+        health: { source: '...', healthy: true }, // Added health state
+        
+        // Warning Modal State
+        warningOpen: false,
+        warningType: 'warning', // warning | error
+        warningMessage: '',
+
+        // Confirmation Modal State
+        confirmOpen: false,
+        confirmMessage: '',
+        confirmCallback: null,
+
         mode: 'create', // create | edit
         saving: false,
         errorMsg: '',
         
-        form: {
+        // User Form
+        userForm: {
           user_id: null,
           email: '',
           name: '',
           role: 'student',
+          academic_id: '', // Initialize
           status: 'active',
           first_clinic_year: new Date().getFullYear(),
-          teamleader_role: false
+          teamleader_role: false,
+          floor_id: '',
+          bay: ''
         },
 
+        get teamLeaders() {
+          // Filter instructors who are Team Leaders
+          if (!this.instructors || this.instructors.length === 0) return [];
+          
+          return this.instructors
+            .filter(i => i.teamleader_role)
+            .map(i => {
+               // Find name from users list
+               const u = this.users.find(u => u.user_id === i.user_id);
+               return {
+                 instructor_id: i.instructor_id,
+                 name: u ? u.name : 'Unknown (' + i.user_id + ')',
+                 user_id: i.user_id
+               };
+            })
+            .sort((a,b) => a.name.localeCompare(b.name));
+        },
+
+        // Division Form
+        divForm: {
+          division_id: null,
+          code: '',
+          name: ''
+        },
+
+        // Floor Form
+        floorForm: {
+          floor_id: null,
+          label: ''
+        },
+
+        // UI State
+        activeTab: 'users',
+        syncing: false,
+        syncResult: null,
+        syncResultMessage: '',
+        
         init() {
-          this.loadUsers();
-          this.$watch('search', () => this.filterUsers());
+          this.loadData();
+          this.loadDivisions();
+          this.loadFloors();
+          this.loadInstructors();
+          this.checkMaintenanceMode();
+          this.checkSystemHealth();
+          
+          this.$watch('search', () => {
+             if (this.activeTab === 'users') this.filterUsers();
+             // else if (this.activeTab === 'divisions') this.filterDivisions();
+          });
+          
           this.$watch('users', () => this.filterUsers());
+          this.$watch('divisions', () => this.filterDivisions());
         },
 
+        syncPatients() {
+          this.syncing = true;
+          this.syncResult = null;
+          this.syncResultMessage = 'Starting sync...';
+          
+          google.script.run
+            .withSuccessHandler(res => {
+              this.syncing = false;
+              this.syncResult = res;
+              if (res.success) {
+                 this.syncResultMessage = `Success! Created: ${res.stats.created}, Updated: ${res.stats.updated}, Errors: ${res.stats.errors}`;
+                 if (res.warning) {
+                   this.warningType = 'error';
+                   this.warningMessage = "Completed with Fallback Warnings:\n" + res.warning;
+                   this.warningOpen = true;
+                 }
+              } else {
+                 this.syncResultMessage = `Failed: ${res.error}`;
+                 this.warningType = 'error';
+                 this.warningMessage = "Sync Failed:\n" + res.error;
+                 this.warningOpen = true;
+              }
+            })
+            .withFailureHandler(err => {
+              this.syncing = false;
+              this.syncResult = { success: false };
+              this.syncResultMessage = `Error: ${err.message}`;
+              this.warningType = 'error';
+              this.warningMessage = "System Error:\n" + err.message;
+              this.warningOpen = true;
+            })
+            .adminSyncPatients();
+        },
+        
+        loadData() {
+          this.loadUsers();
+        },
+
+        checkMaintenanceMode() {
+           google.script.run
+            .withSuccessHandler(mode => {
+              this.maintenanceMode = mode;
+            })
+            .adminGetMaintenanceMode();
+        },
+
+        checkSystemHealth() {
+           google.script.run
+            .withSuccessHandler(res => {
+              this.health = res;
+            })
+            .checkSystemHealth();
+        },
+
+        toggleMaintenance() {
+           // Optimistic UI update handled by x-model, but let's confirm
+           console.log("Toggling maintenance to:", this.maintenanceMode);
+           google.script.run
+            .withSuccessHandler(res => {
+               if(res.success) {
+                 this.maintenanceMode = res.mode;
+                 console.log("Maintenance mode set to:", res.mode);
+               }
+            })
+            .adminSetMaintenanceMode(this.maintenanceMode);
+        },
+
+        switchTab(tab) {
+          this.activeTab = tab;
+          this.search = ''; // Reset search logic on tab switch
+          if (tab === 'users') this.filterUsers();
+          else if (tab === 'divisions') this.filterDivisions();
+        },
+
+        // ──────────────────────────────────────────────
+        //  Filter Logic
+        // ──────────────────────────────────────────────
+        
         filterUsers() {
           if (!this.users) return;
           if (!this.search) {
@@ -235,6 +719,23 @@
           );
         },
 
+        filterDivisions() {
+          if (!this.divisions) return;
+          if (!this.search) {
+            this.filteredDivisions = this.divisions;
+            return;
+          }
+          const q = this.search.toLowerCase();
+          this.filteredDivisions = this.divisions.filter(d => 
+            (d.name && d.name.toLowerCase().includes(q)) || 
+            (d.code && d.code.toLowerCase().includes(q))
+          );
+        },
+
+        // ──────────────────────────────────────────────
+        //  Data Loading
+        // ──────────────────────────────────────────────
+
         loadUsers() {
           this.loading = true;
           google.script.run
@@ -243,49 +744,115 @@
               this.loading = false;
             })
             .withFailureHandler(err => {
-              alert('Failed to load users: ' + err.message);
+              console.error(err); // Log silently, alert on specific action?
               this.loading = false;
             })
             .adminListUsers();
         },
 
-        openModal(mode) {
-          this.mode = mode;
-          this.errorMsg = '';
-          if (mode === 'create') {
-            this.form = {
-              user_id: null,
-              email: '',
-              name: '',
-              role: 'student',
-              status: 'active',
-              first_clinic_year: new Date().getFullYear(),
-              teamleader_role: false
-            };
-          }
-          this.modalOpen = true;
+        loadDivisions() {
+          // Don't set global loading true if users are already loaded, maybe separate loader?
+          // For now, simplicity:
+          google.script.run
+            .withSuccessHandler(data => {
+              this.divisions = data;
+            })
+            .withFailureHandler(err => {
+              console.error("Failed to load divisions", err);
+            })
+            .adminListDivisions();
         },
 
-        editUser(user) {
-          // Optimistic set (base data)
-          this.form = { 
-            ...user,
-            first_clinic_year: new Date().getFullYear(),
-            teamleader_role: false 
-          };
-          
-          this.mode = 'edit';
-          this.modalOpen = true;
-          this.saving = true; // Show loading state on save button (or add dedicated loader)
-          this.errorMsg = 'Loading details...'; // Use error msg area for status or add status field
-
+        loadFloors() {
           google.script.run
+            .withSuccessHandler(data => {
+              this.floors = data;
+            })
+            .withFailureHandler(err => {
+               console.error("Failed to load floors", err);
+            })
+            .adminListFloors();
+        },
+
+        loadInstructors() {
+          google.script.run
+            .withSuccessHandler(data => {
+              this.instructors = data;
+            })
+            .withFailureHandler(err => {
+               console.error("Failed to load instructors", err);
+            })
+            .adminListInstructors();
+        },
+
+        // ──────────────────────────────────────────────
+        //  Modal / Form Handling
+        // ──────────────────────────────────────────────
+
+        openModal(mode, item = null) {
+          this.mode = mode;
+          this.errorMsg = '';
+          this.modalOpen = true;
+
+          if (this.activeTab === 'users') {
+            if (mode === 'create') {
+              this.userForm = {
+                user_id: null,
+                email: '',
+                name: '',
+                role: 'student', // Default
+                status: 'active',
+                first_clinic_year: new Date().getFullYear(),
+                teamleader_role: false,
+                division_id: '',
+                floor_id: '',
+                bay: '',
+                team_leader_1_id: '',
+                team_leader_2_id: ''
+              };
+            } else {
+              // Edit User - Optimistic
+               this.userForm = { 
+                ...item,
+                first_clinic_year: new Date().getFullYear(),
+                teamleader_role: false,
+                division_id: item.division_id || '',
+                floor_id: item.floor_id || item.floor || '', // Support both for display
+                bay: item.bay || ''
+              };
+              this.fetchUserDetail(item.email);
+            }
+          } else if (this.activeTab === 'divisions') {
+            // Divisions
+            if (mode === 'create') {
+              this.divForm = { division_id: null, code: '', name: '' };
+            } else {
+              this.divForm = { ...item };
+            }
+          } else {
+            // Floors
+             if (mode === 'create') {
+              this.floorForm = { floor_id: null, label: '' };
+            } else {
+              this.floorForm = { ...item };
+            }
+          }
+        },
+
+        fetchUserDetail(email) {
+           this.saving = true; 
+           this.errorMsg = 'Loading details...';
+           google.script.run
             .withSuccessHandler(fullUser => {
-               this.form = { 
+               this.userForm = { 
                  ...fullUser,
-                 // Ensure defaults if null
                  first_clinic_year: fullUser.first_clinic_year || new Date().getFullYear(),
-                 teamleader_role: !!fullUser.teamleader_role
+                 teamleader_role: !!fullUser.teamleader_role,
+                 division_id: fullUser.division_id || '',
+                 floor_id: fullUser.floor_id || fullUser.floor || '',
+                 bay: fullUser.bay || '',
+                 team_leader_1_id: fullUser.team_leader_1_id || '',
+                 team_leader_2_id: fullUser.team_leader_2_id || ''
                };
                this.saving = false;
                this.errorMsg = '';
@@ -294,11 +861,17 @@
                this.errorMsg = 'Failed to load details: ' + err.message;
                this.saving = false;
             })
-            .adminGetUserDetail(user.email);
+            .adminGetUserDetail(email);
         },
 
         closeModal() {
           this.modalOpen = false;
+        },
+
+        saveData() {
+          if (this.activeTab === 'users') this.saveUser();
+          else if (this.activeTab === 'divisions') this.saveDivision();
+          else this.saveFloor();
         },
 
         saveUser() {
@@ -308,8 +881,12 @@
           const handler = (res) => {
             this.saving = false;
             if (res.success) {
+              if (res.warning) {
+                this.warningMessage = res.warning;
+                this.warningOpen = true;
+              }
               this.closeModal();
-              this.loadUsers(); // Refresh list
+              this.loadUsers(); 
             } else {
               this.errorMsg = res.error || 'Unknown error occurred.';
             }
@@ -319,35 +896,109 @@
             google.script.run
               .withSuccessHandler(handler)
               .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
-              .adminCreateUser(this.form);
+              .adminCreateUser(this.userForm);
           } else {
             google.script.run
               .withSuccessHandler(handler)
               .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
-              .adminUpdateUser(this.form.user_id, this.form);
+              .adminUpdateUser(this.userForm.user_id, this.userForm);
           }
         },
 
-        deleteUser(user, event) {
-          if (!confirm('Are you sure you want to delete ' + (user.name || user.email) + '?\nThis action cannot be undone.')) return;
+        saveDivision() {
+          this.saving = true;
+          this.errorMsg = '';
           
+          const handler = (res) => {
+            this.saving = false;
+            if (res.success) {
+              this.closeModal();
+              this.loadDivisions(); 
+            } else {
+              this.errorMsg = res.error || 'Unknown error occurred.';
+            }
+          };
+
+          if (this.mode === 'create') {
+            google.script.run
+              .withSuccessHandler(handler)
+              .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
+              .adminCreateDivision(this.divForm);
+          } else {
+            google.script.run
+              .withSuccessHandler(handler)
+              .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
+              .adminUpdateDivision(this.divForm.division_id, this.divForm);
+          }
+        },
+
+        saveFloor() {
+          this.saving = true;
+          this.errorMsg = '';
+          
+          const handler = (res) => {
+            this.saving = false;
+            if (res.success) {
+              this.closeModal();
+              this.loadFloors(); 
+            } else {
+              this.errorMsg = res.error || 'Unknown error occurred.';
+            }
+          };
+
+          if (this.mode === 'create') {
+            google.script.run
+              .withSuccessHandler(handler)
+              .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
+              .adminCreateFloor(this.floorForm);
+          } else {
+             google.script.run
+              .withSuccessHandler(handler)
+              .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
+              .adminUpdateFloor(this.floorForm.floor_id, this.floorForm);
+          }
+        },
+
+        // Confirm Modal Action
+        confirmAction() {
+          if (this.confirmCallback) {
+            this.confirmCallback();
+            this.confirmCallback = null;
+          }
+          this.confirmOpen = false;
+        },
+
+        deleteUser(user, event) {
+          this.confirmMessage = 'Are you sure you want to delete ' + (user.name || user.email) + '?\nThis action cannot be undone.';
+          this.confirmOpen = true;
+          
+          // Capture button reference for spinner
           const btn = event.currentTarget;
+          
+          this.confirmCallback = () => {
+             this.performDeleteUser(user, btn);
+          };
+        },
+
+        performDeleteUser(user, btn) {
           const originalText = btn.innerHTML;
           btn.innerHTML = '<span class="spinner w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin inline-block"></span>';
           btn.disabled = true;
-          
+
           google.script.run
             .withSuccessHandler(res => {
                if (res.success) {
                  this.users = this.users.filter(u => u.user_id !== user.user_id);
                } else {
-                 alert('Failed to delete: ' + res.error);
+                 this.warningMessage = 'Failed to delete: ' + res.error;
+                 this.warningOpen = true;
                  btn.innerHTML = originalText;
                  btn.disabled = false;
                }
             })
             .withFailureHandler(err => {
-               alert('Error: ' + err.message);
+               this.warningMessage = 'Error: ' + err.message;
+               this.warningOpen = true;
                btn.innerHTML = originalText;
                btn.disabled = false;
             })

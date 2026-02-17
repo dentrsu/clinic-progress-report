@@ -6,8 +6,8 @@ This document serves as the "Source of Truth" for the database schema and busine
 
 The system manages dental students, clinical instructors, and patient treatment progress. It uses a **Catalog-Execution** pattern:
 
-* **Catalog:** Defines what treatments exist (`treatment_catalog`) and the mandatory steps for each (`treatment_steps`).
-* **Execution:** Tracks the actual clinical work performed by students (`treatment_records`).
+- **Catalog:** Defines what treatments exist (`treatment_catalog`) and the mandatory steps for each (`treatment_steps`).
+- **Execution:** Tracks the actual clinical work performed by students (`treatment_records`).
 
 ---
 
@@ -20,6 +20,21 @@ create extension if not exists "pgcrypto";
 -- TYPES & ENUMS
 -- user_role: student, instructor, admin
 -- record_status: planned, in_progress, completed, verified, rejected, void
+create type public.record_status as enum ('planned', 'in_progress', 'completed', 'verified', 'rejected', 'void');
+-- patient_status: active, inactive, archived
+create type public.patient_status as enum (
+  'Waiting to Be Assigned',
+  'Full Chart',
+  'Treatment Plan',
+  'First Treatment Plan',
+  'Treatment Plan Approved',
+  'Initial Treatment',
+  'Inactive',
+  'Discharged',
+  'Orthodontic Treatment',
+  'Waiting in Recall Lists'
+);
+
 
 -- TABLES
 
@@ -36,7 +51,12 @@ create table public.users (
 create table public.students (
   student_id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references public.users(user_id) on delete cascade,
-  first_clinic_year int
+  first_clinic_year int,
+  floor_id uuid references public.floors(floor_id),
+  unit_id text,
+  team_leader_1_id uuid references public.instructors(instructor_id),
+  team_leader_2_id uuid references public.instructors(instructor_id),
+  status public.user_status not null default 'active'
 );
 
 create table public.instructors (
@@ -70,10 +90,10 @@ create table public.treatment_records (
   status public.record_status not null default 'planned',
   rsu_units numeric,
   verified_by uuid references public.users(user_id), -- The Instructor's user_id
-  
+
   -- Validation: Step MUST belong to the Treatment
-  constraint fk_treatment_step_validation 
-    foreign key (treatment_id, step_id) 
+  constraint fk_treatment_step_validation
+    foreign key (treatment_id, step_id)
     references public.treatment_steps(treatment_id, step_id)
 );
 
@@ -85,14 +105,14 @@ create table public.treatment_records (
 
 ### A. Data Integrity
 
-* **Composite Validation:** A `treatment_record` cannot have a `step_id` that belongs to a different `treatment_id`. This is enforced at the DB level via `fk_treatment_step_validation`.
-* **User Provisioning:** The `public.users` table is automatically populated via a database trigger (`handle_new_user`) when a user signs up through Supabase Auth.
+- **Composite Validation:** A `treatment_record` cannot have a `step_id` that belongs to a different `treatment_id`. This is enforced at the DB level via `fk_treatment_step_validation`.
+- **User Provisioning:** The `public.users` table is automatically populated via a database trigger (`handle_new_user`) when a user signs up through Supabase Auth.
 
 ### B. Security & Access Control (RLS)
 
-* **Students:** Can `SELECT` and `INSERT` their own `treatment_records`. They cannot update the `verified_by` or `verified_at` fields.
-* **Instructors:** Can `SELECT` all records within their division. They are the only ones allowed to `UPDATE` a record status to `verified`.
-* **Patients:** Patient data is visible to all authenticated clinical staff/students but is strictly read-only for students unless they are part of the Care Team.
+- **Students:** Can `SELECT` and `INSERT` their own `treatment_records`. They cannot update the `verified_by` or `verified_at` fields.
+- **Instructors:** Can `SELECT` all records within their division. They are the only ones allowed to `UPDATE` a record status to `verified`.
+- **Patients:** Patient data is visible to all authenticated clinical staff/students but is strictly read-only for students unless they are part of the Care Team.
 
 ### C. Workflow State Machine
 
@@ -108,9 +128,9 @@ create table public.treatment_records (
 ### Fetching a Student's Progress
 
 ```sql
-select 
-  tc.treatment_name, 
-  ts.step_name, 
+select
+  tc.treatment_name,
+  ts.step_name,
   tr.status
 from public.treatment_records tr
 join public.treatment_catalog tc using (treatment_id)
@@ -123,8 +143,8 @@ where tr.student_id = 'STUDENT_UUID';
 
 ```sql
 update public.treatment_records
-set status = 'verified', 
-    verified_by = auth.uid(), 
+set status = 'verified',
+    verified_by = auth.uid(),
     verified_at = now()
 where record_id = 'RECORD_UUID';
 

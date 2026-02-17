@@ -141,14 +141,22 @@ var SupabaseProvider = (function () {
      * Create a user in Supabase Auth (Admin API).
      * @param {string} email
      * @param {string} password (temporary)
+     * @param {Object} data (optional metadata)
      * @returns {Object} auth user object (contains .id)
      */
-    createAuthUser: function (email, password) {
-      return _post("/auth/v1/admin/users", {
+    createAuthUser: function (email, password, data) {
+      var payload = {
         email: email,
         password: password,
         email_confirm: true,
-      });
+        user_metadata: data || {},
+        app_metadata: data || {}, // Send in both to satisfy trigger regardless of which one it uses
+      };
+      Logger.log(
+        "SupabaseProvider: Creating Auth User with payload: " +
+          JSON.stringify(payload),
+      );
+      return _post("/auth/v1/admin/users", payload);
     },
 
     /**
@@ -165,7 +173,9 @@ var SupabaseProvider = (function () {
      */
     listUsers: function () {
       // Returns all users, ordered by created_at desc
-      return _get("/rest/v1/users?select=*&order=created_at.desc");
+      // Join with students to get academic_id for student users
+      var select = "*,students(academic_id)";
+      return _get("/rest/v1/users?select=" + select + "&order=created_at.desc");
     },
 
     deleteUser: function (userId) {
@@ -178,6 +188,13 @@ var SupabaseProvider = (function () {
 
     deleteInstructorByUserId: function (userId) {
       return _delete("/rest/v1/instructors?user_id=eq." + userId);
+    },
+
+    /**
+     * List all instructors.
+     */
+    listInstructors: function () {
+      return _get("/rest/v1/instructors?select=*,users(name)");
     },
 
     /**
@@ -198,11 +215,60 @@ var SupabaseProvider = (function () {
     },
 
     /**
+     * Update public.patients record.
+     */
+    updatePatient: function (patientId, updates) {
+      var rows = _patch(
+        "/rest/v1/patients?patient_id=eq." + patientId,
+        updates,
+      );
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Upsert patient (Create or Update based on HN).
+     * Uses Supabase upsert capability.
+     */
+    upsertPatient: function (patient) {
+      // POST with resolution=merge-duplicates and on_conflict=hn
+      var url = getSupabaseUrl() + "/rest/v1/patients?on_conflict=hn";
+      var headers = _headers();
+      headers["Prefer"] = "resolution=merge-duplicates,return=representation";
+
+      var response = UrlFetchApp.fetch(url, {
+        method: "post",
+        headers: headers,
+        payload: JSON.stringify(patient),
+        muteHttpExceptions: true,
+      });
+
+      var code = response.getResponseCode();
+      if (code < 200 || code >= 300) {
+        throw new Error(
+          "Supabase UPSERT patients returned " +
+            code +
+            ": " +
+            response.getContentText(),
+        );
+      }
+      var rows = JSON.parse(response.getContentText());
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
      * Create public.students record.
      */
     createStudent: function (student) {
+      // student object should now include academic_id if provided
       var rows = _post("/rest/v1/students", student);
       return rows[0];
+    },
+
+    getStudentByAcademicId: function (academicId) {
+      var rows = _get(
+        "/rest/v1/students?academic_id=eq." + academicId + "&select=*",
+      );
+      return rows && rows.length ? rows[0] : null;
     },
 
     /**
@@ -281,6 +347,169 @@ var SupabaseProvider = (function () {
         "/rest/v1/divisions?division_id=eq." + divisionId + "&select=*",
       );
       return rows.length > 0 ? rows[0] : null;
+    },
+
+    /**
+     * List all divisions, ordered by name.
+     * @returns {Array}
+     */
+    listDivisions: function () {
+      return _get("/rest/v1/divisions?select=*&order=name.asc");
+    },
+
+    /**
+     * Create public.divisions record.
+     */
+    createDivision: function (division) {
+      var rows = _post("/rest/v1/divisions", division);
+      return rows[0];
+    },
+
+    /**
+     * Update public.divisions record.
+     */
+    updateDivision: function (divisionId, updates) {
+      var rows = _patch(
+        "/rest/v1/divisions?division_id=eq." + divisionId,
+        updates,
+      );
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * List all floors, ordered by label.
+     * @returns {Array}
+     */
+    listFloors: function () {
+      return _get("/rest/v1/floors?select=*&order=label.asc");
+    },
+
+    /**
+     * Create public.floors record.
+     */
+    createFloor: function (payload) {
+      var rows = _post("/rest/v1/floors", payload);
+      return rows[0];
+    },
+
+    /**
+     * Update public.floors record.
+     */
+    updateFloor: function (id, payload) {
+      var rows = _patch("/rest/v1/floors?floor_id=eq." + id, payload);
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * List patients assigned to a student (checking student_id_1...5).
+     * @param {string} studentId
+     * @returns {Array}
+     */
+    listPatientsByStudent: function (studentId) {
+      // or=(student_id_1.eq.ID,student_id_2.eq.ID,...)
+      var query =
+        "student_id_1.eq." +
+        studentId +
+        "," +
+        "student_id_2.eq." +
+        studentId +
+        "," +
+        "student_id_3.eq." +
+        studentId +
+        "," +
+        "student_id_4.eq." +
+        studentId +
+        "," +
+        "student_id_5.eq." +
+        studentId;
+
+      // Select with nested joins to get Names AND Academic IDs
+      // Using !column_name to disambiguate multiple FKs to 'students'
+      var select =
+        "*" +
+        ",s1:students!student_id_1(academic_id, user:users(name))" +
+        ",s2:students!student_id_2(academic_id, user:users(name))" +
+        ",s3:students!student_id_3(academic_id, user:users(name))" +
+        ",s4:students!student_id_4(academic_id, user:users(name))" +
+        ",s5:students!student_id_5(academic_id, user:users(name))" +
+        ",inst:instructors(user:users(name))";
+
+      return _get(
+        "/rest/v1/patients?or=(" +
+          query +
+          ")&select=" +
+          select +
+          "&order=updated_at.desc",
+      );
+    },
+
+    /**
+     * List treatment records for a patient, enriched with Catalog/Step/Division info.
+     * @param {string} patientId
+     * @returns {Array}
+     */
+    listTreatmentRecords: function (patientId) {
+      var select =
+        "*" +
+        ",treatment_catalog(treatment_name,divisions(name),requirement_list(requirement_type))" +
+        ",treatment_steps(step_name)";
+
+      return _get(
+        "/rest/v1/treatment_records?patient_id=eq." +
+          patientId +
+          "&select=" +
+          select +
+          "&order=treatment_order.asc,created_at.asc",
+      );
+    },
+
+    /**
+     * Create treatment record.
+     */
+    createTreatmentRecord: function (record) {
+      var rows = _post("/rest/v1/treatment_records", record);
+      return rows[0];
+    },
+
+    /**
+     * Update treatment record.
+     */
+    updateTreatmentRecord: function (recordId, updates) {
+      var rows = _patch(
+        "/rest/v1/treatment_records?record_id=eq." + recordId,
+        updates,
+      );
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Delete treatment record.
+     */
+    deleteTreatmentRecord: function (recordId) {
+      var rows = _delete("/rest/v1/treatment_records?record_id=eq." + recordId);
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Get patient by HN.
+     * @param {string} hn
+     * @returns {Object|null}
+     */
+    getPatientByHn: function (hn) {
+      var rows = _get(
+        "/rest/v1/patients?hn=eq." + encodeURIComponent(hn) + "&select=*",
+      );
+      return rows && rows.length > 0 ? rows[0] : null;
+    },
+
+    /**
+     * Create public.patients record.
+     * @param {Object} patient
+     * @returns {Object}
+     */
+    createPatient: function (patient) {
+      var rows = _post("/rest/v1/patients", patient);
+      return rows[0];
     },
   };
 })();

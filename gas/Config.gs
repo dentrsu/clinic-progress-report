@@ -13,15 +13,29 @@
 // ──────────────────────────────────────────────
 
 function getSupabaseUrl() {
-  return PropertiesService.getScriptProperties().getProperty('SUPABASE_URL') || '';
+  return (
+    PropertiesService.getScriptProperties().getProperty("SUPABASE_URL") || ""
+  );
 }
 
 function getSupabaseKey() {
-  return PropertiesService.getScriptProperties().getProperty('SUPABASE_KEY') || '';
+  return (
+    PropertiesService.getScriptProperties().getProperty("SUPABASE_KEY") || ""
+  );
 }
 
 function getFallbackSheetId() {
-  return PropertiesService.getScriptProperties().getProperty('FALLBACK_SHEET_ID') || '';
+  return (
+    PropertiesService.getScriptProperties().getProperty("FALLBACK_SHEET_ID") ||
+    ""
+  );
+}
+
+function getPatientSheetId() {
+  return (
+    PropertiesService.getScriptProperties().getProperty("PATIENT_SHEET_ID") ||
+    ""
+  );
 }
 
 // ──────────────────────────────────────────────
@@ -29,7 +43,7 @@ function getFallbackSheetId() {
 // ──────────────────────────────────────────────
 
 /** Domain required for access */
-var ALLOWED_DOMAIN = 'rsu.ac.th';
+var ALLOWED_DOMAIN = "rsu.ac.th";
 
 /** Circuit-breaker: max consecutive Supabase failures before switching to Sheets */
 var CB_MAX_FAILURES = 3;
@@ -38,5 +52,5 @@ var CB_MAX_FAILURES = 3;
 var CB_COOLDOWN_SECONDS = 60;
 
 /** Cache keys used by FailoverProvider */
-var CACHE_KEY_FAILURE_COUNT = 'supabase_failure_count';
-var CACHE_KEY_LAST_FAILURE  = 'supabase_last_failure_ts';
+var CACHE_KEY_FAILURE_COUNT = "supabase_failure_count";
+var CACHE_KEY_LAST_FAILURE = "supabase_last_failure_ts";

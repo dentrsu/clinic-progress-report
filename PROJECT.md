@@ -1,19 +1,19 @@
 # Clinic Progress Report
 
-A web application for tracking dental student clinical progress at Rangsit University, College of Dental Medicine. Built on Google Apps Script with Supabase (PostgreSQL) as the primary database and Google Sheets as a fallback.
+A web application for tracking dental student clinical progress at Rangsit University, College of Dental Medicine. Built on Google Apps Script with Supabase (PostgreSQL) as the sole database. Google Sheets serves as a nightly backup destination.
 
 ---
 
 ## Architecture
 
 ```
-Browser UI  →  GAS Web App  →  FailoverProvider  →  Supabase (Primary)
-                                                 ↘  Google Sheets (Backup/Mirror)
+Browser UI  →  GAS Web App  →  SupabaseProvider  →  Supabase (Single Source of Truth)
+                                BackupScheduler   →  Google Sheets (Nightly Backup)
 ```
 
 - **Frontend**: HtmlService + Tailwind CSS (CDN) + Alpine.js
 - **Backend**: Google Apps Script acts as a **Backend-for-Frontend** (BFF).
-- **Dual-Write Strategy**: Writes are sent to Supabase first. If successful, they are asynchronously mirrored to Google Sheets. If Supabase fails, the app falls back to Sheets transparently.
+- **Data Strategy**: All reads and writes go directly to Supabase. A nightly scheduled trigger (`BackupScheduler.gs`) syncs all tables to Google Sheets for disaster recovery.
 
 ---
 
@@ -25,7 +25,15 @@ A dedicated interface for administrators to manage users.
 
 - **User Management**: Create, Read, Update, Delete (CRUD) for all user roles.
 - **Role Switching**: Seamlessly migrate users between 'Student' and 'Instructor' roles (automatically handles underlying data records).
-- **Failover-Ready**: Admin actions work even if Supabase is down (writing to Sheets only), and sync when the primary DB recovers (manual sync required currently).
+- **Student Portal**:
+  - Dashboard with "My Patients" and "Referred Patients".
+  - **Patient Management**: Detail modal to edit patient info and assign students (using Academic ID or Name).
+  - **Treatment Plans**: Dedicated page for viewing/managing treatment records (in progress).
+- **Admin Console**:
+  - Manage Users (Students/Instructors).
+  - **Academic ID Support**: Manage Real-world Student IDs.
+  - System Health Check.
+- **Nightly Backup**: All Supabase tables are automatically synced to Google Sheets at midnight via a GAS time-based trigger.
 - **Security**: Access restricted to users with `role: admin`.
 
 ---
@@ -51,9 +59,9 @@ clinic-progress-report/
 ├── gas/                        # Google Apps Script project
 │   ├── Code.gs                 # Entry point: doGet(), auth, profile API
 │   ├── Config.gs               # Script Properties helpers, constants
-│   ├── SupabaseProvider.gs     # Supabase REST API wrapper
-│   ├── SheetsProvider.gs       # Google Sheets fallback provider
-│   ├── FailoverProvider.gs     # Circuit breaker + health check
+│   ├── SupabaseProvider.gs     # Supabase REST API wrapper (sole data provider)
+│   ├── BackupScheduler.gs      # Nightly Supabase → Sheets backup + trigger mgmt
+│   ├── SheetsProvider.gs       # Google Sheets helper (used by BackupScheduler)
 │   ├── landing.html            # Landing page (Tailwind + Alpine.js)
 │   └── styles.html             # Shared CSS design tokens
 ├── database-context.md         # Database schema documentation
@@ -74,15 +82,24 @@ Access is restricted to **@rsu.ac.th** Google accounts only.
 
 ---
 
-## Failover Mechanism
+## Nightly Backup
 
-The app uses a **circuit breaker** pattern:
+A scheduled trigger runs `backupAllTablesToSheets()` daily at midnight:
 
-1. **Closed** (normal) — all requests go to Supabase
-2. **Open** (outage) — after 3 consecutive failures, switches to Sheets for 60 seconds
-3. **Half-open** — after cooldown, tries Supabase again; resets on success
+| Table               | Backed Up |
+| ------------------- | --------- |
+| `users`             | ✅        |
+| `students`          | ✅        |
+| `instructors`       | ✅        |
+| `divisions`         | ✅        |
+| `floors`            | ✅        |
+| `patients`          | ✅        |
+| `treatment_records` | ✅        |
 
-State is stored in `CacheService.getScriptCache()` (shared across all users).
+- Each table is written to a dedicated sheet in the fallback spreadsheet.
+- Pagination handles tables with >1000 rows.
+- Run `setupNightlyBackupTrigger()` once from the GAS editor to activate.
+- Run `removeNightlyBackupTrigger()` to deactivate.
 
 ---
 
@@ -93,7 +110,7 @@ State is stored in `CacheService.getScriptCache()` (shared across all users).
 - A Google Workspace account with `@rsu.ac.th` domain
 - [Node.js](https://nodejs.org/) installed (for clasp)
 - A Supabase project with the schema from `database-context.md`
-- A Google Spreadsheet for fallback (with sheets: `users`, `students`, `instructors`, `divisions`)
+- A Google Spreadsheet for nightly backups (sheets are created automatically by BackupScheduler)
 
 ### 1. Install clasp
 
@@ -146,16 +163,12 @@ In the Apps Script editor (`script.google.com`), go to **Project Settings → Sc
    - **Who has access:** Anyone within your organization (RSU)
 4. Click **Deploy** and copy the URL
 
-### 6. Set up the fallback spreadsheet
+### 6. Set up nightly backup
 
-Create a Google Spreadsheet with these sheets (one per table):
-
-| Sheet Name    | Required Columns                                                              |
-| ------------- | ----------------------------------------------------------------------------- |
-| `users`       | `user_id`, `email`, `name`, `role`, `status`                                  |
-| `students`    | `student_id`, `user_id`, `first_clinic_year`, `floor_id`, `unit_id`, `status` |
-| `instructors` | `instructor_id`, `user_id`, `division_id`, `teamleader_role`, `status`        |
-| `divisions`   | `division_id`, `code`, `name`                                                 |
+1. Create an empty Google Spreadsheet (sheets will be auto-created by the backup)
+2. Add its ID as `FALLBACK_SHEET_ID` in Script Properties
+3. In the GAS editor, run `setupNightlyBackupTrigger()` once
+4. Optionally run `backupAllTablesToSheets()` to verify the first backup
 
 ---
 
@@ -172,12 +185,12 @@ For separate dev/prod environments, create two GAS deployments and maintain sepa
 
 ## Limitations & Best Practices
 
-| Constraint                   | Mitigation                                                  |
-| ---------------------------- | ----------------------------------------------------------- |
-| GAS 6-min execution limit    | Paginate large queries; avoid bulk operations               |
-| GAS quota limits             | Cache repeated reads; batch API calls                       |
-| Concurrent writes            | Use `LockService` for critical sections (e.g., outbox sync) |
-| Sheets row limit (10M cells) | Keep Sheets as a lightweight mirror, not a complete replica |
+| Constraint                   | Mitigation                                                   |
+| ---------------------------- | ------------------------------------------------------------ |
+| GAS 6-min execution limit    | Paginate large queries; avoid bulk operations                |
+| GAS quota limits             | Cache repeated reads; batch API calls                        |
+| Supabase is sole data source | Nightly backup to Sheets provides disaster recovery          |
+| Sheets row limit (10M cells) | Backup is a snapshot, not a live mirror; manageable at scale |
 
 ---
 

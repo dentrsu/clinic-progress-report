@@ -48,14 +48,34 @@ var FailoverProvider = (function () {
     _setFailureCount(0);
   }
 
+  // ──────────────────────────────────────────────
+  //  Maintenance Mode
+  // ──────────────────────────────────────────────
+
+  function getMaintenanceMode() {
+    return (
+      PropertiesService.getScriptProperties().getProperty(
+        "MAINTENANCE_MODE",
+      ) === "true"
+    );
+  }
+
+  function setMaintenanceMode(enabled) {
+    PropertiesService.getScriptProperties().setProperty(
+      "MAINTENANCE_MODE",
+      String(enabled),
+    );
+  }
+
   /**
    * Determine current circuit state.
    * @returns {'closed'|'open'|'half-open'}
-   *   closed    = Supabase is healthy, use it
-   *   open      = too many failures, use Sheets
-   *   half-open = cooldown expired, try Supabase again
    */
   function _circuitState() {
+    // 1. Forced Maintenance Mode?
+    if (getMaintenanceMode()) return "open";
+
+    // 2. Normal Circuit Breaker Logic
     var failures = _getFailureCount();
     if (failures < CB_MAX_FAILURES) return "closed";
 
@@ -168,6 +188,7 @@ var FailoverProvider = (function () {
       return {
         source: "sheets",
         data: SheetsProvider[methodName].apply(null, args),
+        error: e.message, // Bubble up error
       };
     }
   }
@@ -186,6 +207,9 @@ var FailoverProvider = (function () {
     getStudentByUserId: function (userId) {
       return _call("getStudentByUserId", [userId]);
     },
+    getStudentByAcademicId: function (academicId) {
+      return _call("getStudentByAcademicId", [academicId]);
+    },
     getInstructorByUserId: function (userId) {
       return _call("getInstructorByUserId", [userId]);
     },
@@ -194,6 +218,9 @@ var FailoverProvider = (function () {
     },
     listUsers: function () {
       return _call("listUsers", []);
+    },
+    listInstructors: function () {
+      return _call("listInstructors", []);
     },
 
     // Writes (Dual Write / Fallback)
@@ -218,6 +245,75 @@ var FailoverProvider = (function () {
       return _dualWrite("updateInstructor", [id, data]);
     },
 
+    // Divisions
+    listDivisions: function () {
+      return _call("listDivisions", []);
+    },
+
+    createDivision: function (division) {
+      if (!division.division_id) division.division_id = Utilities.getUuid();
+      return _dualWrite("createDivision", [division]);
+    },
+
+    updateDivision: function (id, division) {
+      return _dualWrite("updateDivision", [id, division]);
+    },
+
+    // Floors
+    listFloors: function () {
+      return _call("listFloors", []);
+    },
+
+    createFloor: function (floor) {
+      if (!floor.floor_id) floor.floor_id = Utilities.getUuid();
+      return _dualWrite("createFloor", [floor]);
+    },
+
+    updateFloor: function (id, floor) {
+      return _dualWrite("updateFloor", [id, floor]);
+    },
+
+    // Patients
+    getPatientByHn: function (hn) {
+      return _call("getPatientByHn", [hn]);
+    },
+
+    createPatient: function (patient) {
+      if (!patient.patient_id) patient.patient_id = Utilities.getUuid();
+      return _dualWrite("createPatient", [patient]);
+    },
+
+    updatePatient: function (id, updates) {
+      return _dualWrite("updatePatient", [id, updates]);
+    },
+
+    upsertPatient: function (patient) {
+      if (!patient.patient_id) patient.patient_id = Utilities.getUuid();
+      return _dualWrite("upsertPatient", [patient]);
+    },
+
+    listPatientsByStudent: function (studentId) {
+      return _call("listPatientsByStudent", [studentId]);
+    },
+
+    // Treatment Records
+    listTreatmentRecords: function (patientId) {
+      return _call("listTreatmentRecords", [patientId]);
+    },
+
+    createTreatmentRecord: function (record) {
+      if (!record.record_id) record.record_id = Utilities.getUuid();
+      return _dualWrite("createTreatmentRecord", [record]);
+    },
+
+    updateTreatmentRecord: function (id, updates) {
+      return _dualWrite("updateTreatmentRecord", [id, updates]);
+    },
+
+    deleteTreatmentRecord: function (id) {
+      return _dualWrite("deleteTreatmentRecord", [id]);
+    },
+
     /**
      * Special handling for Auth User creation.
      * Sheets doesn't have an Auth table, so we simulate an ID if Supabase is down.
@@ -233,6 +329,11 @@ var FailoverProvider = (function () {
         } catch (e) {
           _recordFailure();
           Logger.log("Failover: createAuthUser failed: " + e.message);
+          return {
+            source: "sheets",
+            data: { id: Utilities.getUuid(), email: email, mocked: true },
+            error: e.message, // Bubble up error
+          };
         }
       }
 
@@ -240,6 +341,7 @@ var FailoverProvider = (function () {
       return {
         source: "sheets",
         data: { id: Utilities.getUuid(), email: email, mocked: true },
+        error: state === "open" ? "Circuit is OPEN" : null,
       };
     },
 
@@ -304,14 +406,26 @@ var FailoverProvider = (function () {
      * @returns {{ healthy: boolean, source: string }}
      */
     healthCheck: function () {
+      var maintenance = getMaintenanceMode();
+      if (maintenance) {
+        return { healthy: true, source: "sheets", maintenance: true };
+      }
+
       try {
         var ok = SupabaseProvider.ping();
         if (ok) _resetCircuit();
-        return { healthy: ok, source: ok ? "supabase" : "sheets" };
+        return {
+          healthy: ok,
+          source: ok ? "supabase" : "sheets",
+          maintenance: false,
+        };
       } catch (e) {
         _recordFailure();
-        return { healthy: false, source: "sheets" };
+        return { healthy: false, source: "sheets", maintenance: false };
       }
     },
+
+    getMaintenanceMode: getMaintenanceMode,
+    setMaintenanceMode: setMaintenanceMode,
   };
 })();

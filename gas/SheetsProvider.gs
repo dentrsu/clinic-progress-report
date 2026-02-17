@@ -206,6 +206,10 @@ var SheetsProvider = (function () {
       return _findOne("students", "user_id", userId);
     },
 
+    getStudentByAcademicId: function (academicId) {
+      return _findOne("students", "academic_id", academicId);
+    },
+
     /**
      * Get instructor record by user_id.
      * Enriches with division data if division_id exists.
@@ -236,6 +240,13 @@ var SheetsProvider = (function () {
       return _findOne("divisions", "division_id", divisionId);
     },
 
+    /**
+     * List all divisions.
+     */
+    listDivisions: function () {
+      return _readAll("divisions");
+    },
+
     // ──────────────────────────────────────────────
     //  Write Interface (Mirrors Supabase)
     // ──────────────────────────────────────────────
@@ -243,6 +254,15 @@ var SheetsProvider = (function () {
     /**
      * Create public.users record.
      */
+    createAuthUser: function (email, password, meta) {
+      // Mock Auth creation provided by Sheets logic (no actual auth)
+      return {
+        id: Utilities.getUuid(),
+        email: email,
+        ...meta,
+      };
+    },
+
     createUser: function (user) {
       return _append("users", user);
     },
@@ -256,8 +276,13 @@ var SheetsProvider = (function () {
 
     /**
      * Create public.students record.
+     * Prevents duplicates by checking user_id key.
      */
     createStudent: function (student) {
+      var existing = _findOne("students", "user_id", student.user_id);
+      if (existing) {
+        return _update("students", "user_id", student.user_id, student);
+      }
       return _append("students", student);
     },
 
@@ -270,9 +295,26 @@ var SheetsProvider = (function () {
 
     /**
      * Create public.instructors record.
+     * Prevents duplicates by checking user_id key.
      */
     createInstructor: function (instructor) {
+      var existing = _findOne("instructors", "user_id", instructor.user_id);
+      if (existing) {
+        return _update(
+          "instructors",
+          "user_id",
+          instructor.user_id,
+          instructor,
+        );
+      }
       return _append("instructors", instructor);
+    },
+
+    /**
+     * List all instructors.
+     */
+    listInstructors: function () {
+      return _readAll("instructors");
     },
 
     /**
@@ -280,6 +322,42 @@ var SheetsProvider = (function () {
      */
     updateInstructor: function (instructorId, updates) {
       return _update("instructors", "instructor_id", instructorId, updates);
+    },
+
+    /**
+     * Create public.divisions record.
+     */
+    createDivision: function (division) {
+      return _append("divisions", division);
+    },
+
+    /**
+     * Update public.divisions record.
+     */
+    updateDivision: function (divisionId, updates) {
+      return _update("divisions", "division_id", divisionId, updates);
+    },
+
+    // Floors
+    /**
+     * List all floors.
+     */
+    listFloors: function () {
+      return _readAll("floors");
+    },
+
+    /**
+     * Create public.floors record.
+     */
+    createFloor: function (payload) {
+      return _append("floors", payload);
+    },
+
+    /**
+     * Update public.floors record.
+     */
+    updateFloor: function (id, payload) {
+      return _update("floors", "floor_id", id, payload);
     },
 
     /**
@@ -308,6 +386,94 @@ var SheetsProvider = (function () {
      */
     deleteInstructorByUserId: function (userId) {
       return _delete("instructors", "user_id", userId);
+    },
+    /**
+     * Get patient by HN.
+     * @param {string} hn
+     * @returns {Object|null}
+     */
+    getPatientByHn: function (hn) {
+      return (
+        _findOne("patients", "hn", hn) ||
+        _findOne("patients", "HN", hn) ||
+        _findOne("patients", "Hn", hn)
+      );
+    },
+
+    /**
+     * Create public.patients record.
+     */
+    createPatient: function (patient) {
+      var existing = _findOne("patients", "hn", patient.hn);
+      if (existing) {
+        return _update("patients", "hn", patient.hn, patient);
+      }
+      return _append("patients", patient);
+    },
+
+    /**
+     * Update public.patients record.
+     */
+    updatePatient: function (patientId, updates) {
+      return _update("patients", "patient_id", patientId, updates);
+    },
+
+    /**
+     * Upsert patient.
+     */
+    upsertPatient: function (patient) {
+      var existing = _findOne("patients", "hn", patient.hn);
+      if (existing) {
+        // Merge updates into existing
+        return _update("patients", "hn", patient.hn, patient);
+      }
+      return _append("patients", patient);
+    },
+
+    /**
+     * List patients assigned to a student.
+     * @param {string} studentId
+     * @returns {Array}
+     */
+    listPatientsByStudent: function (studentId) {
+      var all = _readAll("patients");
+      if (!all || all.length === 0) return [];
+
+      return all.filter(function (p) {
+        return (
+          p.student_id_1 === studentId ||
+          p.student_id_2 === studentId ||
+          p.student_id_3 === studentId ||
+          p.student_id_4 === studentId ||
+          p.student_id_5 === studentId
+        );
+      });
+    },
+
+    // ──────────────────────────────────────────────
+    //  Treatment Records
+    // ──────────────────────────────────────────────
+
+    listTreatmentRecords: function (patientId) {
+      // returns raw rows. Joins are NOT implemented here for performance.
+      // Frontend must handle missing enriched data or Service layer must enrich.
+      var all = _readAll("treatment_records");
+      return all.filter(function (r) {
+        return r.patient_id === patientId;
+      });
+    },
+
+    createTreatmentRecord: function (record) {
+      if (!record.record_id) record.record_id = Utilities.getUuid();
+      return _append("treatment_records", record);
+    },
+
+    updateTreatmentRecord: function (recordId, updates) {
+      return _update("treatment_records", "record_id", recordId, updates);
+    },
+
+    deleteTreatmentRecord: function (recordId) {
+      return _delete("treatment_records", "record_id", recordId);
     },
   };
 })();

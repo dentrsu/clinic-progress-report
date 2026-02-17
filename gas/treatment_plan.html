@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:      { DEFAULT: '#1B2A4A', light: '#2A3E66' },
+            gold:      { DEFAULT: '#C4972F', light: '#D4AD4E' },
+            surface:   '#F8F7F4',
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+        },
+      },
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <?!= include('styles') ?>
+</head>
+<body class="bg-surface min-h-screen p-6">
+
+  <div x-data="treatmentApp()" x-init="init()">
+    <!-- Header -->
+    <div class="max-w-6xl mx-auto mb-8 flex justify-between items-center">
+      <div class="flex items-center gap-4">
+        <a href="<?= appDevUrl ?>" class="p-2 rounded-full bg-white shadow-sm text-gray-400 hover:text-navy hover:bg-gray-50 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </a>
+        <div>
+          <h1 class="text-2xl font-bold text-navy">Treatment Plan</h1>
+          <template x-if="patient">
+            <div class="flex items-center gap-3 text-sm text-gray-500 mt-1">
+               <span class="font-medium text-gray-800" x-text="patient.name"></span>
+               <span class="w-1 h-1 rounded-full bg-gray-300"></span>
+               <span class="font-mono">HN: <span x-text="patient.hn"></span></span>
+            </div>
+          </template>
+        </div>
+      </div>
+      
+      <!-- Add Button -->
+      <button @click="openAddModal()" class="btn-primary flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Add Treatment
+      </button>
+    </div>
+
+    <!-- Content -->
+    <div class="max-w-6xl mx-auto">
+      
+      <!-- Loading -->
+      <div x-show="loading" class="py-12 text-center">
+        <div class="spinner mx-auto mb-3"></div>
+        <p class="text-sm text-gray-400">Loading records...</p>
+      </div>
+
+      <!-- Error Message -->
+      <template x-if="errorMsg">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-4" x-text="errorMsg"></div>
+      </template>
+
+      <!-- Table -->
+      <div x-show="!loading" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+        <table class="w-full text-sm text-left">
+          <thead class="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+            <tr>
+              <th class="px-4 py-3 w-16 text-center">#</th>
+              <th class="px-4 py-3 w-20">Area</th>
+              <th class="px-4 py-3">Treatment / Step</th>
+              <th class="px-4 py-3">Division</th>
+              <th class="px-4 py-3">Type</th>
+              <th class="px-4 py-3 w-32">Start</th>
+              <th class="px-4 py-3 w-32">Complete</th>
+              <th class="px-4 py-3 w-24 text-center">Status</th>
+              <th class="px-4 py-3 w-16"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="r in records" :key="r.record_id">
+              <tr class="hover:bg-gray-50/50 transition-colors group">
+                <td class="px-4 py-3 text-center text-gray-400 font-mono" x-text="r.treatment_order || '-'"></td>
+                <td class="px-4 py-3 font-semibold text-navy" x-text="r.area || '-'"></td>
+                <td class="px-4 py-3">
+                  <div class="font-medium text-gray-800" x-text="r.treatment_catalog ? r.treatment_catalog.treatment_name : 'Unknown'"></div>
+                  <div class="text-xs text-gray-400 mt-0.5" x-text="r.treatment_steps ? r.treatment_steps.step_name : (r.step_id ? 'Step ID: ' + r.step_id : 'No Step')"></div>
+                </td>
+                <td class="px-4 py-3 text-gray-500" x-text="r.treatment_catalog && r.treatment_catalog.divisions ? r.treatment_catalog.divisions.name : '-'"></td>
+                <td class="px-4 py-3 text-gray-500" x-text="r.treatment_catalog && r.treatment_catalog.requirement_list ? r.treatment_catalog.requirement_list.requirement_type : '-'"></td>
+                
+                <td class="px-4 py-3 text-gray-500 font-mono text-xs" x-text="formatDate(r.start_date)"></td>
+                <td class="px-4 py-3 text-gray-500 font-mono text-xs" x-text="formatDate(r.complete_date)"></td>
+                
+                <td class="px-4 py-3 text-center">
+                   <span class="px-2 py-1 rounded-full text-[0.65rem] font-bold uppercase tracking-wide"
+                         :class="{
+                           'bg-gray-100 text-gray-500': r.status === 'planned',
+                           'bg-blue-50 text-blue-600': r.status === 'in_progress',
+                           'bg-emerald-50 text-emerald-600': r.status === 'completed' || r.status === 'verified'
+                         }"
+                         x-text="r.status"></span>
+                </td>
+                <td class="px-4 py-3 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button class="text-gray-400 hover:text-navy p-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                  </button>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="records.length === 0">
+              <td colspan="9" class="py-12 text-center text-gray-400 italic">No treatment records found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function treatmentApp() {
+      return {
+        loading: true,
+        hn: '',
+        patient: null,
+        records: [],
+        errorMsg: '',
+
+        init: function() {
+          // Use GAS client-side API to get URL parameters
+          // (window.location.search doesn't work inside GAS iframe)
+          var self = this;
+          google.script.url.getLocation(function(location) {
+            console.log("[TP] Location:", location);
+            self.hn = location.parameter.hn || '';
+            console.log("[TP] HN:", self.hn);
+
+            if (!self.hn) {
+              self.errorMsg = "No HN specified. Please go back and try again.";
+              self.loading = false;
+              return;
+            }
+
+            // Fetch data
+            google.script.run
+              .withSuccessHandler(function(res) {
+                console.log("[TP] Data received:", res);
+                self.patient = res.patient;
+                self.records = res.records || [];
+                self.loading = false;
+              })
+              .withFailureHandler(function(err) {
+                console.error("[TP] Error:", err);
+                self.errorMsg = "Error loading data: " + (err.message || err);
+                self.loading = false;
+              })
+              .studentGetTreatmentPlan(self.hn);
+          });
+        },
+
+        formatDate: function(d) {
+          if (!d) return '-';
+          return new Date(d).toLocaleDateString('th-TH');
+        },
+        
+        openAddModal: function() {
+          alert("Add/Edit Feature: Coming Soon (Requires Catalog Selection UI)");
+        }
+      }
+    }
+  </script>
+</body>
+</html>
