@@ -762,29 +762,11 @@
                this.showErrorModal("Cannot view treatment plan: Patient HN is missing.");
                return;
             }
-            this.tpModalOpen = true;
-            this.tpLoading = true;
-            this.tpPatient = null;
-            this.tpRecords = [];
-            this.tpError = '';
-            this.editModalOpen = false;
-            google.script.run
-              .withSuccessHandler((res) => {
-                 console.log('[TP] Result:', res);
-                 if (!res) {
-                    this.tpError = 'No data returned from server.';
-                    this.tpLoading = false;
-                    return;
-                 }
-                 this.tpPatient = res.patient;
-                 this.tpRecords = res.records || [];
-                 this.tpLoading = false;
-              })
-              .withFailureHandler((err) => {
-                 this.tpError = err.message || 'Failed to load treatment plan';
-                 this.tpLoading = false;
-              })
-              .studentGetTreatmentPlan(hn);
+            // Navigate to standalone treatment_plan page
+            // Detect current base URL to use /dev or /exec accordingly
+            var baseUrl = '<?= appDevUrl ?>';
+            var url = baseUrl + '?page=treatment_plan&hn=' + encodeURIComponent(hn);
+            window.top.location.href = url;
          },
 
          formatDate(d) {

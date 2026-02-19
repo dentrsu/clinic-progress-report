@@ -21,6 +21,7 @@ create extension if not exists "pgcrypto";
 -- user_role: student, instructor, admin
 -- record_status: planned, in_progress, completed, verified, rejected, void
 create type public.record_status as enum ('planned', 'in_progress', 'completed', 'verified', 'rejected', 'void');
+-- treatment_phase_order: 1=Systemic, 2=Acute, 3=Disease Control, 4=Definitive, 5=Maintenance
 -- patient_status: active, inactive, archived
 create type public.patient_status as enum (
   'Waiting to Be Assigned',
@@ -65,7 +66,14 @@ create table public.instructors (
   division_id uuid references public.divisions(division_id)
 );
 
--- 2. Clinical Catalog
+-- 2. Treatment Phases (lookup / ordering)
+create table public.treatment_phases (
+  phase_id uuid primary key default gen_random_uuid(),
+  phase_order integer not null unique,   -- 1–5 ascending
+  phase_name text not null unique
+);
+
+-- 3. Clinical Catalog
 create table public.treatment_catalog (
   treatment_id uuid primary key default gen_random_uuid(),
   division_id uuid not null references public.divisions(division_id),
@@ -80,15 +88,21 @@ create table public.treatment_steps (
   unique (treatment_id, step_id) -- Required for composite FK validation
 );
 
--- 3. Execution (The Workhorse)
+-- 4. Execution (The Workhorse)
 create table public.treatment_records (
   record_id uuid primary key default gen_random_uuid(),
   patient_id uuid not null references public.patients(patient_id),
   student_id uuid references public.students(student_id),
+  phase_id uuid references public.treatment_phases(phase_id), -- Treatment phase for ordering
   treatment_id uuid references public.treatment_catalog(treatment_id),
   step_id uuid,
   status public.record_status not null default 'planned',
   rsu_units numeric,
+  cda_units numeric,
+  severity numeric,                                  -- PERIO division
+  book_number numeric,                               -- OPER division
+  page_number numeric,                               -- OPER division
+  requirement_id uuid references public.requirement_list(requirement_id), -- Linked requirement
   verified_by uuid references public.users(user_id), -- The Instructor's user_id
 
   -- Validation: Step MUST belong to the Treatment
@@ -106,6 +120,7 @@ create table public.treatment_records (
 ### A. Data Integrity
 
 - **Composite Validation:** A `treatment_record` cannot have a `step_id` that belongs to a different `treatment_id`. This is enforced at the DB level via `fk_treatment_step_validation`.
+- **Treatment Phase Ordering:** Every treatment record can be assigned a `phase_id` from `treatment_phases`. Phases are sorted by `phase_order` (1 = Systemic → 5 = Maintenance) to define the treatment plan sequence.
 - **User Provisioning:** The `public.users` table is automatically populated via a database trigger (`handle_new_user`) when a user signs up through Supabase Auth.
 
 ### B. Security & Access Control (RLS)

@@ -18,6 +18,7 @@ var BACKUP_TABLES = [
   { name: "divisions", key: "division_id" },
   { name: "floors", key: "floor_id" },
   { name: "patients", key: "patient_id" },
+  { name: "treatment_phases", key: "phase_id" },
   { name: "treatment_records", key: "record_id" },
 ];
 

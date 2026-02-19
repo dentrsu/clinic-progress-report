@@ -60,6 +60,8 @@ division_id uuid NOT NULL,
 requirement_type text NOT NULL,
 minimum_rsu numeric,
 minimum_cda numeric,
+rsu_unit text DEFAULT 'Case',
+cda_unit text DEFAULT 'Case',
 CONSTRAINT requirement_list_pkey PRIMARY KEY (requirement_id),
 CONSTRAINT requirement_list_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(division_id)
 );
@@ -81,6 +83,13 @@ CONSTRAINT students_floor_id_fkey FOREIGN KEY (floor_id) REFERENCES public.floor
 CONSTRAINT students_tl1_fkey FOREIGN KEY (team_leader_1_id) REFERENCES public.instructors(instructor_id),
 CONSTRAINT students_tl2_fkey FOREIGN KEY (team_leader_2_id) REFERENCES public.instructors(instructor_id)
 );
+CREATE TABLE public.treatment_phases (
+phase_id uuid NOT NULL DEFAULT gen_random_uuid(),
+phase_order integer NOT NULL UNIQUE,
+phase_name text NOT NULL UNIQUE,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+CONSTRAINT treatment_phases_pkey PRIMARY KEY (phase_id)
+);
 CREATE TABLE public.treatment_catalog (
 treatment_id uuid NOT NULL DEFAULT gen_random_uuid(),
 division_id uuid NOT NULL,
@@ -95,10 +104,15 @@ record_id uuid NOT NULL DEFAULT gen_random_uuid(),
 patient_id uuid NOT NULL,
 student_id uuid,
 division_id uuid NOT NULL,
+phase_id uuid,
 treatment_id uuid,
 step_id uuid,
 status USER-DEFINED NOT NULL DEFAULT 'planned'::record_status,
 rsu_units numeric,
+cda_units numeric,
+severity numeric,
+book_number numeric,
+page_number numeric,
 instructor_id uuid,
 verified_at timestamp with time zone,
 verified_by uuid,
@@ -108,6 +122,7 @@ CONSTRAINT treatment_records_pkey PRIMARY KEY (record_id),
 CONSTRAINT treatment_records_patient_id_fkey FOREIGN KEY (patient_id) REFERENCES public.patients(patient_id),
 CONSTRAINT treatment_records_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(student_id),
 CONSTRAINT treatment_records_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(division_id),
+CONSTRAINT treatment_records_phase_id_fkey FOREIGN KEY (phase_id) REFERENCES public.treatment_phases(phase_id),
 CONSTRAINT treatment_records_treatment_id_fkey FOREIGN KEY (treatment_id) REFERENCES public.treatment_catalog(treatment_id),
 CONSTRAINT treatment_records_instructor_id_fkey FOREIGN KEY (instructor_id) REFERENCES public.instructors(instructor_id),
 CONSTRAINT treatment_records_verified_by_fkey FOREIGN KEY (verified_by) REFERENCES public.users(user_id),

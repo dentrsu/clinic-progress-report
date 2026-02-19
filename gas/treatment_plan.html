@@ -20,14 +20,29 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <?!= include('styles') ?>
+  <style>
+    [x-cloak] { display: none !important; }
+    .modal-backdrop { background: rgba(27,42,74,0.45); backdrop-filter: blur(4px); }
+    .modal-panel { animation: slideUp 0.3s ease-out; }
+    @keyframes slideUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+    select, input[type="date"], input[type="number"], input[type="text"] {
+      font-size: 0.875rem;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #e5e5e0;
+      border-radius: 0.5rem;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+    select:focus, input:focus { outline: none; border-color: #1B2A4A; box-shadow: 0 0 0 2px rgba(27,42,74,0.08); }
+  </style>
 </head>
 <body class="bg-surface min-h-screen p-6">
 
   <div x-data="treatmentApp()" x-init="init()">
     <!-- Header -->
-    <div class="max-w-6xl mx-auto mb-8 flex justify-between items-center">
+    <div class="max-w-7xl mx-auto mb-6 flex justify-between items-center">
       <div class="flex items-center gap-4">
-        <a href="<?= appDevUrl ?>" class="p-2 rounded-full bg-white shadow-sm text-gray-400 hover:text-navy hover:bg-gray-50 transition">
+        <a :href="backUrl" class="p-2 rounded-full bg-white shadow-sm text-gray-400 hover:text-navy hover:bg-gray-50 transition">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
         </a>
         <div>
@@ -43,14 +58,15 @@
       </div>
       
       <!-- Add Button -->
-      <button @click="openAddModal()" class="btn-primary flex items-center gap-2">
+      <!-- Only show for students (or admins/others, but definitely hide for instructor) -->
+      <button x-show="!currentUser || currentUser.role !== 'instructor'" @click="openModal(null)" class="btn-primary flex items-center gap-2 px-4 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition shadow-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         Add Treatment
       </button>
     </div>
 
     <!-- Content -->
-    <div class="max-w-6xl mx-auto">
+    <div class="max-w-7xl mx-auto">
       
       <!-- Loading -->
       <div x-show="loading" class="py-12 text-center">
@@ -63,60 +79,373 @@
         <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-4" x-text="errorMsg"></div>
       </template>
 
+      <!-- Success Toast -->
+      <div x-show="successMsg" x-transition class="fixed top-6 right-6 z-50 bg-emerald-500 text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <span x-text="successMsg"></span>
+      </div>
+
       <!-- Table -->
       <div x-show="!loading" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
         <table class="w-full text-sm text-left">
           <thead class="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
-            <tr>
-              <th class="px-4 py-3 w-16 text-center">#</th>
-              <th class="px-4 py-3 w-20">Area</th>
-              <th class="px-4 py-3">Treatment / Step</th>
-              <th class="px-4 py-3">Division</th>
-              <th class="px-4 py-3">Type</th>
-              <th class="px-4 py-3 w-32">Start</th>
-              <th class="px-4 py-3 w-32">Complete</th>
-              <th class="px-4 py-3 w-24 text-center">Status</th>
-              <th class="px-4 py-3 w-16"></th>
+            <tr class="cursor-pointer" @click="toggleActionRow('header')">
+              <th class="px-3 py-3 w-12 text-center">#</th>
+
+              <th class="px-3 py-3 w-20">Area</th>
+              <th class="px-3 py-3 w-32">Treatment / Step</th>
+              <th class="px-3 py-3 w-20">Student</th>
+              <th class="px-3 py-3 w-28">Start</th>
+              <th class="px-3 py-3 w-28">Complete</th>
+              <th class="px-3 py-3 w-24 text-center">Status</th>
+            </tr>
+            <!-- Header action row -->
+            <tr x-show="activeActionRow === 'header'" x-cloak>
+              <td colspan="7" class="px-3 py-2 bg-blue-50/50">
+                <div class="flex gap-2">
+                  <button x-show="!currentUser || currentUser.role !== 'instructor'" @click.stop="openModal(null)" class="px-3 py-1.5 bg-navy text-white text-xs font-medium rounded-md hover:bg-navy-light transition flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Insert New Treatment
+                  </button>
+                  <button @click.stop class="px-3 py-1.5 bg-gray-100 text-gray-500 text-xs font-medium rounded-md hover:bg-gray-200 transition flex items-center gap-1 cursor-not-allowed opacity-50" title="Coming soon">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Treatment Approval Request
+                  </button>
+                </div>
+              </td>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
-            <template x-for="r in records" :key="r.record_id">
-              <tr class="hover:bg-gray-50/50 transition-colors group">
-                <td class="px-4 py-3 text-center text-gray-400 font-mono" x-text="r.treatment_order || '-'"></td>
-                <td class="px-4 py-3 font-semibold text-navy" x-text="r.area || '-'"></td>
-                <td class="px-4 py-3">
-                  <div class="font-medium text-gray-800" x-text="r.treatment_catalog ? r.treatment_catalog.treatment_name : 'Unknown'"></div>
-                  <div class="text-xs text-gray-400 mt-0.5" x-text="r.treatment_steps ? r.treatment_steps.step_name : (r.step_id ? 'Step ID: ' + r.step_id : 'No Step')"></div>
-                </td>
-                <td class="px-4 py-3 text-gray-500" x-text="r.treatment_catalog && r.treatment_catalog.divisions ? r.treatment_catalog.divisions.name : '-'"></td>
-                <td class="px-4 py-3 text-gray-500" x-text="r.treatment_catalog && r.treatment_catalog.requirement_list ? r.treatment_catalog.requirement_list.requirement_type : '-'"></td>
-                
-                <td class="px-4 py-3 text-gray-500 font-mono text-xs" x-text="formatDate(r.start_date)"></td>
-                <td class="px-4 py-3 text-gray-500 font-mono text-xs" x-text="formatDate(r.complete_date)"></td>
-                
-                <td class="px-4 py-3 text-center">
-                   <span class="px-2 py-1 rounded-full text-[0.65rem] font-bold uppercase tracking-wide"
-                         :class="{
-                           'bg-gray-100 text-gray-500': r.status === 'planned',
-                           'bg-blue-50 text-blue-600': r.status === 'in_progress',
-                           'bg-emerald-50 text-emerald-600': r.status === 'completed' || r.status === 'verified'
-                         }"
-                         x-text="r.status"></span>
-                </td>
-                <td class="px-4 py-3 text-right opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button class="text-gray-400 hover:text-navy p-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                  </button>
-                </td>
-              </tr>
-            </template>
-            <tr x-show="records.length === 0">
-              <td colspan="9" class="py-12 text-center text-gray-400 italic">No treatment records found.</td>
+          <template x-for="(r, idx) in records" :key="r.record_id">
+            <tbody class="border-b border-gray-100">
+                <!-- Phase Header -->
+                <tr x-show="idx === 0 || (r.phase_id !== (records[idx-1] && records[idx-1].phase_id))" class="bg-gray-50 border-b border-gray-100">
+                  <td colspan="7" class="px-4 py-2 text-xs font-bold text-navy uppercase tracking-wide">
+                    <span x-text="r.treatment_phases ? r.treatment_phases.phase_name : 'No Phase'"></span>
+                  </td>
+                </tr>
+                <!-- Data Row -->
+                <tr class="hover:bg-gray-50/50 transition-colors cursor-pointer group" @click="toggleActionRow(r.record_id)">
+                  <td class="px-3 py-3 text-center text-gray-400 font-mono text-xs" x-text="r.treatment_order || (idx+1)"></td>
+                  <!-- Phase removed -->
+                  <td class="px-3 py-3 font-semibold text-navy text-xs" x-text="r.area || '-'"></td>
+                  <td class="px-3 py-3">
+                    <div class="font-medium text-gray-800 text-sm" x-text="r.treatment_catalog ? r.treatment_catalog.treatment_name : '-'"></div>
+                    <div class="text-xs text-gray-400 mt-0.5" x-text="r.treatment_steps ? r.treatment_steps.step_name : '-'"></div>
+                  </td>
+                  <td class="px-3 py-3 text-xs text-gray-500" x-text="r.student && r.student.user ? r.student.user.name : '-'"></td>
+                  <td class="px-3 py-3 text-gray-500 font-mono text-xs" x-text="formatDate(r.start_date)"></td>
+                  <td class="px-3 py-3 text-gray-500 font-mono text-xs" x-text="formatDate(r.complete_date)"></td>
+                  <td class="px-3 py-3 text-center">
+                     <span class="px-2 py-1 rounded-full text-[0.6rem] font-bold uppercase tracking-wide"
+                           :class="{
+                             'bg-gray-100 text-gray-500': r.status === 'planned',
+                             'bg-blue-50 text-blue-600': r.status === 'in_progress',
+                             'bg-emerald-50 text-emerald-600': r.status === 'completed' || r.status === 'verified',
+                             'bg-red-50 text-red-500': r.status === 'rejected' || r.status === 'void'
+                           }"
+                           x-text="r.status"></span>
+                  </td>
+                </tr>
+                <!-- Action Row -->
+                <tr x-show="activeActionRow === r.record_id" x-cloak>
+                  <td colspan="7" class="px-3 py-2 bg-blue-50/50">
+                    <div class="flex gap-2">
+                      <button x-show="!currentUser || currentUser.role !== 'instructor'" @click.stop="openModal(null, r.treatment_order || (idx+1))" class="px-3 py-1.5 bg-navy text-white text-xs font-medium rounded-md hover:bg-navy-light transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Insert
+                      </button>
+                      <button @click.stop="openModal(r)" class="px-3 py-1.5 bg-gold/10 text-gold text-xs font-medium rounded-md hover:bg-gold/20 transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                        <span x-text="(currentUser && currentUser.role === 'instructor') ? 'Requirement Verify' : 'Edit'"></span>
+                      </button>
+                      <button x-show="!currentUser || currentUser.role !== 'instructor'" @click.stop="promptReorder(r)" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-md hover:bg-indigo-100 transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
+                        Reorder
+                      </button>
+                      <button x-show="!currentUser || currentUser.role !== 'instructor'" @click.stop="confirmDelete(r)" class="px-3 py-1.5 bg-red-50 text-red-500 text-xs font-medium rounded-md hover:bg-red-100 transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+            </tbody>
+          </template>
+          <tbody x-show="records.length === 0">
+            <tr>
+              <td colspan="7" class="py-12 text-center text-gray-400 italic">No treatment records found. Click "Add Treatment" to get started.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
+
+    <!-- ==================== MODAL ==================== -->
+    <div x-show="showModal" class="fixed inset-0 z-40 flex items-center justify-center modal-backdrop" @click.self="closeModal()" x-cloak>
+      <div class="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" @click.stop>
+        <!-- Modal Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10 rounded-t-2xl">
+          <h2 class="text-lg font-bold text-navy" x-text="editingRecord ? 'Edit Treatment' : 'New Treatment'"></h2>
+          <button @click="closeModal()" class="p-1.5 rounded-full hover:bg-gray-100 transition text-gray-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="px-6 py-5 space-y-4">
+          <!-- Row 1: Phase & Division -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Phase</label>
+              <select x-model="form.phase_id" class="w-full">
+                <option value="">— Select Phase —</option>
+                <template x-for="p in phases" :key="p.phase_id">
+                  <option :value="p.phase_id" x-text="p.phase_name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Division</label>
+              <select x-model="form.division_id" @change="onDivisionChange()" class="w-full">
+                <option value="">— Select Division —</option>
+                <template x-for="d in divisions" :key="d.division_id">
+                  <option :value="d.division_id" x-text="d.code + ' — ' + d.name"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+
+          <!-- Row 1.5: Order (New Treatment Only) -->
+          <div x-show="!editingRecord" class="bg-blue-50/50 p-3 rounded-lg border border-blue-100 mb-4">
+            <label class="block text-xs font-medium text-blue-700 mb-1 uppercase tracking-wide">
+              Initial Order (Insert At)
+            </label>
+            <div class="flex items-center gap-2">
+              <input type="number" x-model="form.treatment_order" min="1" class="w-24" />
+              <div class="text-xs text-blue-500">
+                Default is at the end. Change this to insert the record at a specific position (e.g., 1 to put it at the top).
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2: Treatment & Step -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Treatment</label>
+              <select x-model="form.treatment_id" @change="onTreatmentChange()" class="w-full" :disabled="!form.division_id">
+                <option value="">— Select Treatment —</option>
+                <template x-for="t in filteredCatalog" :key="t.treatment_id">
+                  <option :value="t.treatment_id" x-text="t.treatment_name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Step</label>
+              <select x-model="form.step_id" @change="onStepChange()" class="w-full" :disabled="!form.treatment_id">
+                <option value="">— Select Step —</option>
+                <template x-for="s in filteredSteps" :key="s.step_id">
+                  <option :value="s.step_id" x-text="s.step_order + '. ' + s.step_name"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+
+
+
+          <!-- Student & Area (Keep outside as context) -->
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <div class="flex justify-between items-end mb-1">
+                  <label class="block text-xs font-medium text-gray-500 uppercase tracking-wide">Student</label>
+                  <button x-show="!currentUser || currentUser.role !== 'instructor'" 
+                          @click.prevent="referralMode = !referralMode" 
+                          class="text-xs text-navy hover:underline flex items-center gap-1 transition">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                      <span x-text="referralMode ? 'Cancel Search' : 'Search to Refer'"></span>
+                  </button>
+              </div>
+              
+              <!-- Referral Search Panel -->
+              <div x-show="referralMode" x-transition class="mt-1 p-3 bg-blue-50/50 rounded-lg border border-blue-100 mb-2">
+                  <div class="flex gap-2">
+                      <input type="text" x-model="referralQuery" placeholder="Enter Academic ID" class="text-xs flex-1 uppercase" @keydown.enter.prevent="searchStudent()">
+                      <button @click.prevent="searchStudent()" :disabled="searching" class="bg-navy text-white px-3 py-1.5 rounded text-xs font-medium disabled:opacity-50 hover:bg-navy-light transition">
+                          <span x-text="searching ? '...' : 'Search'"></span>
+                      </button>
+                  </div>
+                  <div x-show="referralError" class="text-xs text-red-500 mt-2 font-medium" x-text="referralError"></div>
+                  
+                  <template x-if="referralResult">
+                    <div class="mt-3 border-t border-blue-200 pt-2 animate-fade-in">
+                        <div class="flex items-center justify-between mb-2">
+                           <div class="text-xs text-gray-700"><span class="font-bold text-navy" x-text="referralResult.name"></span> <span class="text-gray-500" x-text="'(' + referralResult.academic_id + ')'"></span></div>
+                        </div>
+                        <button @click.prevent="confirmReferral()" :disabled="confirming" class="w-full bg-emerald-600 text-white py-1.5 rounded text-xs font-semibold hover:bg-emerald-700 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                          <div x-show="confirming" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          <span x-text="confirming ? 'Confirming...' : 'Confirm Assignment'"></span>
+                        </button>
+                    </div>
+                  </template>
+              </div>
+
+              <select x-model="form.student_id" class="w-full">
+                <option value="">— Select Student —</option>
+                <template x-for="s in students" :key="s.student_id">
+                  <option :value="s.student_id" x-text="s.name + (s.academic_id ? ' (' + s.academic_id + ')' : '')"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Area / Tooth No./Description</label>
+              <input type="text" x-model="form.area" placeholder="e.g. #14, Q1, maxillary area" class="w-full" />
+            </div>
+          </div>
+          
+          <!-- Requirement Summary Group -->
+          <fieldset class="border border-indigo-100 rounded-xl p-5 mb-6 bg-slate-50 relative mt-6">
+            <legend class="text-xs font-bold text-white px-3 py-1 bg-navy rounded-full uppercase tracking-wide absolute -top-3 left-4 shadow-sm">
+              Requirement Summary
+            </legend>
+            
+            <div class="space-y-4 mt-2">
+              <!-- Row 1: Advisor & Requirement -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Advisor</label>
+                  <select x-model="form.instructor_id" class="w-full" :disabled="!form.division_id">
+                    <option value="">— Select Advisor —</option>
+                    <template x-for="i in filteredInstructors" :key="i.instructor_id">
+                      <option :value="i.instructor_id" x-text="i.users && i.users.name ? i.users.name : (i.user && i.user.name ? i.user.name : 'Unknown')"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Requirement</label>
+                  <select x-model="form.requirement_id" class="w-full" :disabled="!form.division_id">
+                    <option value="">— Select Requirement —</option>
+                    <template x-for="r in filteredRequirements" :key="r.requirement_id">
+                      <option :value="r.requirement_id" x-text="r.requirement_type + (r.rsu_unit ? ' (' + r.rsu_unit + ')' : '')"></option>
+                    </template>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Row 2: Units -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">RSU Units</label>
+                  <input type="number" x-model="form.rsu_units" step="0.01" min="0" placeholder="0" class="w-full" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">CDA Units</label>
+                  <input type="number" x-model="form.cda_units" step="0.01" min="0" placeholder="0" class="w-full" />
+                </div>
+              </div>
+
+              <!-- Row 3: Dates -->
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Start Date</label>
+                  <input type="date" x-model="form.start_date" class="w-full" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Complete Date</label>
+                  <input type="date" x-model="form.complete_date" class="w-full" />
+                </div>
+              </div>
+            </div>
+
+
+            
+            <!-- Approval Button (Instructor Only) -->
+            <div x-show="currentUser && (currentUser.role === 'instructor' || currentUser.role === 'admin') && (form.status === 'completed' || editingRecord && editingRecord.status === 'completed')" class="mt-6 pt-4 border-t border-gray-200 flex justify-end">
+               <button type="button" @click="verifyRecord()" :disabled="verifying" class="px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition shadow-md flex items-center gap-2 disabled:opacity-50">
+                  <div x-show="verifying" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <svg x-show="!verifying" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  <span x-text="verifying ? 'Verifying...' : 'Approve & Verify Requirement'"></span>
+               </button>
+            </div>
+          </fieldset>
+            
+          <!-- PERIO: Severity -->
+          <div x-show="selectedDivisionCode === 'PERIO'" x-transition class="bg-indigo-50/50 rounded-lg p-4 border border-indigo-100">
+            <label class="block text-xs font-medium text-indigo-600 mb-1 uppercase tracking-wide">Severity (PERIO)</label>
+            <input type="number" x-model="form.severity" step="0.01" min="0" max="99.99" placeholder="0.00" class="w-full" />
+          </div>
+
+          <!-- OPER: Book & Page -->
+          <div x-show="selectedDivisionCode === 'OPER'" x-transition class="bg-amber-50/50 rounded-lg p-4 border border-amber-100">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-amber-700 mb-1 uppercase tracking-wide">Book Number (OPER)</label>
+                <input type="number" x-model="form.book_number" step="1" min="0" placeholder="0" class="w-full" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-amber-700 mb-1 uppercase tracking-wide">Page Number (OPER)</label>
+                <input type="number" x-model="form.page_number" step="1" min="0" placeholder="0" class="w-full" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Status (auto-calculated, shown read-only) -->
+          <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 flex items-center justify-between">
+            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Auto Status</span>
+            <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide"
+                  :class="{
+                    'bg-gray-200 text-gray-600': form.status === 'planned',
+                    'bg-blue-100 text-blue-700': form.status === 'in_progress',
+                    'bg-emerald-100 text-emerald-700': form.status === 'completed'
+                  }"
+                  x-text="form.status"></span>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
+          <button @click="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition">Cancel</button>
+          <button x-show="!currentUser || currentUser.role === 'student'" @click="saveRecord()" :disabled="saving" class="px-5 py-2 bg-navy text-white text-sm font-semibold rounded-lg hover:bg-navy-light transition shadow-sm disabled:opacity-50 flex items-center gap-2">
+            <div x-show="saving" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span x-text="saving ? 'Saving...' : (editingRecord ? 'Update' : 'Save')"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== APPROVE CONFIRMATION ==================== -->
+    <div x-show="showApproveConfirm" class="fixed inset-0 z-[60] flex items-center justify-center modal-backdrop" @click.self="showApproveConfirm=false" x-cloak>
+      <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center" @click.stop>
+        <div class="w-12 h-12 rounded-full bg-emerald-50 mx-auto mb-4 flex items-center justify-center">
+          <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Approve Requirement?</h3>
+        <p class="text-sm text-gray-500 mb-6">You are about to verify this treatment as completed. This action will be recorded.</p>
+        <div class="flex gap-3 justify-center">
+          <button @click="showApproveConfirm=false" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition">Cancel</button>
+          <button @click="confirmVerify()" :disabled="verifying" class="px-5 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50 flex items-center gap-2">
+            <div x-show="verifying" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span x-text="verifying ? 'Verifying...' : 'Confirm Approval'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== DELETE CONFIRMATION ==================== -->
+    <div x-show="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" @click.self="showDeleteConfirm=false" x-cloak>
+      <div class="modal-panel bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center" @click.stop>
+        <div class="w-12 h-12 rounded-full bg-red-50 mx-auto mb-4 flex items-center justify-center">
+          <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Delete Treatment?</h3>
+        <p class="text-sm text-gray-500 mb-6">This action cannot be undone. The treatment order will be recalculated.</p>
+        <div class="flex gap-3 justify-center">
+          <button @click="showDeleteConfirm=false" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition">Cancel</button>
+          <button @click="doDelete()" :disabled="deleting" class="px-5 py-2 bg-red-500 text-white text-sm font-semibold rounded-lg hover:bg-red-600 transition disabled:opacity-50">
+            <span x-text="deleting ? 'Deleting...' : 'Delete'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -124,35 +453,124 @@
       return {
         loading: true,
         hn: '',
+        backUrl: '<?= appDevUrl ?>',
         patient: null,
         records: [],
+        phases: [],
+        divisions: [],
+        catalog: [],
+        allSteps: [],
+        catalog: [],
+        allSteps: [],
+        students: [],
+
+        instructors: [],
+        requirements: [],
+        currentUser: null,
         errorMsg: '',
+        successMsg: '',
+        activeActionRow: null,
+
+        // Modal state
+        showModal: false,
+        editingRecord: null,
+        saving: false,
+        form: {},
+
+        // Delete state
+        showDeleteConfirm: false,
+        deletingRecord: null,
+        deleting: false,
+
+        // Verify state
+        showApproveConfirm: false,
+        verifying: false,
+        changingOrder: false,
+        
+        // Referral State
+        referralMode: false,
+        referralQuery: '',
+        searching: false,
+        referralResult: null,
+        referralError: '',
+        confirming: false,
+
+         // Verify state
+         verifying: false,
+
+         // Computed-like getters
+        get filteredCatalog() {
+          if (!this.form.division_id) return [];
+          var divId = this.form.division_id;
+          return this.catalog.filter(function(t) { return t.division_id === divId; });
+        },
+
+        get filteredInstructors() {
+           const divId = this.form.division_id;
+           const currentInstId = this.form.instructor_id;
+           const editingInstId = this.editingRecord ? this.editingRecord.instructor_id : null;
+           
+           if (!divId) return [];
+           // Include currently selected instructor to ensure it appears even if division mismatch
+           return this.instructors.filter(i => 
+             i.division_id === divId || 
+             (currentInstId && i.instructor_id === currentInstId) ||
+             (editingInstId && i.instructor_id === editingInstId)
+           );
+        },
+
+        get filteredRequirements() {
+           const divId = this.form.division_id;
+           const currentReqId = this.form.requirement_id;
+           const editingReqId = this.editingRecord ? this.editingRecord.requirement_id : null;
+           
+           if (!divId) return [];
+           // Include currently selected requirement to ensure it appears even if division mismatch
+           return this.requirements.filter(r => 
+             r.division_id === divId || 
+             (currentReqId && r.requirement_id === currentReqId) ||
+             (editingReqId && r.requirement_id === editingReqId)
+           );
+        },
+
+        get filteredSteps() {
+          if (!this.form.treatment_id) return [];
+          var tId = this.form.treatment_id;
+          return this.allSteps.filter(function(s) { return s.treatment_id === tId; });
+        },
+
+        get selectedDivisionCode() {
+          if (!this.form.division_id) return '';
+          var divId = this.form.division_id;
+          var div = this.divisions.find(function(d) { return d.division_id === divId; });
+          return div ? (div.code || '').toUpperCase() : '';
+        },
 
         init: function() {
-          // Use GAS client-side API to get URL parameters
-          // (window.location.search doesn't work inside GAS iframe)
           var self = this;
           google.script.url.getLocation(function(location) {
-            console.log("[TP] Location:", location);
             self.hn = location.parameter.hn || '';
-            console.log("[TP] HN:", self.hn);
-
             if (!self.hn) {
               self.errorMsg = "No HN specified. Please go back and try again.";
               self.loading = false;
               return;
             }
-
-            // Fetch data
             google.script.run
               .withSuccessHandler(function(res) {
-                console.log("[TP] Data received:", res);
                 self.patient = res.patient;
                 self.records = res.records || [];
+                self.phases = res.phases || [];
+                self.divisions = res.divisions || [];
+                self.catalog = res.catalog || [];
+                self.allSteps = res.steps || [];
+
+                self.instructors = res.instructors || [];
+                self.requirements = res.requirements || [];
+                self.students = res.students || [];
+                self.currentUser = res.currentUser || null;
                 self.loading = false;
               })
               .withFailureHandler(function(err) {
-                console.error("[TP] Error:", err);
                 self.errorMsg = "Error loading data: " + (err.message || err);
                 self.loading = false;
               })
@@ -164,9 +582,372 @@
           if (!d) return '-';
           return new Date(d).toLocaleDateString('th-TH');
         },
+
+        toggleActionRow: function(id) {
+          this.activeActionRow = this.activeActionRow === id ? null : id;
+        },
+
+        resetForm: function() {
+          this.form = {
+            phase_id: '',
+            division_id: '',
+            treatment_id: '',
+            step_id: '',
+            student_id: this.students.length > 0 ? this.students[0].student_id : '',
+            instructor_id: '',
+            requirement_id: '',
+            area: '',
+            start_date: '',
+            complete_date: '',
+            rsu_units: '',
+            cda_units: '',
+            severity: '',
+            book_number: '',
+            page_number: '',
+            book_number: '',
+            page_number: '',
+            status: 'planned',
+            treatment_order: this.records.length + 1
+          };
+        },
+
+        openModal: function(record, insertAfterOrder) {
+          this.activeActionRow = null;
+          this.resetForm(); // Reset to defaults first
+          this.referralMode = false;
+          this.referralQuery = '';
+          this.referralResult = null;
+          this.referralError = '';
+          var self = this;
+          
+          if (record) {
+            // Edit mode: populate form from record
+            this.editingRecord = record;
+            
+            // 1. Assign independent properties that control filters
+            this.form.phase_id = record.phase_id || '';
+            this.form.student_id = record.student_id || '';
+            this.form.division_id = record.division_id || (record.treatment_catalog ? record.treatment_catalog.division_id : '') || '';
+
+            // 2. Assign simple fields
+            this.form.area = record.area || '';
+            this.form.start_date = record.start_date ? record.start_date.substring(0, 10) : '';
+            this.form.complete_date = record.complete_date ? record.complete_date.substring(0, 10) : '';
+            this.form.rsu_units = record.rsu_units != null ? record.rsu_units : '';
+            this.form.cda_units = record.cda_units != null ? record.cda_units : '';
+            this.form.severity = record.severity != null ? record.severity : '';
+            this.form.book_number = record.book_number != null ? record.book_number : '';
+            this.form.page_number = record.page_number != null ? record.page_number : '';
+            this.form.status = record.status || 'planned';
+
+            // 3. Delay setting dependent fields (Catalog, Instructor, Requirement) to allow filters to update
+            setTimeout(function() {
+               self.form.treatment_id = record.treatment_id || '';
+               self.form.instructor_id = record.instructor_id || '';
+               self.form.requirement_id = record.requirement_id || '';
+               
+               // 4. Delay setting Step ID (depends on treatment_id) and showing modal
+               setTimeout(function() {
+                  self.form.step_id = record.step_id || '';
+                  self.showModal = true;
+               }, 50);
+            }, 50);
+
+          } else {
+            // Insert mode
+            this.editingRecord = null;
+            if (insertAfterOrder) {
+              this.form.treatment_order = parseInt(insertAfterOrder) + 1;
+            }
+            setTimeout(function() {
+              self.showModal = true;
+            }, 50);
+          }
+        },
+
+        closeModal: function() {
+          this.showModal = false;
+          this.editingRecord = null;
+        },
+
+        onDivisionChange: function() {
+          this.form.treatment_id = '';
+          this.form.step_id = '';
+
+          this.form.instructor_id = '';
+          this.form.requirement_id = '';
+          this.updateStatus();
+        },
+
+        onTreatmentChange: function() {
+          this.form.step_id = '';
+          // Auto-select first step
+          var steps = this.filteredSteps;
+          if (steps.length > 0) {
+            this.form.step_id = steps[0].step_id;
+          }
+          this.updateStatus();
+        },
+
+        onStepChange: function() {
+          this.updateStatus();
+        },
+
+        updateStatus: function() {
+          if (!this.form.step_id) {
+            this.form.status = 'planned';
+            return;
+          }
+          var stepId = this.form.step_id;
+          var step = this.allSteps.find(function(s) { return s.step_id === stepId; });
+          if (!step) {
+            this.form.status = 'planned';
+            return;
+          }
+          if (step.step_order === 1) {
+            this.form.status = 'planned';
+          } else if (step.step_name && step.step_name.toLowerCase() === 'completed') {
+            this.form.status = 'completed';
+          } else {
+            this.form.status = 'in_progress';
+          }
+        },
+
+        saveRecord: function() {
+          var self = this;
+          self.saving = true;
+
+          if (self.editingRecord) {
+            // Update
+            google.script.run
+              .withSuccessHandler(function(res) {
+                self.saving = false;
+                if (res.success) {
+                  self.showToast('Treatment updated successfully');
+                  self.closeModal();
+                  self.reload();
+                } else {
+                  self.errorMsg = res.error || 'Failed to update.';
+                }
+              })
+              .withFailureHandler(function(err) {
+                self.saving = false;
+                self.errorMsg = 'Error: ' + (err.message || err);
+              })
+              .studentUpdateTreatmentRecord(self.editingRecord.record_id, self.form);
+          } else {
+            // Create
+            google.script.run
+              .withSuccessHandler(function(res) {
+                self.saving = false;
+                if (res.success) {
+                  self.showToast('Treatment added successfully');
+                  self.closeModal();
+                  self.reload();
+                } else {
+                  self.errorMsg = res.error || 'Failed to create.';
+                }
+              })
+              .withFailureHandler(function(err) {
+                self.saving = false;
+                self.errorMsg = 'Error: ' + (err.message || err);
+              })
+              .studentCreateTreatmentRecord(self.hn, self.form);
+          }
+        },
+
+        confirmDelete: function(record) {
+          this.deletingRecord = record;
+          this.showDeleteConfirm = true;
+          this.activeActionRow = null;
+        },
+
+        doDelete: function() {
+          var self = this;
+          self.deleting = true;
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.deleting = false;
+              self.showDeleteConfirm = false;
+              if (res.success) {
+                self.showToast('Treatment deleted');
+                self.reload();
+              } else {
+                self.errorMsg = res.error || 'Failed to delete.';
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.deleting = false;
+              self.showDeleteConfirm = false;
+              self.errorMsg = 'Error: ' + (err.message || err);
+            })
+            .studentDeleteTreatmentRecord(self.hn, self.deletingRecord.record_id);
+        },
+
+
+
+        verifyRecord: function() {
+          var self = this;
+          if (!self.editingRecord || !self.editingRecord.record_id) return;
+          self.showApproveConfirm = true;
+        },
+
+        confirmVerify: function() {
+          var self = this;
+          self.verifying = true;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.verifying = false;
+              self.showApproveConfirm = false;
+              if (res.success) {
+                self.showToast('Requirement verified');
+                self.closeModal();
+                self.reload();
+              } else {
+                self.errorMsg = res.error || 'Verification failed.';
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.verifying = false;
+              self.showApproveConfirm = false;
+              self.errorMsg = 'Error: ' + (err.message || err);
+            })
+            .instructorVerifyTreatmentRecord(self.editingRecord.record_id);
+        },
+
+        reload: function() {
+          var self = this;
+          self.loading = true;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.patient = res.patient;
+              self.records = res.records || [];
+              self.phases = res.phases || [];
+              self.divisions = res.divisions || [];
+              self.catalog = res.catalog || [];
+              self.allSteps = res.steps || [];
+
+              self.instructors = res.instructors || [];
+              self.requirements = res.requirements || [];
+              self.students = res.students || [];
+              self.loading = false;
+            })
+            .withFailureHandler(function(err) {
+              self.errorMsg = "Error reloading: " + (err.message || err);
+              self.loading = false;
+            })
+            .studentGetTreatmentPlan(self.hn);
+        },
+
+
         
-        openAddModal: function() {
-          alert("Add/Edit Feature: Coming Soon (Requires Catalog Selection UI)");
+        searchStudent: function() {
+           var self = this;
+           if(!self.referralQuery) return;
+           self.searching = true;
+           self.referralError = '';
+           self.referralResult = null;
+           
+           google.script.run
+             .withSuccessHandler(function(res){
+                 self.searching = false;
+                 if(res.found) {
+                     self.referralResult = res.student;
+                 } else {
+                     self.referralError = 'Student not found.';
+                 }
+             })
+             .withFailureHandler(function(err){
+                 self.searching = false;
+                 self.referralError = 'Error: ' + err.message;
+             })
+             .studentSearchByAcademicId(self.referralQuery);
+        },
+
+        confirmReferral: function() {
+           var self = this;
+           if(!self.referralResult) return;
+           self.confirming = true;
+           self.referralError = '';
+           
+           var recordId = self.editingRecord ? self.editingRecord.record_id : null;
+           
+           google.script.run
+             .withSuccessHandler(function(res){
+                 self.confirming = false;
+                 if(res.success) {
+                     self.showToast(res.message);
+                     
+                     // Add student to list if not present
+                     var exists = self.students.find(function(s) { return s.student_id === res.student.student_id; });
+                     if(!exists) {
+                         self.students.push(res.student);
+                         // Optional: Sort students by name?
+                         self.students.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+                     }
+                     
+                     // Update form selection
+                     self.form.student_id = res.student.student_id;
+                     
+                     // Reset UI
+                     self.referralMode = false;
+                     self.referralQuery = '';
+                     self.referralResult = null;
+                     
+                 } else {
+                     self.referralError = res.message || 'Failed.';
+                 }
+             })
+             .withFailureHandler(function(err){
+                 self.confirming = false;
+                 self.referralError = 'Error: ' + err.message;
+             })
+             .studentReferTreatment(recordId, self.referralResult.student_id, self.hn);
+        },
+
+        promptReorder: function(record) {
+          var self = this;
+          var currentOrder = record.treatment_order || 0;
+          var input = prompt("Enter new order number:", currentOrder);
+          
+          if (input === null) return; // Cancelled
+          
+          var newOrder = parseInt(input);
+          if (isNaN(newOrder) || newOrder < 1) {
+            alert("Please enter a valid number greater than 0.");
+            return;
+          }
+
+          if (newOrder === currentOrder) return;
+
+          self.changingOrder = true;
+          self.loading = true; // Block UI
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.changingOrder = false;
+              if (res.success) {
+                self.showToast('Order updated');
+                self.activeActionRow = null; 
+                self.reload();
+              } else {
+                self.errorMsg = res.error || 'Failed to reorder.';
+                self.loading = false;
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.changingOrder = false;
+              self.errorMsg = 'Error: ' + (err.message || err);
+              self.loading = false;
+            })
+            .studentUpdateTreatmentOrder(self.hn, record.record_id, newOrder);
+        },
+
+        showToast: function(msg) {
+          var self = this;
+          self.successMsg = msg;
+          setTimeout(function() { self.successMsg = ''; }, 3000);
         }
       }
     }

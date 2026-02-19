@@ -12,6 +12,9 @@
 //  Web App entry point
 // ──────────────────────────────────────────────
 
+/** Domain required for access */
+var ALLOWED_DOMAIN = "rsu.ac.th";
+
 /**
  * Get assigned patients for the current student.
  * @returns {Array} List of patient objects
@@ -52,6 +55,11 @@ function getStudentPatients() {
     p.student_3_acad = getAcad(p.s3) || "";
 
     p.student_4_name = getName(p.s4) || p.student_id_4 || "-";
+    p.student_4_acad = getAcad(p.s4) || "";
+
+    p.student_5_name = getName(p.s5) || p.student_id_5 || "-";
+    p.student_5_acad = getAcad(p.s5) || "";
+
     p.instructor_name =
       getName(p.inst) ||
       (p.instructor_id ? "Inst ID: " + p.instructor_id : "-");
@@ -143,6 +151,127 @@ function _resolveStudentId(academicId) {
   // Throwing might be better UX if they typo.
 
   throw new Error("Student with ID '" + acad + "' not found.");
+}
+
+/**
+ * Search for a student by Academic ID (for Referral).
+ * @param {string} academicId
+ * @returns {Object} result
+ */
+function studentSearchByAcademicId(academicId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  // Instructors can search too? The requirement said hide button for instructors.
+  // But if we reuse this, it's fine.
+
+  if (!academicId) return { found: false };
+
+  var student = SupabaseProvider.getStudentByAcademicId(
+    String(academicId).trim(),
+  );
+  if (student) {
+    // Enrich with name
+    var u = SupabaseProvider.getUserByEmail(
+      student.users ? student.users.email : "",
+    ); // We might not have email easily in all objects if not joined
+    // Actually getStudentByAcademicId might not return Joined User?
+    // Let's check SupabaseProvider.getStudentByAcademicId implementation.
+    // It calls: /rest/v1/students?academic_id=eq...&select=*
+    // It does NOT join users. We need to fetch user name.
+
+    // Better: Helper to get student details
+    var fullStudent = SupabaseProvider.getStudentById(student.student_id); // This joins user:users(name)
+
+    return {
+      found: true,
+      student: {
+        student_id: fullStudent.student_id,
+        academic_id: fullStudent.academic_id,
+        name: fullStudent.user ? fullStudent.user.name : "Unknown",
+        user: fullStudent.user, // Match structure expected by frontend
+      },
+    };
+  }
+
+  return { found: false };
+}
+
+/**
+ * Refer a treatment to another student.
+ * Updates treatment_records (if recordId present) and patients (slots 2-4).
+ * @param {string|null} recordId
+ * @param {string} studentId (UUID of the student to refer to)
+ * @param {string} hn
+ */
+function studentReferTreatment(recordId, studentId, hn) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  // 1. Validate Target Student
+  var targetStudent = SupabaseProvider.getStudentById(studentId);
+  if (!targetStudent) throw new Error("Target student not found.");
+
+  // 2. Update Patient (Care Team)
+  var patient = SupabaseProvider.getPatientByHn(hn);
+  if (!patient) throw new Error("Patient not found.");
+
+  var updates = {};
+  var needsUpdate = false;
+
+  // Check for duplicates
+  var isAlreadyAssigned =
+    patient.student_id_1 === studentId ||
+    patient.student_id_2 === studentId ||
+    patient.student_id_3 === studentId ||
+    patient.student_id_4 === studentId ||
+    patient.student_id_5 === studentId;
+
+  if (!isAlreadyAssigned) {
+    // Find empty slot (2, 3, 4, 5 only)
+    if (!patient.student_id_2) {
+      updates.student_id_2 = studentId;
+      needsUpdate = true;
+    } else if (!patient.student_id_3) {
+      updates.student_id_3 = studentId;
+      needsUpdate = true;
+    } else if (!patient.student_id_4) {
+      updates.student_id_4 = studentId;
+      needsUpdate = true;
+    } else if (!patient.student_id_5) {
+      updates.student_id_5 = studentId;
+      needsUpdate = true;
+    } else {
+      // All full
+      throw new Error("Referral limit reached (Slots 2, 3, 4, 5 are full).");
+    }
+  }
+
+  if (needsUpdate) {
+    updates.updated_at = new Date().toISOString();
+    SupabaseProvider.updatePatient(patient.patient_id, updates);
+  }
+
+  // 3. Update Treatment Record (if existing)
+  if (recordId) {
+    SupabaseProvider.updateTreatmentRecord(recordId, {
+      student_id: studentId,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  return {
+    success: true,
+    student: {
+      student_id: targetStudent.student_id,
+      academic_id: targetStudent.academic_id,
+      name: targetStudent.user ? targetStudent.user.name : "Unknown",
+      user: targetStudent.user,
+    },
+    message: isAlreadyAssigned
+      ? "Student already in care team. Treatment updated."
+      : "Referral successful.",
+  };
 }
 
 /**
@@ -397,6 +526,14 @@ function adminListUsers() {
 function adminListInstructors() {
   _assertAdmin();
   return SupabaseProvider.listInstructors() || [];
+}
+
+/**
+ * List all students (Admin only).
+ */
+function adminListStudents() {
+  _assertAdmin();
+  return SupabaseProvider.listStudents() || [];
 }
 
 /**
@@ -777,9 +914,272 @@ function adminSyncPatients() {
 }
 
 /**
+ * Syncs instructor data from the configured Google Sheet (MASTER_SHEET_ID).
+ * (Admin only).
+ */
+function adminSyncInstructors() {
+  _assertAdmin();
+
+  var sheetId =
+    PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
+  if (!sheetId) {
+    return { success: false, error: "MASTER_SHEET_ID not configured." };
+  }
+
+  try {
+    var ss = SpreadsheetApp.openById(sheetId);
+    var sheet = ss.getSheetByName("Teacher");
+    if (!sheet) {
+      return { success: false, error: "Sheet named 'Teacher' not found." };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: "Teacher sheet is empty or has only headers.",
+      };
+    }
+
+    // Pre-fetch Divisions/Floors for Lookup
+    var divisions = SupabaseProvider.listDivisions() || [];
+    var floors = SupabaseProvider.listFloors() || [];
+
+    var divMap = {}; // code -> division_id
+    divisions.forEach(function (d) {
+      if (d.code) divMap[d.code.trim().toUpperCase()] = d.division_id;
+    });
+
+    var floorMap = {}; // label -> floor_id
+    floors.forEach(function (f) {
+      if (f.label) floorMap[f.label.trim()] = f.floor_id;
+    });
+
+    var stats = { processed: 0, updated: 0, errors: 0, warnings: [] };
+
+    // Data starts at row 2 (index 1)
+    for (var i = 1; i < data.length; i++) {
+      try {
+        var row = data[i];
+        // Col B (1): Name
+        // Col C (2): Email
+        // Col D (3): Division (Code)
+        // Col E (4): Type ('ประจำ' or 'พิเศษ')
+        // Col F (5): Status
+        // Col G (6): Role ('Team Leader' or 'Instructor')
+        // Col H (7): Bay
+        // Col I (8): Floor Label
+
+        var name = String(row[1]).trim();
+        var email = String(row[2]).trim().toLowerCase();
+        var divCode = String(row[3]).trim().toUpperCase();
+        var type = String(row[4]).trim();
+        var statusRaw = String(row[5]).trim().toLowerCase();
+        var roleRaw = String(row[6]).trim();
+        var bay = String(row[7]).trim().toUpperCase();
+        var floorLabel = String(row[8]).trim();
+
+        // 1. Filter: Sync only Active & Permanent (ประจำ)
+        if (statusRaw !== "active") continue;
+        if (type !== "ประจำ") continue;
+
+        if (!email) {
+          stats.warnings.push("Row " + (i + 1) + ": Missing email");
+          continue;
+        }
+
+        stats.processed++;
+
+        // 2. Upsert User
+        // Note: For instructors, we force role='instructor'.
+        var userRecord = SupabaseProvider.upsertUser(email, {
+          name: name,
+          role: "instructor",
+          status: "active",
+        });
+
+        if (!userRecord || !userRecord.user_id) {
+          throw new Error("Failed to upsert user for " + email);
+        }
+
+        // 3. Upsert Instructor
+        var divId = divMap[divCode] || null;
+        var floorId = floorMap[floorLabel] || null;
+        var isTeamLeader = roleRaw === "Team Leader";
+
+        if (!divId && divCode) {
+          // stats.warnings.push("Row " + (i + 1) + ": Division code '" + divCode + "' not found.");
+        }
+
+        SupabaseProvider.upsertInstructor(userRecord.user_id, {
+          division_id: divId,
+          floor_id: floorId,
+          bay: bay,
+          teamleader_role: isTeamLeader,
+          updated_at: new Date().toISOString(),
+        });
+
+        stats.updated++;
+      } catch (rowErr) {
+        Logger.log(
+          "Error processing instructor row " + (i + 1) + ": " + rowErr.message,
+        );
+        stats.errors++;
+        stats.warnings.push("Row " + (i + 1) + ": " + rowErr.message);
+      }
+    }
+
+    return { success: true, stats: stats };
+  } catch (e) {
+    Logger.log("adminSyncInstructors error: " + e.message);
+    return { success: false, error: "Error syncing instructors: " + e.message };
+  }
+}
+
+/**
  * Delete a user (Admin only).
  * Restricted to Students and Instructors.
  */
+/**
+ * Syncs student data from the configured Google Sheet (MASTER_SHEET_ID).
+ * (Admin only).
+ */
+function adminSyncStudents() {
+  _assertAdmin();
+
+  var sheetId =
+    PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
+  if (!sheetId) {
+    return { success: false, error: "MASTER_SHEET_ID not configured." };
+  }
+
+  try {
+    var ss = SpreadsheetApp.openById(sheetId);
+    var sheet = ss.getSheetByName("Student");
+    if (!sheet) {
+      return { success: false, error: "Sheet named 'Student' not found." };
+    }
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) {
+      return {
+        success: false,
+        error: "Student sheet is empty or has only headers.",
+      };
+    }
+
+    // Pre-fetch Data for Lookups
+    var floors = SupabaseProvider.listFloors() || [];
+    var allUsers = SupabaseProvider.listUsers() || [];
+    var allInstructors = SupabaseProvider.listInstructors() || [];
+
+    // Maps
+    var floorMap = {}; // label -> floor_id "2", "3"
+    floors.forEach(function (f) {
+      if (f.label) floorMap[f.label.trim()] = f.floor_id;
+    });
+
+    var emailMap = {}; // email -> user_id
+    allUsers.forEach(function (u) {
+      if (u.email) emailMap[u.email.toLowerCase()] = u.user_id;
+    });
+
+    var instructorMap = {}; // user_id -> instructor_id
+    allInstructors.forEach(function (i) {
+      instructorMap[i.user_id] = i.instructor_id;
+    });
+
+    // Helper to get instructor ID from email
+    function getInstructorIdByEmail(email) {
+      if (!email) return null;
+      var cleanEmail = email.trim().toLowerCase();
+      var uid = emailMap[cleanEmail];
+      if (!uid) return null;
+      return instructorMap[uid] || null;
+    }
+
+    var stats = { processed: 0, updated: 0, errors: 0, warnings: [] };
+
+    // Data starts at row 2 (index 1)
+    // B(1): Floor
+    // D(3): Unit
+    // E(4): Name
+    // F(5): ID (Academic ID)
+    // G(6): Email
+    // H(7): Status
+    // I(8): First Clinic Year
+    // L(11): Team Leader 1 Email
+    // N(13): Team Leader 2 Email
+
+    for (var i = 1; i < data.length; i++) {
+      try {
+        var row = data[i];
+
+        var floorRaw = String(row[1]).trim();
+        var unitId = String(row[3]).trim();
+        var name = String(row[4]).trim();
+        var academicId = String(row[5]).trim();
+        var email = String(row[6]).trim().toLowerCase();
+        var statusRaw = String(row[7]).trim().toLowerCase();
+        var yearRaw = row[8];
+        var tl1Email = String(row[11]).trim();
+        var tl2Email = String(row[13]).trim();
+
+        // 1. Filter: Sync only Active
+        if (statusRaw !== "active") continue;
+
+        if (!email) {
+          stats.warnings.push("Row " + (i + 1) + ": Missing email");
+          continue;
+        }
+
+        stats.processed++;
+
+        // 2. Upsert User
+        var userRecord = SupabaseProvider.upsertUser(email, {
+          name: name,
+          role: "student",
+          status: "active",
+        });
+
+        if (!userRecord || !userRecord.user_id) {
+          throw new Error("Failed to upsert user for " + email);
+        }
+
+        // 3. Upsert Student
+        var floorId = floorMap[floorRaw] || null;
+        var firstClinicYear = parseInt(yearRaw) || new Date().getFullYear();
+        var tl1Id = getInstructorIdByEmail(tl1Email);
+        var tl2Id = getInstructorIdByEmail(tl2Email);
+
+        SupabaseProvider.upsertStudent(userRecord.user_id, {
+          academic_id: academicId,
+          first_clinic_year: firstClinicYear,
+          floor_id: floorId,
+          unit_id: unitId,
+          team_leader_1_id: tl1Id,
+          team_leader_2_id: tl2Id,
+          status: "active",
+          updated_at: new Date().toISOString(),
+        });
+
+        stats.updated++;
+      } catch (rowErr) {
+        Logger.log(
+          "Error processing student row " + (i + 1) + ": " + rowErr.message,
+        );
+        stats.errors++;
+        stats.warnings.push("Row " + (i + 1) + ": " + rowErr.message);
+      }
+    }
+
+    return { success: true, stats: stats };
+  } catch (e) {
+    Logger.log("adminSyncStudents error: " + e.message);
+    return { success: false, error: "Error syncing students: " + e.message };
+  }
+}
+
 function adminDeleteUser(userId) {
   var admin = _assertAdmin();
 
@@ -890,31 +1290,561 @@ function adminUpdateFloor(id, form) {
   }
 }
 
+// --- Treatment Phases ---
+function adminListTreatmentPhases() {
+  _assertAdmin();
+  return SupabaseProvider.listTreatmentPhases() || [];
+}
+
+function adminCreateTreatmentPhase(form) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.createTreatmentPhase({
+      phase_order: parseInt(form.phase_order),
+      phase_name: form.phase_name,
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function adminUpdateTreatmentPhase(id, form) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.updateTreatmentPhase(id, {
+      phase_order: parseInt(form.phase_order),
+      phase_name: form.phase_name,
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function adminDeleteTreatmentPhase(id) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.deleteTreatmentPhase(id);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// --- Treatment Catalog ---
+function adminListTreatmentCatalog() {
+  _assertAdmin();
+  return SupabaseProvider.listTreatmentCatalog() || [];
+}
+
+function adminCreateTreatmentCatalog(form) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.createTreatmentCatalog({
+      division_id: form.division_id,
+      treatment_name: form.treatment_name,
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function adminUpdateTreatmentCatalog(id, form) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.updateTreatmentCatalog(id, {
+      division_id: form.division_id,
+      treatment_name: form.treatment_name,
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function adminDeleteTreatmentCatalog(id) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.deleteTreatmentCatalog(id);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// --- Treatment Steps ---
+function adminListTreatmentSteps() {
+  _assertAdmin();
+  var steps = SupabaseProvider.listAllTreatmentSteps() || [];
+
+  // Sort: Division Name ASC, Step Order ASC
+  steps.sort(function (a, b) {
+    var divA =
+      (a.treatment_catalog &&
+        a.treatment_catalog.divisions &&
+        a.treatment_catalog.divisions.name) ||
+      "";
+    var divB =
+      (b.treatment_catalog &&
+        b.treatment_catalog.divisions &&
+        b.treatment_catalog.divisions.name) ||
+      "";
+
+    var cmp = divA.localeCompare(divB);
+    if (cmp !== 0) return cmp;
+
+    return (a.step_order || 0) - (b.step_order || 0);
+  });
+
+  return steps;
+}
+
+function adminCreateTreatmentStep(form) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.createTreatmentStep({
+      treatment_id: form.treatment_id,
+      step_order: parseInt(form.step_order),
+      step_name: form.step_name,
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function adminUpdateTreatmentStep(id, form) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.updateTreatmentStep(id, {
+      treatment_id: form.treatment_id,
+      step_order: parseInt(form.step_order),
+      step_name: form.step_name,
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function adminDeleteTreatmentStep(id) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.deleteTreatmentStep(id);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// --- Requirements ---
+function adminListRequirements() {
+  _assertAdmin();
+  return SupabaseProvider.listRequirements() || [];
+}
+
+function adminCreateRequirement(form) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.createRequirement({
+      division_id: form.division_id,
+      requirement_type: form.requirement_type,
+      minimum_rsu: parseFloat(form.minimum_rsu) || 0,
+      minimum_cda: parseFloat(form.minimum_cda) || 0,
+      rsu_unit: form.rsu_unit || "Case",
+      cda_unit: form.cda_unit || "Case",
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function adminUpdateRequirement(id, form) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.updateRequirement(id, {
+      division_id: form.division_id,
+      requirement_type: form.requirement_type,
+      minimum_rsu: parseFloat(form.minimum_rsu) || 0,
+      minimum_cda: parseFloat(form.minimum_cda) || 0,
+      rsu_unit: form.rsu_unit || "Case",
+      cda_unit: form.cda_unit || "Case",
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+function adminDeleteRequirement(id) {
+  _assertAdmin();
+  try {
+    SupabaseProvider.deleteRequirement(id);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
 /**
- * Get treatment plan details for a patient.
+ * Get treatment plan details + all form data for a patient (prefetched).
  * @param {string} hn
- * @returns {Object} { patient, records }
+ * @returns {Object} { patient, records, phases, divisions, catalog, steps, students }
  */
 function studentGetTreatmentPlan(hn) {
   var user = getCurrentUser();
   if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
 
-  // Fetch Patient
+  // Fetch Patient (with student assignments)
   var patient = SupabaseProvider.getPatientByHn(hn);
 
   if (!patient) {
-    return { patient: null, records: [] };
+    return {
+      patient: null,
+      records: [],
+      phases: [],
+      divisions: [],
+      catalog: [],
+      steps: [],
+      students: [],
+    };
   }
 
   // Normalize HN
   if (!patient.hn && patient.HN) patient.hn = patient.HN;
   if (!patient.hn && patient.Hn) patient.hn = patient.Hn;
 
-  // Fetch Records
+  // Fetch Records (enriched with joins)
   var records = SupabaseProvider.listTreatmentRecords(patient.patient_id) || [];
+
+  // Prefetch all catalog data for dropdowns
+  var phases = SupabaseProvider.listTreatmentPhases() || [];
+  var divisions = SupabaseProvider.listDivisions() || [];
+  var catalog = SupabaseProvider.listTreatmentCatalog() || [];
+  var catalog = SupabaseProvider.listTreatmentCatalog() || [];
+  var steps = SupabaseProvider.listAllTreatmentSteps() || [];
+  var instructors = SupabaseProvider.listInstructors() || [];
+  var requirements = SupabaseProvider.listRequirements() || [];
+
+  // Build students list from patient's assigned student_id_1..5
+  var students = [];
+  for (var i = 1; i <= 5; i++) {
+    var sid = patient["student_id_" + i];
+    if (sid) {
+      var s = SupabaseProvider.getStudentById(sid);
+      if (s) {
+        students.push({
+          student_id: sid,
+          name: s.user && s.user.name ? s.user.name : "Student " + i,
+          academic_id: s.academic_id || "",
+          slot: i,
+        });
+      } else {
+        students.push({
+          student_id: sid,
+          name: "Student " + i,
+          academic_id: "",
+          slot: i,
+        });
+      }
+    }
+  }
 
   return {
     patient: JSON.parse(JSON.stringify(patient)),
     records: JSON.parse(JSON.stringify(records)),
+    phases: JSON.parse(JSON.stringify(phases)),
+    divisions: JSON.parse(JSON.stringify(divisions)),
+    catalog: JSON.parse(JSON.stringify(catalog)),
+    steps: JSON.parse(JSON.stringify(steps)),
+    instructors: JSON.parse(JSON.stringify(instructors)),
+    requirements: JSON.parse(JSON.stringify(requirements)),
+    students: JSON.parse(JSON.stringify(students)),
+    currentUser: {
+      email: profile.email,
+      role: profile.role,
+      id: profile.instructor_id || profile.student_id || profile.user_id, // Prefer specific ID if avail
+    },
   };
+}
+
+/**
+ * Verify a treatment record (Instructor/Admin only).
+ * @param {string} recordId
+ * @returns {Object} { success, error? }
+ */
+function instructorVerifyTreatmentRecord(recordId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (
+    !profile.found ||
+    !profile.active ||
+    (profile.role !== "instructor" && profile.role !== "admin")
+  ) {
+    throw new Error("Access Denied: Instructors only.");
+  }
+
+  try {
+    var verifierId = profile.user_id;
+
+    SupabaseProvider.updateTreatmentRecord(recordId, {
+      status: "verified",
+      verified_by: verifierId,
+      verified_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    return { success: true };
+  } catch (e) {
+    Logger.log("instructorVerifyTreatmentRecord error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Create a treatment record for a patient.
+ * @param {string} hn — Patient HN
+ * @param {Object} form — Form data from the modal
+ * @returns {Object} { success, record?, error? }
+ */
+function studentCreateTreatmentRecord(hn, form) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  try {
+    var patient = SupabaseProvider.getPatientByHn(hn);
+    if (!patient) return { success: false, error: "Patient not found." };
+
+    // Determine treatment_order: max existing + 1
+    var existing =
+      SupabaseProvider.listTreatmentRecords(patient.patient_id) || [];
+    var maxOrder = 0;
+    for (var i = 0; i < existing.length; i++) {
+      var o = existing[i].treatment_order || 0;
+      if (o > maxOrder) maxOrder = o;
+    }
+
+    var payload = {
+      patient_id: patient.patient_id,
+      phase_id: form.phase_id || null,
+      division_id: form.division_id || null,
+      treatment_id: form.treatment_id || null,
+      step_id: form.step_id || null,
+      student_id: form.student_id || null,
+      instructor_id: form.instructor_id || null,
+      requirement_id: form.requirement_id || null,
+      area: form.area || null,
+      status: form.status || "planned",
+      rsu_units: form.rsu_units ? Number(form.rsu_units) : null,
+      cda_units: form.cda_units ? Number(form.cda_units) : null,
+      severity:
+        form.severity != null && form.severity !== ""
+          ? Number(form.severity)
+          : null,
+      book_number:
+        form.book_number != null && form.book_number !== ""
+          ? Number(form.book_number)
+          : null,
+      page_number:
+        form.page_number != null && form.page_number !== ""
+          ? Number(form.page_number)
+          : null,
+      start_date: form.start_date || null,
+      complete_date: form.complete_date || null,
+      // treatment_order: set below
+    };
+
+    // Determine Order
+    var newOrder = form.treatment_order
+      ? parseInt(form.treatment_order)
+      : maxOrder + 1;
+    if (isNaN(newOrder) || newOrder < 1) newOrder = maxOrder + 1;
+
+    // If inserting in middle (newOrder <= maxOrder), shift others down
+    if (newOrder <= maxOrder) {
+      // Shift records with order >= newOrder
+      // We can loop through existing and update them
+      // Sort descending to avoid conflicts? validation?
+      // Actually updates are independent if using unique IDs.
+      for (var i = 0; i < existing.length; i++) {
+        var r = existing[i];
+        var ro = r.treatment_order || 0;
+        if (ro >= newOrder) {
+          SupabaseProvider.updateTreatmentRecord(r.record_id, {
+            treatment_order: ro + 1,
+          });
+        }
+      }
+    }
+
+    payload.treatment_order = newOrder;
+
+    var record = SupabaseProvider.createTreatmentRecord(payload);
+    return { success: true, record: record };
+  } catch (e) {
+    Logger.log("studentCreateTreatmentRecord error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Update a treatment record.
+ * @param {string} recordId
+ * @param {Object} form
+ * @returns {Object} { success, record?, error? }
+ */
+function studentUpdateTreatmentRecord(recordId, form) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  try {
+    var updates = {
+      phase_id: form.phase_id || null,
+      division_id: form.division_id || null,
+      treatment_id: form.treatment_id || null,
+      step_id: form.step_id || null,
+      student_id: form.student_id || null,
+      instructor_id: form.instructor_id || null,
+      requirement_id: form.requirement_id || null,
+      area: form.area || null,
+      status: form.status || "planned",
+      rsu_units: form.rsu_units ? Number(form.rsu_units) : null,
+      cda_units: form.cda_units ? Number(form.cda_units) : null,
+      severity:
+        form.severity != null && form.severity !== ""
+          ? Number(form.severity)
+          : null,
+      book_number:
+        form.book_number != null && form.book_number !== ""
+          ? Number(form.book_number)
+          : null,
+      page_number:
+        form.page_number != null && form.page_number !== ""
+          ? Number(form.page_number)
+          : null,
+      start_date: form.start_date || null,
+      complete_date: form.complete_date || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    var record = SupabaseProvider.updateTreatmentRecord(recordId, updates);
+    return { success: true, record: record };
+  } catch (e) {
+    Logger.log("studentUpdateTreatmentRecord error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Delete a treatment record and re-order remaining records.
+ * @param {string} hn — Patient HN (for re-ordering)
+ * @param {string} recordId
+ * @returns {Object} { success, error? }
+ */
+function studentDeleteTreatmentRecord(hn, recordId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  try {
+    var patient = SupabaseProvider.getPatientByHn(hn);
+    if (!patient) return { success: false, error: "Patient not found." };
+
+    // Delete the record
+    SupabaseProvider.deleteTreatmentRecord(recordId);
+
+    // Re-order remaining records
+    var remaining =
+      SupabaseProvider.listTreatmentRecords(patient.patient_id) || [];
+    for (var i = 0; i < remaining.length; i++) {
+      var newOrder = i + 1;
+      if (remaining[i].treatment_order !== newOrder) {
+        SupabaseProvider.updateTreatmentRecord(remaining[i].record_id, {
+          treatment_order: newOrder,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    return { success: true };
+  } catch (e) {
+    Logger.log("studentDeleteTreatmentRecord error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Re-order a treatment record and shift others accordingly.
+ * @param {string} hn
+ * @param {string} recordId
+ * @param {number} newOrder
+ */
+function studentUpdateTreatmentOrder(hn, recordId, newOrder) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  try {
+    var patient = SupabaseProvider.getPatientByHn(hn);
+    if (!patient) return { success: false, error: "Patient not found." };
+
+    var records =
+      SupabaseProvider.listTreatmentRecords(patient.patient_id) || [];
+
+    // Find target record
+    var target = records.find(function (r) {
+      return r.record_id === recordId;
+    });
+    if (!target) return { success: false, error: "Record not found." };
+
+    var oldOrder = target.treatment_order || 0;
+    newOrder = parseInt(newOrder);
+
+    if (isNaN(newOrder) || newOrder < 1)
+      return { success: false, error: "Invalid order number." };
+    if (newOrder > records.length) newOrder = records.length;
+    if (newOrder === oldOrder) return { success: true }; // No change
+
+    // Adjust orders
+    // If moving down (e.g. 1 -> 3): shift items in (1, 3] down by 1 (decrement) -> Wait, logic check
+    // If moving down (e.g. 1 -> 3): Items at 2 and 3 need to shift UP to 1 and 2.  (idx 1->0, 2->1)
+    // Actually simpler: Remove target from array, splice into new index.
+
+    // 1. Sort current by order
+    records.sort(function (a, b) {
+      return (a.treatment_order || 0) - (b.treatment_order || 0);
+    });
+
+    // 2. Remove target
+    var currentIndex = records.findIndex(function (r) {
+      return r.record_id === recordId;
+    });
+    if (currentIndex === -1)
+      return { success: false, error: "Record index error." };
+    records.splice(currentIndex, 1);
+
+    // 3. Insert at new position (1-based newOrder maps to 0-based index)
+    records.splice(newOrder - 1, 0, target);
+
+    // 4. Update records that have changed order
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i];
+      var correctOrder = i + 1;
+
+      if (r.treatment_order !== correctOrder) {
+        SupabaseProvider.updateTreatmentRecord(r.record_id, {
+          treatment_order: correctOrder,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    return { success: true };
+  } catch (e) {
+    Logger.log("studentUpdateTreatmentOrder error: " + e.message);
+    return { success: false, error: e.message };
+  }
 }

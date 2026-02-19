@@ -94,6 +94,7 @@ A scheduled trigger runs `backupAllTablesToSheets()` daily at midnight:
 | `divisions`         | ✅        |
 | `floors`            | ✅        |
 | `patients`          | ✅        |
+| `treatment_phases`  | ✅        |
 | `treatment_records` | ✅        |
 
 - Each table is written to a dedicated sheet in the fallback spreadsheet.

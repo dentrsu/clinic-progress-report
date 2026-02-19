@@ -194,7 +194,9 @@ var SupabaseProvider = (function () {
      * List all instructors.
      */
     listInstructors: function () {
-      return _get("/rest/v1/instructors?select=*,users(name)");
+      return _get(
+        "/rest/v1/instructors?select=*,users(name,email),divisions(code)",
+      );
     },
 
     /**
@@ -324,6 +326,20 @@ var SupabaseProvider = (function () {
     },
 
     /**
+     * Get student record by student_id (with user name).
+     * @param {string} studentId (uuid)
+     * @returns {Object|null}
+     */
+    getStudentById: function (studentId) {
+      var rows = _get(
+        "/rest/v1/students?student_id=eq." +
+          studentId +
+          "&select=student_id,academic_id,user:users(name)",
+      );
+      return rows.length > 0 ? rows[0] : null;
+    },
+
+    /**
      * Get instructor record by user_id, including division info.
      * @param {string} userId  (uuid)
      * @returns {Object|null}
@@ -444,15 +460,17 @@ var SupabaseProvider = (function () {
     },
 
     /**
-     * List treatment records for a patient, enriched with Catalog/Step/Division info.
+     * List treatment records for a patient, enriched with Catalog/Step/Division/Phase/Student info.
      * @param {string} patientId
      * @returns {Array}
      */
     listTreatmentRecords: function (patientId) {
       var select =
         "*" +
-        ",treatment_catalog(treatment_name,divisions(name),requirement_list(requirement_type))" +
-        ",treatment_steps(step_name)";
+        ",treatment_phases(phase_name,phase_order)" +
+        ",treatment_catalog(treatment_name,division_id,divisions(name,code),requirement_list(requirement_type))" +
+        ",treatment_steps(step_name,step_order)" +
+        ",student:students!student_id(student_id,user:users(name))";
 
       return _get(
         "/rest/v1/treatment_records?patient_id=eq." +
@@ -461,6 +479,142 @@ var SupabaseProvider = (function () {
           select +
           "&order=treatment_order.asc,created_at.asc",
       );
+    },
+
+    /**
+     * List all treatment phases, ordered by phase_order ascending.
+     * @returns {Array}
+     */
+    listTreatmentPhases: function () {
+      return _get("/rest/v1/treatment_phases?select=*&order=phase_order.asc");
+    },
+
+    /**
+     * Create public.treatment_phases record.
+     */
+    createTreatmentPhase: function (payload) {
+      var rows = _post("/rest/v1/treatment_phases", payload);
+      return rows[0];
+    },
+
+    /**
+     * Update public.treatment_phases record.
+     */
+    updateTreatmentPhase: function (id, payload) {
+      var rows = _patch("/rest/v1/treatment_phases?phase_id=eq." + id, payload);
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Delete public.treatment_phases record.
+     */
+    deleteTreatmentPhase: function (id) {
+      return _delete("/rest/v1/treatment_phases?phase_id=eq." + id);
+    },
+
+    /**
+     * List all treatment catalog entries with division info.
+     * @returns {Array}
+     */
+    listTreatmentCatalog: function () {
+      return _get(
+        "/rest/v1/treatment_catalog?select=*,divisions(name,code)&order=treatment_name.asc",
+      );
+    },
+
+    /**
+     * Create public.treatment_catalog record.
+     */
+    createTreatmentCatalog: function (payload) {
+      var rows = _post("/rest/v1/treatment_catalog", payload);
+      return rows[0];
+    },
+
+    /**
+     * Update public.treatment_catalog record.
+     */
+    updateTreatmentCatalog: function (id, payload) {
+      var rows = _patch(
+        "/rest/v1/treatment_catalog?treatment_id=eq." + id,
+        payload,
+      );
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Delete public.treatment_catalog record.
+     */
+    deleteTreatmentCatalog: function (id) {
+      return _delete("/rest/v1/treatment_catalog?treatment_id=eq." + id);
+    },
+
+    /**
+     * List all treatment steps, ordered by step_order.
+     * @returns {Array}
+     */
+    listAllTreatmentSteps: function () {
+      return _get(
+        "/rest/v1/treatment_steps?select=*,treatment_catalog(treatment_name,divisions(name))&order=step_order.asc",
+      );
+    },
+
+    /**
+     * Create public.treatment_steps record.
+     */
+    createTreatmentStep: function (payload) {
+      var rows = _post("/rest/v1/treatment_steps", payload);
+      return rows[0];
+    },
+
+    /**
+     * Update public.treatment_steps record.
+     */
+    updateTreatmentStep: function (id, payload) {
+      var rows = _patch("/rest/v1/treatment_steps?step_id=eq." + id, payload);
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Delete public.treatment_steps record.
+     */
+    deleteTreatmentStep: function (id) {
+      return _delete("/rest/v1/treatment_steps?step_id=eq." + id);
+    },
+
+    /**
+     * List all requirements with division info.
+     * @returns {Array}
+     */
+    listRequirements: function () {
+      return _get(
+        "/rest/v1/requirement_list?select=*,divisions(name,code)&order=requirement_type.asc",
+      );
+    },
+
+    /**
+     * Create public.requirement_list record.
+     */
+    createRequirement: function (payload) {
+      var rows = _post("/rest/v1/requirement_list", payload);
+      return rows[0];
+    },
+
+    /**
+     * Update public.requirement_list record.
+     */
+    updateRequirement: function (id, payload) {
+      var rows = _patch(
+        "/rest/v1/requirement_list?requirement_id=eq." + id,
+        payload,
+      );
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Delete public.requirement_list record.
+     */
+    deleteRequirement: function (id) {
+      return _delete("/rest/v1/requirement_list?requirement_id=eq." + id);
     },
 
     /**
@@ -510,6 +664,88 @@ var SupabaseProvider = (function () {
     createPatient: function (patient) {
       var rows = _post("/rest/v1/patients", patient);
       return rows[0];
+    },
+    /**
+     * Upsert user (Create Auth+Public or Update Public).
+     * @param {string} email
+     * @param {Object} details {name, role, status}
+     * @returns {Object} public.users record
+     */
+    upsertUser: function (email, details) {
+      var existing = this.getUserByEmail(email);
+      if (existing) {
+        return this.updateUser(existing.user_id, details);
+      }
+
+      // Create Auth User first
+      // Note: We set a random temp password. User should reset or use generated link.
+      // But for instructors synced from sheet, they might use Google Auth,
+      // ensuring email matches is key.
+      var tempPass = "Temp" + Math.random().toString(36).substring(2) + "!";
+      var authRes = this.createAuthUser(email, tempPass, {
+        name: details.name,
+        role: details.role,
+      });
+
+      var userId = authRes.user ? authRes.user.id : authRes.id;
+      if (!userId) throw new Error("Failed to create Auth user for " + email);
+
+      // Try creating public user (in case no trigger)
+      try {
+        var payload = {
+          user_id: userId,
+          email: email,
+          name: details.name,
+          role: details.role,
+          status: details.status || "active",
+        };
+        return this.createUser(payload);
+      } catch (e) {
+        // If creation fails (likely duplicate key from trigger), update instead
+        return this.updateUser(userId, details);
+      }
+    },
+
+    /**
+     * Upsert instructor (Create or Update).
+     * @param {string} userId
+     * @param {Object} data {division_id?, ...}
+     * @returns {Object} public.instructors record
+     */
+    upsertInstructor: function (userId, data) {
+      var existing = this.getInstructorByUserId(userId);
+      if (existing) {
+        return this.updateInstructor(existing.instructor_id, data);
+      }
+      var payload = data || {};
+      payload.user_id = userId;
+      return this.createInstructor(payload);
+    },
+
+    /**
+     * Upsert student (Create or Update).
+     * @param {string} userId
+     * @param {Object} data {academic_id?, ...}
+     * @returns {Object} public.students record
+     */
+    upsertStudent: function (userId, data) {
+      var existing = this.getStudentByUserId(userId);
+      if (existing) {
+        return this.updateStudent(existing.student_id, data);
+      }
+      var payload = data || {};
+      payload.user_id = userId;
+      // Default uuid for student_id if createStudent doesn't handle it (it does in Code.gs but let's check createStudent impl)
+      // createStudent in SupabaseProvider takes a student object.
+      if (!payload.student_id) payload.student_id = Utilities.getUuid();
+
+      return this.createStudent(payload);
+    },
+    /**
+     * List all students with user details.
+     */
+    listStudents: function () {
+      return _get("/rest/v1/students?select=*,users(name,email),floors(label)");
     },
   };
 })();

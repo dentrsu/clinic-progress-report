@@ -38,12 +38,15 @@ function getPatientSheetId() {
   );
 }
 
+function getInstructorSheetId() {
+  return (
+    PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID") || ""
+  );
+}
+
 // ──────────────────────────────────────────────
 //  Constants
 // ──────────────────────────────────────────────
-
-/** Domain required for access */
-var ALLOWED_DOMAIN = "rsu.ac.th";
 
 /** Circuit-breaker: max consecutive Supabase failures before switching to Sheets */
 var CB_MAX_FAILURES = 3;
