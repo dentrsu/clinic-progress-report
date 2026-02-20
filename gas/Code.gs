@@ -64,6 +64,11 @@ function getStudentPatients() {
       getName(p.inst) ||
       (p.instructor_id ? "Inst ID: " + p.instructor_id : "-");
 
+    p.case_type_name = p.case_type ? p.case_type.type_of_case : "-";
+
+    // Set type_of_case to the text value for standard dropdown selection in UI
+    p.type_of_case = p.case_type ? p.case_type.type_of_case : "";
+
     return p;
   });
 }
@@ -119,12 +124,51 @@ function studentUpdatePatient(hn, form) {
     student_id_3: _resolveStudentId(form.student_3_acad),
     student_id_4: _resolveStudentId(form.student_4_acad),
     student_id_5: _resolveStudentId(form.student_5_acad),
+    is_completed_case: !!form.is_completed_case,
+    complexity: form.complexity || null,
+    // Resolve text to ID (alignment logic)
+    type_of_case: SupabaseProvider.getTypeOfCaseIdByText(form.type_of_case),
 
     updated_at: new Date().toISOString(),
   };
 
   // 4. Execute Update
   SupabaseProvider.updatePatient(patient.patient_id, payload);
+
+  return { success: true };
+}
+
+/**
+ * Toggle Complete Case status for a patient (Student).
+ * @param {string} hn
+ * @param {boolean} isComplete
+ */
+function studentToggleCompleteCase(hn, isComplete) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("User is not an active student.");
+  }
+
+  var patient = SupabaseProvider.getPatientByHn(hn);
+  if (!patient) throw new Error("Patient not found.");
+
+  var myId = profile.student_id;
+  var isAssigned =
+    patient.student_id_1 === myId ||
+    patient.student_id_2 === myId ||
+    patient.student_id_3 === myId ||
+    patient.student_id_4 === myId ||
+    patient.student_id_5 === myId;
+
+  if (!isAssigned) throw new Error("Access Denied: Not assigned.");
+
+  SupabaseProvider.updatePatient(patient.patient_id, {
+    is_completed_case: !!isComplete,
+    updated_at: new Date().toISOString(),
+  });
 
   return { success: true };
 }
@@ -743,6 +787,45 @@ function adminGetUserDetail(email) {
 }
 
 /**
+ * List all type_of_case records (Admin).
+ */
+function adminListTypeOfCases() {
+  _assertAdmin();
+  return SupabaseProvider.listTypeOfCases() || [];
+}
+
+/**
+ * Create public.type_of_case record (Admin).
+ */
+function adminCreateTypeOfCase(form) {
+  _assertAdmin();
+  return SupabaseProvider.createTypeOfCase(form);
+}
+
+/**
+ * Update public.type_of_case record (Admin).
+ */
+function adminUpdateTypeOfCase(id, form) {
+  _assertAdmin();
+  return SupabaseProvider.updateTypeOfCase(id, form);
+}
+
+/**
+ * Delete public.type_of_case record (Admin).
+ */
+function adminDeleteTypeOfCase(id) {
+  _assertAdmin();
+  return SupabaseProvider.deleteTypeOfCase(id);
+}
+
+/**
+ * List all type_of_case records (Public/Student).
+ */
+function studentListTypeOfCases() {
+  return SupabaseProvider.listTypeOfCases() || [];
+}
+
+/**
  * Syncs patient data from a configured Google Sheet to the active data source.
  * (Admin only).
  */
@@ -1238,6 +1321,7 @@ function adminCreateDivision(form) {
     SupabaseProvider.createDivision({
       code: form.code,
       name: form.name,
+      clinic: form.clinic || "N/A",
     });
     return { success: true };
   } catch (e) {
@@ -1251,6 +1335,7 @@ function adminUpdateDivision(id, form) {
     SupabaseProvider.updateDivision(id, {
       code: form.code,
       name: form.name,
+      clinic: form.clinic || "N/A",
       updated_at: new Date().toISOString(),
     });
     return { success: true };
@@ -1455,6 +1540,9 @@ function adminCreateRequirement(form) {
       minimum_cda: parseFloat(form.minimum_cda) || 0,
       rsu_unit: form.rsu_unit || "Case",
       cda_unit: form.cda_unit || "Case",
+      is_patient_treatment:
+        form.is_patient_treatment === true ||
+        form.is_patient_treatment === "true",
     });
     return { success: true };
   } catch (e) {
@@ -1472,6 +1560,9 @@ function adminUpdateRequirement(id, form) {
       minimum_cda: parseFloat(form.minimum_cda) || 0,
       rsu_unit: form.rsu_unit || "Case",
       cda_unit: form.cda_unit || "Case",
+      is_patient_treatment:
+        form.is_patient_treatment === true ||
+        form.is_patient_treatment === "true",
     });
     return { success: true };
   } catch (e) {
@@ -1829,10 +1920,42 @@ function studentUpdateTreatmentOrder(hn, recordId, newOrder) {
     // 3. Insert at new position (1-based newOrder maps to 0-based index)
     records.splice(newOrder - 1, 0, target);
 
-    // 4. Update records that have changed order
+    // 4. Check for Phase Change based on new neighbors
+    var newIndex = newOrder - 1;
+    var targetPhaseId = target.phase_id;
+    var message = null;
+
+    // Look at previous neighbor first (simulating "append to group")
+    var neighbor = null;
+    if (newIndex > 0) {
+      neighbor = records[newIndex - 1]; // Prev
+    } else if (records.length > 1) {
+      neighbor = records[newIndex + 1]; // Next (if at top)
+    }
+
+    if (neighbor && neighbor.phase_id && neighbor.phase_id !== targetPhaseId) {
+      // Phase changed!
+      target.phase_id = neighbor.phase_id; // Update in memory object for consistent loop below?
+      // Actually loop below updates treatment_order, we need to update phase_id too.
+      // We will do specific update for target.
+
+      SupabaseProvider.updateTreatmentRecord(target.record_id, {
+        phase_id: neighbor.phase_id,
+        updated_at: new Date().toISOString(),
+      });
+
+      // Get Phase Name for message (optional, need to fetch phases or join? simpler generic message)
+      message = "Record moved to new phase group.";
+    }
+
+    // 5. Update records that have changed order
     for (var i = 0; i < records.length; i++) {
       var r = records[i];
       var correctOrder = i + 1;
+
+      // Ensure we don't double update if we just did phase update above,
+      // but treatment_order might still need update.
+      // SupabaseProvider.updateTreatmentRecord is distinct call.
 
       if (r.treatment_order !== correctOrder) {
         SupabaseProvider.updateTreatmentRecord(r.record_id, {
@@ -1842,9 +1965,75 @@ function studentUpdateTreatmentOrder(hn, recordId, newOrder) {
       }
     }
 
-    return { success: true };
+    return { success: true, message: message };
   } catch (e) {
     Logger.log("studentUpdateTreatmentOrder error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+// ──────────────────────────────────────────────
+//  Student: Rotate Clinic Workflow
+// ──────────────────────────────────────────────
+
+/**
+ * List divisions for Rotate Clinic (clinic = 'rotate').
+ */
+function studentListRotateDivisions() {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  return SupabaseProvider.listRotateDivisions();
+}
+
+/**
+ * List requirements for a specific division.
+ */
+function studentListRequirementsByDivision(divisionId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  return SupabaseProvider.listRequirementsByDivision(divisionId);
+}
+
+/**
+ * List instructors for a specific division.
+ */
+function studentListInstructorsByDivision(divisionId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  return SupabaseProvider.listInstructorsByDivision(divisionId);
+}
+
+/**
+ * Submit a Rotate Clinic Requirement.
+ * @param {Object} form
+ * @returns {Object} { success, error? }
+ */
+function studentSubmitRotateRequirement(form) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("Student only.");
+  }
+
+  try {
+    var payload = {
+      student_id: profile.student_id,
+      division_id: form.division_id,
+      requirement_id: form.requirement_id,
+      instructor_id: form.instructor_id || null,
+      area: form.area || null,
+      rsu_units: form.rsu_units ? Number(form.rsu_units) : 0,
+      cda_units: form.cda_units ? Number(form.cda_units) : 0,
+      status: "completed",
+      hn: form.hn || null,
+      patient_name: form.patient_name || null,
+    };
+
+    SupabaseProvider.createTreatmentRecord(payload);
+    return { success: true };
+  } catch (e) {
     return { success: false, error: e.message };
   }
 }

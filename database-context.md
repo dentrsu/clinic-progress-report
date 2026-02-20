@@ -60,6 +60,17 @@ create table public.students (
   status public.user_status not null default 'active'
 );
 
+
+-- 1.1 Divisions
+create type public.clinic_type as enum ('main', 'rotate', 'N/A');
+
+create table public.divisions (
+  division_id uuid primary key default gen_random_uuid(),
+  name text not null,
+  code text not null,
+  clinic public.clinic_type not null default 'N/A'
+);
+
 create table public.instructors (
   instructor_id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references public.users(user_id) on delete cascade,
@@ -88,10 +99,42 @@ create table public.treatment_steps (
   unique (treatment_id, step_id) -- Required for composite FK validation
 );
 
+
+-- 3.5 Requirement List (Missing from previous context)
+create table public.requirement_list (
+  requirement_id uuid primary key default gen_random_uuid(),
+  division_id uuid not null references public.divisions(division_id),
+  requirement_type text not null,
+  rsu_unit numeric, -- e.g. 1.0, 0.5
+  is_patient_treatment boolean not null default true
+);
+
+-- 3.6 Patients
+-- create table public.patients (
+--   patient_id uuid primary key default gen_random_uuid(),
+--   hn text not null unique,
+--   name text not null,
+--   status public.patient_status not null default 'Waiting to Be Assigned',
+--   is_completed_case boolean not null default false,
+  complexity text,
+  type_of_case uuid references public.type_of_case(id),
+--   ...
+-- );
+
+-- 3.7 Case Types
+create table public.type_of_case (
+  id uuid primary key default gen_random_uuid(),
+  type_of_case text not null unique,
+  created_at timestamp with time zone default now(),
+  updated_at timestamp with time zone default now()
+);
+
 -- 4. Execution (The Workhorse)
 create table public.treatment_records (
   record_id uuid primary key default gen_random_uuid(),
-  patient_id uuid not null references public.patients(patient_id),
+  patient_id uuid references public.patients(patient_id), -- Nullable for Rotate Clinic
+  hn text,                                          -- For ad-hoc/rotate patients
+  patient_name text,                                -- For ad-hoc/rotate patients
   student_id uuid references public.students(student_id),
   phase_id uuid references public.treatment_phases(phase_id), -- Treatment phase for ordering
   treatment_id uuid references public.treatment_catalog(treatment_id),
@@ -127,7 +170,7 @@ create table public.treatment_records (
 
 - **Students:** Can `SELECT` and `INSERT` their own `treatment_records`. They cannot update the `verified_by` or `verified_at` fields.
 - **Instructors:** Can `SELECT` all records within their division. They are the only ones allowed to `UPDATE` a record status to `verified`.
-- **Patients:** Patient data is visible to all authenticated clinical staff/students but is strictly read-only for students unless they are part of the Care Team.
+- **Patients:** Patient data is visible to all authenticated clinical staff/students but is strictly read-only for students unless they are part of the Care Team. Students can toggle the `is_completed_case` status for their assigned patients.
 
 ### C. Workflow State Machine
 
@@ -135,6 +178,33 @@ create table public.treatment_records (
 2. **In Progress:** Student begins clinical work on a specific step.
 3. **Completed:** Student finishes the work and requests verification.
 4. **Verified:** Instructor reviews work and "signs off" (triggers RSU unit credit).
+
+### D. Auto-Calculation Logic (PERIO)
+
+For the Periodontics (PERIO) division, `rsu_units` and `cda_units` are automatically calculated based on the selected Requirement, Treatment Step, and Severity:
+
+- **RSU Units**:
+  - `Case G` (Step Order >= 7): `Severity / 0.8`
+  - `Case P` (Step Order >= 7): `Severity / 0.5`
+  - Exams (`SRP 1st Exam`, `OHI 1st Exam`, `OHI 2nd Exam`): `1.0`
+  - Others: `0.0`
+
+- **CDA Units**:
+  - `Case G`: `1.0`
+  - `Case P`: `1.0`
+  - `SRP 2nd Exam`: `1.0`
+  - Others: `0.0`
+
+### E. Phase Sorting & Smart Reorder
+
+To maintain clinical integrity, treatment records are strictly validated and sorted:
+
+1.  **Strict Phase Sorting:** The list of treatment records is always sorted primarily by `phase_order` (from the `treatment_phases` table), then by the user-defined `treatment_order`. This prevents "Phase Splitting" (e.g., a Phase 1 record appearing between two Phase 3 records).
+2.  **Smart Reorder:**
+    - If a user manually reorders a record into a position occupied by a different Phase group, the system **automatically updates the record's Phase** to match the new group.
+    - Example: Moving a "Systemic" record into the middle of "Disease Control" records will convert it to "Disease Control".
+3.  **Contextual Insert:**
+    - When inserting a new record via the "Insert" button on an existing row, the new record is **locked** to that row's Phase and inserted immediately after it. The Order field is also locked to prevent accidental displacement.
 
 ---
 

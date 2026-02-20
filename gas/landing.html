@@ -232,6 +232,15 @@
               <span class="detail-label">Team Leader</span>
               <span class="detail-value" x-text="getTeamLeaderName()"></span>
             </div>
+            
+            <!-- Rotate Clinic Link -->
+            <div class="mt-4 pt-3 border-t border-gray-100 text-center">
+              <button @click="openRotateModal()" 
+                      class="text-sm font-semibold text-navy hover:text-navy-light hover:underline flex items-center justify-center gap-1 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Rotate Clinic Requirement
+              </button>
+            </div>
           </div>
         </template>
 
@@ -317,6 +326,38 @@
                  <option>Orthodontic Treatment</option>
                  <option>Waiting in Recall Lists</option>
               </select>
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100"
+                 x-show="editingPatient.student_id_1 === profile.student_id">
+               <div>
+                  <label class="block text-xs font-bold text-navy uppercase tracking-wider">Complete Case</label>
+               </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                   <input type="checkbox" x-model="editingPatient.is_completed_case" 
+                          @change="toggleCompleteCase(editingPatient, true)"
+                          class="sr-only peer">
+                   <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+            </div>
+           
+           <!-- Complexity and Type of Case -->
+           <div class="grid grid-cols-2 gap-4">
+             <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Complexity</label>
+                <input type="text" x-model="editingPatient.complexity" placeholder="e.g. 1, 2, 3"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy">
+             </div>
+             <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Type of Case</label>
+                <select x-model="editingPatient.type_of_case" 
+                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy">
+                   <option value="">(Select Type)</option>
+                   <template x-for="tc in typeOfCases" :key="tc.id">
+                      <option :value="tc.type_of_case" x-text="tc.type_of_case"></option>
+                   </template>
+                </select>
+             </div>
            </div>
 
            <div class="grid grid-cols-2 gap-4">
@@ -331,6 +372,7 @@
                 <input type="text" x-model="editingPatient.tel" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
              </div>
            </div>
+
 
            <!-- Note -->
            <div>
@@ -403,7 +445,9 @@
            <button @click="viewTreatmentPlan(editingPatient.hn)" class="w-full py-2 bg-white border border-navy text-navy font-semibold rounded-lg shadow-sm hover:bg-navy hover:text-white transition">
               View Treatment Plan
            </button>
-           <button @click="savePatient()" class="w-full py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition flex justify-center items-center gap-2" :disabled="saving">
+           <button @click="savePatient()" 
+                   x-show="editingPatient.student_id_1 === profile.student_id"
+                   class="w-full py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition flex justify-center items-center gap-2" :disabled="saving">
               <span x-show="saving" class="spinner w-4 h-4 border-white/30 border-t-white"></span>
               <span x-text="saving ? 'Saving...' : 'Save Changes'"></span>
            </button>
@@ -445,11 +489,23 @@
                          }"
                          x-text="p.status">
                    </span>
-                 </div>
-                 <div class="pl-2 text-xs text-gray-500 space-y-1">
-                    <p x-show="p.tel"><span class="font-medium text-gray-400">Tel:</span> <span x-text="p.tel"></span></p>
-                    <p x-show="p.note" class="italic text-gray-400 mt-2 border-t border-gray-50 pt-2" x-text="p.note"></p>
-                 </div>
+                  </div>
+                  <div class="pl-2 flex justify-between items-center mb-2">
+                    <div class="text-xs text-gray-500 space-y-1">
+                       <p x-show="p.tel"><span class="font-medium text-gray-400">Tel:</span> <span x-text="p.tel"></span></p>
+                    </div>
+                    <!-- Toggle Switch -->
+                    <div class="flex items-center gap-2" @click.stop>
+                       <span class="text-[0.65rem] font-bold uppercase tracking-wide transition-colors" :class="p.is_completed_case ? 'text-emerald-600' : 'text-gray-400'">Complete Case</span>
+                       <label class="relative inline-flex items-center cursor-pointer scale-90">
+                          <input type="checkbox" x-model="p.is_completed_case" @change="toggleCompleteCase(p, false)" class="sr-only peer">
+                          <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                       </label>
+                    </div>
+                  </div>
+                  <div class="pl-2 text-xs text-gray-500">
+                     <p x-show="p.note" class="italic text-gray-400 mt-2 border-t border-gray-50 pt-2" x-text="p.note"></p>
+                  </div>
                </div>
              </template>
            </div>
@@ -471,12 +527,16 @@
                          x-text="p.status">
                    </span>
                  </div>
-                 <div class="pl-2 text-xs text-gray-500 space-y-1">
-                    <p x-show="p.tel"><span class="font-medium text-gray-400">Tel:</span> <span x-text="p.tel"></span></p>
+                  <div class="pl-2 flex justify-between items-center mb-2">
+                    <div class="text-xs text-gray-500 space-y-1">
+                       <p x-show="p.tel"><span class="font-medium text-gray-400">Tel:</span> <span x-text="p.tel"></span></p>
+                    </div>
+                  </div>
+                  <div class="pl-2 text-xs text-gray-500">
                     <div class="mt-2 text-[0.65rem] text-gold font-medium uppercase tracking-wide">
                        Referred Case
                     </div>
-                 </div>
+                  </div>
                </div>
              </template>
            </div>
@@ -591,6 +651,138 @@
     </div>
   </div>
 
+  <!-- ─── Rotate Clinic Modal ─── -->
+  <div x-show="rotateModalOpen" style="display: none;"
+       class="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+       x-transition.opacity>
+    
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in flex flex-col max-h-[90vh]"
+         @click.outside="rotateModalOpen = false">
+      
+      <!-- Header -->
+      <div class="bg-navy px-6 py-4 flex justify-between items-center text-white shrink-0">
+        <h3 class="text-lg font-bold">Add Rotate Requirement</h3>
+        <button @click="rotateModalOpen = false" class="text-white/70 hover:text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-6 space-y-4 overflow-y-auto">
+        <div x-show="rotateLoading" class="text-center py-4">
+           <div class="spinner w-6 h-6 border-navy/20 border-t-navy mx-auto"></div>
+           <p class="text-xs text-gray-400 mt-2">Loading data...</p>
+        </div>
+
+        <div x-show="!rotateLoading" class="space-y-4">
+          
+          <!-- 1. Division -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Rotate Clinic</label>
+            <select x-model="rotateForm.division_id" @change="onRotateDivisionChange()"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy">
+              <option value="">-- Select Clinic --</option>
+              <template x-for="d in rotateDivisions" :key="d.division_id">
+                <option :value="d.division_id" x-text="d.name"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- 2. Requirement -->
+          <div x-show="rotateForm.division_id">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Requirement</label>
+              <div x-show="rotateOptionsLoading" class="spinner w-3 h-3 border-navy/20 border-t-navy"></div>
+            </div>
+            <select x-model="rotateForm.requirement_id" @change="onRotateRequirementChange()"
+                    :disabled="rotateOptionsLoading"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy disabled:bg-gray-50">
+              <option value="">-- Select Requirement --</option>
+              <template x-for="r in rotateRequirements" :key="r.requirement_id">
+                <option :value="r.requirement_id" x-text="r.requirement_type"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- 3. RSU / CDA Units -->
+          <div x-show="rotateForm.requirement_id" class="grid grid-cols-2 gap-4">
+             <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">RSU Requirement</label>
+                <div class="flex items-center gap-2">
+                   <input type="number" step="0.1" x-model="rotateForm.rsu_units" 
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy"
+                          :disabled="rotateForm.min_rsu === 0">
+                   <span class="text-xs text-gray-500 font-medium" x-show="rotateForm.rsu_unit" x-text="rotateForm.rsu_unit"></span>
+                </div>
+             </div>
+             <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">CDA Requirement</label>
+                <div class="flex items-center gap-2">
+                   <input type="number" step="0.1" x-model="rotateForm.cda_units" 
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy"
+                          :disabled="rotateForm.min_cda === 0">
+                   <span class="text-xs text-gray-500 font-medium" x-show="rotateForm.cda_unit" x-text="rotateForm.cda_unit"></span>
+                </div>
+             </div>
+          </div>
+
+          <!-- 4. Patient Info (Conditional) -->
+          <div x-show="rotateForm.requirement_id && rotateForm.is_patient_treatment" class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+             <h4 class="text-xs font-bold text-navy uppercase mb-3 border-b border-gray-200 pb-1">Patient Information</h4>
+             <div class="space-y-3">
+                <div class="grid grid-cols-3 gap-3">
+                   <div class="col-span-1">
+                      <label class="block text-xs text-gray-500 mb-1">HN</label>
+                      <input type="text" x-model="rotateForm.hn" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                   </div>
+                   <div class="col-span-2">
+                      <label class="block text-xs text-gray-500 mb-1">Patient Name</label>
+                      <input type="text" x-model="rotateForm.patient_name" class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                   </div>
+                </div>
+                <div>
+                   <label class="block text-xs text-gray-500 mb-1">Area / Teeth / Description</label>
+                   <input type="text" x-model="rotateForm.area" placeholder="e.g. Tooth 16, Full Mouth..." class="w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                </div>
+                <p class="text-[0.65rem] text-amber-600 mt-1">
+                   * Note: If this patient is assigned to you in the main clinic, please submit via your Patient List instead.
+                </p>
+             </div>
+          </div>
+
+          <!-- 5. Advisor -->
+          <div x-show="rotateForm.requirement_id">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Advisor (Instructor)</label>
+              <div x-show="rotateOptionsLoading" class="spinner w-3 h-3 border-navy/20 border-t-navy"></div>
+            </div>
+            <select x-model="rotateForm.instructor_id"
+                    :disabled="rotateOptionsLoading"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy disabled:bg-gray-50">
+              <option value="">-- Select Advisor --</option>
+              <template x-for="i in rotateInstructors" :key="i.instructor_id">
+                <option :value="i.instructor_id" x-text="i.user ? i.user.name : 'Unknown'"></option>
+              </template>
+            </select>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
+         <button @click="rotateModalOpen = false" class="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium text-sm">Cancel</button>
+         <button @click="submitRotateRequirement()" 
+                 :disabled="rotateSubmitting || !rotateForm.division_id || !rotateForm.requirement_id || !rotateForm.instructor_id"
+                 class="px-4 py-2 bg-navy text-white font-medium rounded-lg shadow hover:bg-navy-light disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <span x-show="rotateSubmitting" class="spinner w-4 h-4 border-white/30 border-t-white"></span>
+            <span x-text="rotateSubmitting ? 'Submitting...' : 'Submit'"></span>
+         </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- ─── Alpine.js App Logic ─── -->
   <script>
     function landingApp() {
@@ -642,6 +834,7 @@
 
                   if (profile.role === 'student') {
                      this.loadPatients();
+                     this.loadTypeOfCases();
                   }
                 })
                 .withFailureHandler((err) => {
@@ -693,6 +886,7 @@
         loadingPatients: false,
         myPatients: [],
         referredPatients: [],
+        typeOfCases: [],
         
         // Modal State
         editModalOpen: false,
@@ -728,7 +922,71 @@
                 console.error("Failed to load patients", err);
                 this.loadingPatients = false;
              })
-             .getStudentPatients();
+              .getStudentPatients();
+        },
+
+        loadTypeOfCases() {
+          google.script.run
+            .withSuccessHandler((data) => {
+               this.typeOfCases = data || [];
+            })
+            .withFailureHandler((err) => {
+               console.error("Failed to load case types", err);
+            })
+            .studentListTypeOfCases();
+        },
+
+        toggleCompleteCase(p, fromModal = false) {
+           // If called from modal, p is a copy (this.editingPatient)
+           // If called from card, p is the original in the list
+           
+           // If p is from modal, we don't need to manually toggle newValue 
+           // because x-model already updated it.
+           // If from card, we use the passed value (which is currently @change triggered)
+           
+           const newValue = p.is_completed_case; 
+           const hn = p.hn;
+           
+           // If from modal, sync to the list immediately
+           if (fromModal) {
+              const findInList = (list) => {
+                 const match = list.find(item => item.hn === hn);
+                 if (match) match.is_completed_case = newValue;
+              };
+              findInList(this.myPatients);
+              findInList(this.referredPatients);
+           }
+           
+           google.script.run
+             .withSuccessHandler((res) => {
+                if (!res.success) {
+                  // Revert if failed
+                  p.is_completed_case = !newValue;
+                  if (fromModal) {
+                     const findInList = (list) => {
+                        const match = list.find(item => item.hn === hn);
+                        if (match) match.is_completed_case = !newValue;
+                     };
+                     findInList(this.myPatients);
+                     findInList(this.referredPatients);
+                  }
+                  this.showErrorModal("Failed to toggle completion status.");
+                }
+             })
+             .withFailureHandler((err) => {
+                // Revert
+                p.is_completed_case = !newValue;
+                if (fromModal) {
+                   const findInList = (list) => {
+                      const match = list.find(item => item.hn === hn);
+                      if (match) match.is_completed_case = !newValue;
+                   };
+                   findInList(this.myPatients);
+                   findInList(this.referredPatients);
+                }
+                this.showErrorModal("Error: " + err.message);
+             })
+             .studentToggleCompleteCase(hn, newValue);
         },
 
         openPatientModal(p) {
@@ -781,6 +1039,153 @@
         showErrorModal(msg) {
            this.errorModalMessage = msg;
            this.errorModalOpen = true;
+        },
+
+        // --- Rotate Clinic Logic ---
+        rotateModalOpen: false,
+        rotateLoading: false,
+        rotateOptionsLoading: false,
+        rotateSubmitting: false,
+        rotateDivisions: [],
+        rotateRequirements: [],
+        rotateInstructors: [],
+        rotateForm: {
+           division_id: '',
+           requirement_id: '',
+           rsu_units: 0,
+           cda_units: 0,
+           instructor_id: '',
+           area: '',
+           hn: '',
+           patient_name: '',
+           // Helpers (not sent)
+           min_rsu: 0,
+           min_cda: 0,
+           rsu_unit: '',
+           cda_unit: '',
+           is_patient_treatment: false
+        },
+
+        openRotateModal() {
+           this.rotateForm = { division_id: '', requirement_id: '', rsu_units: 0, cda_units: 0, instructor_id: '', area: '', hn: '', patient_name: '', min_rsu: 0, min_cda: 0, rsu_unit: '', cda_unit: '', is_patient_treatment: false };
+           this.rotateModalOpen = true;
+           this.rotateLoading = true;
+           this.rotateOptionsLoading = false;
+           
+           google.script.run
+             .withSuccessHandler((divs) => {
+                this.rotateDivisions = divs;
+                this.rotateLoading = false;
+             })
+             .withFailureHandler((err) => {
+                this.showErrorModal("Failed to load divisions: " + err.message);
+                this.rotateModalOpen = false;
+             })
+             .studentListRotateDivisions();
+        },
+
+        onRotateDivisionChange() {
+           const divId = this.rotateForm.division_id;
+           this.rotateRequirements = [];
+           this.rotateInstructors = [];
+           this.rotateForm.requirement_id = '';
+           this.rotateForm.instructor_id = '';
+           
+           if (!divId) return;
+           
+           this.rotateOptionsLoading = true;
+           let reqsDone = false;
+           let instsDone = false;
+
+           const checkAllDone = () => {
+             if (reqsDone && instsDone) {
+               this.rotateOptionsLoading = false;
+             }
+           };
+           
+           // Fetch Requirements
+           google.script.run
+             .withSuccessHandler((reqs) => {
+                this.rotateRequirements = reqs;
+                reqsDone = true;
+                checkAllDone();
+             })
+             .withFailureHandler((err) => {
+                console.error("Failed to load requirements", err);
+                reqsDone = true;
+                checkAllDone();
+             })
+             .studentListRequirementsByDivision(divId);
+             
+           // Fetch Instructors
+           google.script.run
+             .withSuccessHandler((insts) => {
+                this.rotateInstructors = insts;
+                instsDone = true;
+                checkAllDone();
+             })
+             .withFailureHandler((err) => {
+                console.error("Failed to load instructors", err);
+                instsDone = true;
+                checkAllDone();
+             })
+             .studentListInstructorsByDivision(divId);
+        },
+
+        onRotateRequirementChange() {
+           const reqId = this.rotateForm.requirement_id;
+           
+           if (!reqId) {
+             // Reset if no requirement selected
+             this.rotateForm.min_rsu = 0;
+             this.rotateForm.min_cda = 0;
+             this.rotateForm.is_patient_treatment = false;
+             this.rotateForm.rsu_units = 0;
+             this.rotateForm.cda_units = 0;
+             this.rotateForm.rsu_unit = '';
+             this.rotateForm.cda_unit = '';
+             return;
+           }
+           
+           const req = this.rotateRequirements.find(r => r.requirement_id === reqId);
+           if (req) {
+              this.rotateForm.min_rsu = req.minimum_rsu || 0;
+              this.rotateForm.min_cda = req.minimum_cda || 0;
+              this.rotateForm.rsu_unit = req.rsu_unit || '';
+              this.rotateForm.cda_unit = req.cda_unit || '';
+              this.rotateForm.is_patient_treatment = req.is_patient_treatment === true;
+              
+              // Preset units if they are fixed/min
+              if (this.rotateForm.min_rsu > 0) this.rotateForm.rsu_units = this.rotateForm.min_rsu;
+              else this.rotateForm.rsu_units = 0;
+              
+              if (this.rotateForm.min_cda > 0) this.rotateForm.cda_units = this.rotateForm.min_cda;
+              else this.rotateForm.cda_units = 0;
+           }
+        },
+
+        submitRotateRequirement() {
+           if (!this.rotateForm.division_id || !this.rotateForm.requirement_id || !this.rotateForm.instructor_id) {
+              return;
+           }
+           
+           this.rotateSubmitting = true;
+           google.script.run
+             .withSuccessHandler((res) => {
+                this.rotateSubmitting = false;
+                if (res.success) {
+                   this.rotateModalOpen = false;
+                   // Optional: Show success toast?
+                   // No patient list to update here really.
+                } else {
+                   this.showErrorModal(res.error || "Submission failed.");
+                }
+             })
+             .withFailureHandler((err) => {
+                this.rotateSubmitting = false;
+                this.showErrorModal(err.message || "Submission failed.");
+             })
+             .studentSubmitRotateRequirement(this.rotateForm);
         }
       };
     }

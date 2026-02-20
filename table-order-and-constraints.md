@@ -1,6 +1,13 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.type_of_case (
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+type_of_case text NOT NULL UNIQUE,
+created_at timestamp with time zone NOT NULL DEFAULT now(),
+updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
 CREATE TABLE public.divisions (
 division_id uuid NOT NULL DEFAULT gen_random_uuid(),
 code text NOT NULL UNIQUE,
@@ -43,6 +50,9 @@ name text NOT NULL,
 birthdate date,
 tel text,
 status USER-DEFINED NOT NULL DEFAULT 'Waiting to Be Assigned'::patient_status,
+is_completed_case boolean NOT NULL DEFAULT false,
+complexity text,
+type_of_case uuid references public.type_of_case(id),
 note text,
 instructor_id uuid references public.instructors(instructor_id),
 student_id_1 uuid references public.students(student_id),

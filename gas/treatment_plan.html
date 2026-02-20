@@ -57,9 +57,10 @@
         </div>
       </div>
       
-      <!-- Add Button -->
-      <!-- Only show for students (or admins/others, but definitely hide for instructor) -->
-      <button x-show="!currentUser || currentUser.role !== 'instructor'" @click="openModal(null)" class="btn-primary flex items-center gap-2 px-4 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition shadow-sm">
+      <!-- Add Button: Only show for primary owner (student_id_1) -->
+      <button x-show="patient && patient.student_id_1 === (currentUser ? currentUser.id : null) && (!currentUser || currentUser.role !== 'instructor')" 
+              @click="openModal(null)" 
+              class="btn-primary flex items-center gap-2 px-4 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition shadow-sm">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         Add Treatment
       </button>
@@ -103,7 +104,10 @@
             <tr x-show="activeActionRow === 'header'" x-cloak>
               <td colspan="7" class="px-3 py-2 bg-blue-50/50">
                 <div class="flex gap-2">
-                  <button x-show="!currentUser || currentUser.role !== 'instructor'" @click.stop="openModal(null)" class="px-3 py-1.5 bg-navy text-white text-xs font-medium rounded-md hover:bg-navy-light transition flex items-center gap-1">
+                   <!-- Only show "Insert New Treatment" to the primary owner -->
+                  <button x-show="patient && patient.student_id_1 === (currentUser ? currentUser.id : null) && (!currentUser || currentUser.role !== 'instructor')" 
+                          @click.stop="openModal(null)" 
+                          class="px-3 py-1.5 bg-navy text-white text-xs font-medium rounded-md hover:bg-navy-light transition flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Insert New Treatment
                   </button>
@@ -150,19 +154,34 @@
                 <tr x-show="activeActionRow === r.record_id" x-cloak>
                   <td colspan="7" class="px-3 py-2 bg-blue-50/50">
                     <div class="flex gap-2">
-                      <button x-show="!currentUser || currentUser.role !== 'instructor'" @click.stop="openModal(null, r.treatment_order || (idx+1))" class="px-3 py-1.5 bg-navy text-white text-xs font-medium rounded-md hover:bg-navy-light transition flex items-center gap-1">
+                      <!-- Row Insert: Only for primary owner -->
+                      <button x-show="patient && patient.student_id_1 === (currentUser ? currentUser.id : null) && (!currentUser || currentUser.role !== 'instructor')" 
+                              @click.stop="openModal(null, r.treatment_order || (idx+1), r.phase_id)" 
+                              class="px-3 py-1.5 bg-navy text-white text-xs font-medium rounded-md hover:bg-navy-light transition flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         Insert
                       </button>
-                      <button @click.stop="openModal(r)" class="px-3 py-1.5 bg-gold/10 text-gold text-xs font-medium rounded-md hover:bg-gold/20 transition flex items-center gap-1">
+                      
+                      <!-- Row Edit: Available to primary owner OR to students editing their own records -->
+                      <button x-show="(patient && patient.student_id_1 === (currentUser ? currentUser.id : null)) || (currentUser && r.student_id === currentUser.id)" 
+                              @click.stop="openModal(r)" 
+                              class="px-3 py-1.5 bg-gold/10 text-gold text-xs font-medium rounded-md hover:bg-gold/20 transition flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                         <span x-text="(currentUser && currentUser.role === 'instructor') ? 'Requirement Verify' : 'Edit'"></span>
                       </button>
-                      <button x-show="!currentUser || currentUser.role !== 'instructor'" @click.stop="promptReorder(r)" class="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-md hover:bg-indigo-100 transition flex items-center gap-1">
+                      
+                      <!-- Row Reorder: Only for primary owner -->
+                      <button x-show="patient && patient.student_id_1 === (currentUser ? currentUser.id : null) && (!currentUser || currentUser.role !== 'instructor')" 
+                              @click.stop="promptReorder(r)" 
+                              class="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-md hover:bg-indigo-100 transition flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
                         Reorder
                       </button>
-                      <button x-show="!currentUser || currentUser.role !== 'instructor'" @click.stop="confirmDelete(r)" class="px-3 py-1.5 bg-red-50 text-red-500 text-xs font-medium rounded-md hover:bg-red-100 transition flex items-center gap-1">
+                      
+                      <!-- Row Delete: Only for primary owner -->
+                      <button x-show="patient && patient.student_id_1 === (currentUser ? currentUser.id : null) && (!currentUser || currentUser.role !== 'instructor')" 
+                              @click.stop="confirmDelete(r)" 
+                              class="px-3 py-1.5 bg-red-50 text-red-500 text-xs font-medium rounded-md hover:bg-red-100 transition flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         Delete
                       </button>
@@ -197,12 +216,15 @@
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Phase</label>
-              <select x-model="form.phase_id" class="w-full">
+              <select x-model="form.phase_id" class="w-full" :disabled="phaseLocked">
                 <option value="">— Select Phase —</option>
                 <template x-for="p in phases" :key="p.phase_id">
                   <option :value="p.phase_id" x-text="p.phase_name"></option>
                 </template>
               </select>
+                </template>
+              </select>
+              <div x-show="phaseLocked" class="text-[0.6rem] text-orange-500 mt-1">Locked to current phase group. Use "Add Treatment" button to add to other phases.</div>
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Division</label>
@@ -221,9 +243,10 @@
               Initial Order (Insert At)
             </label>
             <div class="flex items-center gap-2">
-              <input type="number" x-model="form.treatment_order" min="1" class="w-24" />
+              <input type="number" x-model="form.treatment_order" min="1" class="w-24" :disabled="phaseLocked" />
               <div class="text-xs text-blue-500">
-                Default is at the end. Change this to insert the record at a specific position (e.g., 1 to put it at the top).
+                <span x-show="!phaseLocked">Default is at the end. Change this to insert the record at a specific position (e.g., 1 to put it at the top).</span>
+                <span x-show="phaseLocked" class="text-orange-500">Order is locked relative to the selected row.</span>
               </div>
             </div>
           </div>
@@ -301,6 +324,12 @@
             </div>
           </div>
           
+          <!-- PERIO: Severity -->
+          <div x-show="selectedDivisionCode === 'PERIO'" x-transition class="bg-indigo-50/50 rounded-lg p-4 border border-indigo-100 mb-6">
+            <label class="block text-xs font-medium text-indigo-600 mb-1 uppercase tracking-wide">Severity (PERIO)</label>
+            <input type="number" x-model="form.severity" @input="calculatePerioUnits()" step="0.01" min="0" max="99.99" placeholder="0.00" class="w-full" />
+          </div>
+          
           <!-- Requirement Summary Group -->
           <fieldset class="border border-indigo-100 rounded-xl p-5 mb-6 bg-slate-50 relative mt-6">
             <legend class="text-xs font-bold text-white px-3 py-1 bg-navy rounded-full uppercase tracking-wide absolute -top-3 left-4 shadow-sm">
@@ -321,7 +350,7 @@
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Requirement</label>
-                  <select x-model="form.requirement_id" class="w-full" :disabled="!form.division_id">
+                  <select x-model="form.requirement_id" @change="calculatePerioUnits()" class="w-full" :disabled="!form.division_id">
                     <option value="">— Select Requirement —</option>
                     <template x-for="r in filteredRequirements" :key="r.requirement_id">
                       <option :value="r.requirement_id" x-text="r.requirement_type + (r.rsu_unit ? ' (' + r.rsu_unit + ')' : '')"></option>
@@ -333,11 +362,11 @@
               <!-- Row 2: Units -->
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">RSU Units</label>
+                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide" x-text="(selectedDivisionCode === 'PERIO' && (selectedRequirementType === 'Case G' || selectedRequirementType === 'Case P')) ? 'Complexities' : 'RSU Requirements'"></label>
                   <input type="number" x-model="form.rsu_units" step="0.01" min="0" placeholder="0" class="w-full" />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">CDA Units</label>
+                  <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">CDA Requirements</label>
                   <input type="number" x-model="form.cda_units" step="0.01" min="0" placeholder="0" class="w-full" />
                 </div>
               </div>
@@ -367,11 +396,7 @@
             </div>
           </fieldset>
             
-          <!-- PERIO: Severity -->
-          <div x-show="selectedDivisionCode === 'PERIO'" x-transition class="bg-indigo-50/50 rounded-lg p-4 border border-indigo-100">
-            <label class="block text-xs font-medium text-indigo-600 mb-1 uppercase tracking-wide">Severity (PERIO)</label>
-            <input type="number" x-model="form.severity" step="0.01" min="0" max="99.99" placeholder="0.00" class="w-full" />
-          </div>
+
 
           <!-- OPER: Book & Page -->
           <div x-show="selectedDivisionCode === 'OPER'" x-transition class="bg-amber-50/50 rounded-lg p-4 border border-amber-100">
@@ -497,6 +522,7 @@
 
          // Verify state
          verifying: false,
+         phaseLocked: false,
 
          // Computed-like getters
         get filteredCatalog() {
@@ -544,6 +570,13 @@
           var divId = this.form.division_id;
           var div = this.divisions.find(function(d) { return d.division_id === divId; });
           return div ? (div.code || '').toUpperCase() : '';
+        },
+
+        get selectedRequirementType() {
+          if (!this.form.requirement_id) return '';
+          var reqId = this.form.requirement_id;
+          var req = this.requirements.find(function(r) { return r.requirement_id === reqId; });
+          return req ? req.requirement_type : '';
         },
 
         init: function() {
@@ -611,13 +644,14 @@
           };
         },
 
-        openModal: function(record, insertAfterOrder) {
+        openModal: function(record, insertAfterOrder, fixedPhaseId) {
           this.activeActionRow = null;
           this.resetForm(); // Reset to defaults first
           this.referralMode = false;
           this.referralQuery = '';
           this.referralResult = null;
           this.referralError = '';
+          this.phaseLocked = false;
           var self = this;
           
           if (record) {
@@ -659,6 +693,10 @@
             if (insertAfterOrder) {
               this.form.treatment_order = parseInt(insertAfterOrder) + 1;
             }
+            if (fixedPhaseId) {
+              this.form.phase_id = fixedPhaseId;
+              this.phaseLocked = true;
+            }
             setTimeout(function() {
               self.showModal = true;
             }, 50);
@@ -690,6 +728,7 @@
         },
 
         onStepChange: function() {
+          this.calculatePerioUnits();
           this.updateStatus();
         },
 
@@ -711,6 +750,41 @@
           } else {
             this.form.status = 'in_progress';
           }
+        },
+
+        calculatePerioUnits: function() {
+          if (this.selectedDivisionCode !== 'PERIO') return;
+
+          var reqId = this.form.requirement_id;
+          var stepId = this.form.step_id;
+          var severity = parseFloat(this.form.severity) || 0;
+
+          var req = this.requirements.find(function(r) { return r.requirement_id === reqId; });
+          var step = this.allSteps.find(function(s) { return s.step_id === stepId; });
+          
+          if (!req) return;
+
+          var reqType = req.requirement_type || '';
+          var stepOrder = step ? step.step_order : 0;
+          var rsu = 0;
+          var cda = 0;
+
+          // RSU Units
+          if (reqType === 'Case G' && stepOrder >= 7) {
+            rsu = severity / 0.8;
+          } else if (reqType === 'Case P' && stepOrder >= 7) {
+            rsu = severity / 0.5;
+          } else if (['SRP 1st Exam', 'OHI 1st Exam', 'OHI 2nd Exam'].indexOf(reqType) !== -1) {
+            rsu = 1;
+          }
+
+          // CDA Units
+          if (['Case G', 'Case P', 'SRP 2nd Exam'].indexOf(reqType) !== -1) {
+             cda = 1;
+          }
+          
+          this.form.rsu_units = rsu.toFixed(2);
+          this.form.cda_units = cda.toFixed(2);
         },
 
         saveRecord: function() {
@@ -928,7 +1002,7 @@
             .withSuccessHandler(function(res) {
               self.changingOrder = false;
               if (res.success) {
-                self.showToast('Order updated');
+                self.showToast(res.message || 'Order updated');
                 self.activeActionRow = null; 
                 self.reload();
               } else {

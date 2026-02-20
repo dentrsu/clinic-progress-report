@@ -448,6 +448,7 @@ var SupabaseProvider = (function () {
         ",s3:students!student_id_3(academic_id, user:users(name))" +
         ",s4:students!student_id_4(academic_id, user:users(name))" +
         ",s5:students!student_id_5(academic_id, user:users(name))" +
+        ",case_type:type_of_case(type_of_case)" +
         ",inst:instructors(user:users(name))";
 
       return _get(
@@ -477,7 +478,7 @@ var SupabaseProvider = (function () {
           patientId +
           "&select=" +
           select +
-          "&order=treatment_order.asc,created_at.asc",
+          "&order=treatment_phases(phase_order).asc,treatment_order.asc,created_at.asc",
       );
     },
 
@@ -618,10 +619,91 @@ var SupabaseProvider = (function () {
     },
 
     /**
-     * Create treatment record.
+     * List all type_of_case records.
      */
-    createTreatmentRecord: function (record) {
-      var rows = _post("/rest/v1/treatment_records", record);
+    listTypeOfCases: function () {
+      return _get("/rest/v1/type_of_case?select=*&order=type_of_case.asc");
+    },
+
+    /**
+     * Resolve Type of Case text to its ID.
+     * @param {string} text
+     * @returns {string|null} UUID or null
+     */
+    getTypeOfCaseIdByText: function (text) {
+      if (!text) return null;
+      var rows = _get(
+        "/rest/v1/type_of_case?type_of_case=eq." +
+          encodeURIComponent(text) +
+          "&select=id",
+      );
+      return rows && rows.length > 0 ? rows[0].id : null;
+    },
+
+    /**
+     * Create public.type_of_case record.
+     */
+    createTypeOfCase: function (payload) {
+      var rows = _post("/rest/v1/type_of_case", payload);
+      return rows[0];
+    },
+
+    /**
+     * Update public.type_of_case record.
+     */
+    updateTypeOfCase: function (id, payload) {
+      var rows = _patch("/rest/v1/type_of_case?id=eq." + id, payload);
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Delete public.type_of_case record.
+     */
+    deleteTypeOfCase: function (id) {
+      return _delete("/rest/v1/type_of_case?id=eq." + id);
+    },
+
+    // ──────────────────────────────────────────────
+    //  Rotate Clinic Workflow
+    // ──────────────────────────────────────────────
+
+    /**
+     * List divisions where clinic = 'rotate'.
+     */
+    listRotateDivisions: function () {
+      // Fetch rotate divisions
+      return _get(
+        "/rest/v1/divisions?clinic=eq.rotate&select=*&order=name.asc",
+      );
+    },
+
+    /**
+     * List requirements for a specific division.
+     */
+    listRequirementsByDivision: function (divisionId) {
+      return _get(
+        "/rest/v1/requirement_list?division_id=eq." +
+          divisionId +
+          "&select=*&order=requirement_type.asc",
+      );
+    },
+
+    /**
+     * List instructors belonging to a specific division.
+     */
+    listInstructorsByDivision: function (divisionId) {
+      return _get(
+        "/rest/v1/instructors?division_id=eq." +
+          divisionId +
+          "&select=*,user:users(name)&order=user(name).asc",
+      );
+    },
+
+    /**
+     * Create a treatment record for a rotate clinic requirement.
+     */
+    createTreatmentRecord: function (payload) {
+      var rows = _post("/rest/v1/treatment_records", payload);
       return rows[0];
     },
 
