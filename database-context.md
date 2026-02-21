@@ -68,7 +68,8 @@ create table public.divisions (
   division_id uuid primary key default gen_random_uuid(),
   name text not null,
   code text not null,
-  clinic public.clinic_type not null default 'N/A'
+  clinic public.clinic_type not null default 'N/A',
+  have_non_main_patient_requirements boolean not null default true
 );
 
 create table public.instructors (
@@ -105,8 +106,12 @@ create table public.requirement_list (
   requirement_id uuid primary key default gen_random_uuid(),
   division_id uuid not null references public.divisions(division_id),
   requirement_type text not null,
-  rsu_unit numeric, -- e.g. 1.0, 0.5
-  is_patient_treatment boolean not null default true
+  minimum_rsu numeric not null default 0,
+  minimum_cda numeric not null default 0,
+  rsu_unit text, -- e.g. 'Case', 'Visit'
+  cda_unit text,
+  is_patient_treatment boolean not null default true,
+  non_mc_pateint_req boolean not null default true
 );
 
 -- 3.6 Patients

@@ -352,6 +352,21 @@ function doGet(e) {
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
 
+  if (page === "vault") {
+    var user = getCurrentUser();
+    var profile = getUserProfile(user.email);
+    var t = HtmlService.createTemplateFromFile("requirement_vault");
+    t.appUrl = url;
+    t.appDevUrl = devUrl;
+    t.academic_id = profile.academic_id || "-";
+    t.student_name = profile.name || "-";
+    return t
+      .evaluate()
+      .setTitle("Requirement Vault — Clinic Progress Report")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
   var t = HtmlService.createTemplateFromFile("landing");
   t.appUrl = url;
   t.appDevUrl = devUrl;
@@ -360,6 +375,69 @@ function doGet(e) {
     .setTitle("Clinic Progress Report — RSU")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag("viewport", "width=device-width, initial-scale=1");
+}
+
+/**
+ * Get student requirement progress for the vault.
+ * @returns {Object} Grouped by division
+ */
+function getStudentVaultData() {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("User is not an active student.");
+  }
+
+  // 1. Fetch all requirements
+  var requirements = SupabaseProvider.listRequirements() || [];
+
+  // 2. Fetch all verified records for this student
+  var records =
+    SupabaseProvider.listVerifiedRecordsByStudent(profile.student_id) || [];
+
+  // 3. Aggregate progress
+  var progressMap = {}; // requirement_id -> { total_rsu, total_cda }
+  records.forEach(function (rec) {
+    if (!rec.requirement_id) return;
+    if (!progressMap[rec.requirement_id]) {
+      progressMap[rec.requirement_id] = { rsu: 0, cda: 0 };
+    }
+    progressMap[rec.requirement_id].rsu += parseFloat(rec.rsu_units) || 0;
+    progressMap[rec.requirement_id].cda += parseFloat(rec.cda_units) || 0;
+  });
+
+  // 4. Map requirements with progress and group by division
+  var divisions = {};
+  requirements.forEach(function (req) {
+    var divName =
+      req.divisions && req.divisions.name ? req.divisions.name : "Other";
+    if (!divisions[divName]) {
+      divisions[divName] = {
+        name: divName,
+        requirements: [],
+      };
+    }
+
+    var prog = progressMap[req.requirement_id] || { rsu: 0, cda: 0 };
+
+    divisions[divName].requirements.push({
+      requirement_id: req.requirement_id,
+      requirement_type: req.requirement_type,
+      minimum_rsu: req.minimum_rsu || 0,
+      minimum_cda: req.minimum_cda || 0,
+      current_rsu: Math.round(prog.rsu * 100) / 100,
+      current_cda: Math.round(prog.cda * 100) / 100,
+      rsu_unit: req.rsu_unit || "Case",
+      cda_unit: req.cda_unit || "Case",
+    });
+  });
+
+  // Convert map to sorted array
+  return Object.values(divisions).sort(function (a, b) {
+    return a.name.localeCompare(b.name);
+  });
 }
 
 /**
@@ -799,15 +877,26 @@ function adminListTypeOfCases() {
  */
 function adminCreateTypeOfCase(form) {
   _assertAdmin();
-  return SupabaseProvider.createTypeOfCase(form);
+  try {
+    SupabaseProvider.createTypeOfCase({
+      type_of_case: form.type_of_case,
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 }
 
-/**
- * Update public.type_of_case record (Admin).
- */
 function adminUpdateTypeOfCase(id, form) {
   _assertAdmin();
-  return SupabaseProvider.updateTypeOfCase(id, form);
+  try {
+    SupabaseProvider.updateTypeOfCase(id, {
+      type_of_case: form.type_of_case,
+    });
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 }
 
 /**
@@ -1322,6 +1411,8 @@ function adminCreateDivision(form) {
       code: form.code,
       name: form.name,
       clinic: form.clinic || "N/A",
+      have_non_main_patient_requirements:
+        !!form.have_non_main_patient_requirements,
     });
     return { success: true };
   } catch (e) {
@@ -1336,7 +1427,8 @@ function adminUpdateDivision(id, form) {
       code: form.code,
       name: form.name,
       clinic: form.clinic || "N/A",
-      updated_at: new Date().toISOString(),
+      have_non_main_patient_requirements:
+        !!form.have_non_main_patient_requirements,
     });
     return { success: true };
   } catch (e) {
@@ -1543,6 +1635,8 @@ function adminCreateRequirement(form) {
       is_patient_treatment:
         form.is_patient_treatment === true ||
         form.is_patient_treatment === "true",
+      non_mc_pateint_req:
+        form.non_mc_pateint_req === true || form.non_mc_pateint_req === "true",
     });
     return { success: true };
   } catch (e) {
@@ -1563,6 +1657,8 @@ function adminUpdateRequirement(id, form) {
       is_patient_treatment:
         form.is_patient_treatment === true ||
         form.is_patient_treatment === "true",
+      non_mc_pateint_req:
+        form.non_mc_pateint_req === true || form.non_mc_pateint_req === "true",
     });
     return { success: true };
   } catch (e) {
@@ -1977,7 +2073,7 @@ function studentUpdateTreatmentOrder(hn, recordId, newOrder) {
 // ──────────────────────────────────────────────
 
 /**
- * List divisions for Rotate Clinic (clinic = 'rotate').
+ * List divisions for Out-of-Patient entries (clinic = 'out of patient').
  */
 function studentListRotateDivisions() {
   var user = getCurrentUser();
@@ -1992,6 +2088,12 @@ function studentListRequirementsByDivision(divisionId) {
   var user = getCurrentUser();
   if (!user.allowed) throw new Error("Access Denied");
   return SupabaseProvider.listRequirementsByDivision(divisionId);
+}
+
+function studentListNonMCRequirementsByDivision(divisionId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  return SupabaseProvider.listNonMCRequirementsByDivision(divisionId);
 }
 
 /**

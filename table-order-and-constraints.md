@@ -12,6 +12,7 @@ CREATE TABLE public.divisions (
 division_id uuid NOT NULL DEFAULT gen_random_uuid(),
 code text NOT NULL UNIQUE,
 name text NOT NULL,
+have_non_main_patient_requirements boolean NOT NULL DEFAULT true,
 CONSTRAINT divisions_pkey PRIMARY KEY (division_id)
 );
 create table public.floors (
@@ -72,6 +73,7 @@ minimum_rsu numeric,
 minimum_cda numeric,
 rsu_unit text DEFAULT 'Case',
 cda_unit text DEFAULT 'Case',
+non_mc_pateint_req boolean NOT NULL DEFAULT true,
 CONSTRAINT requirement_list_pkey PRIMARY KEY (requirement_id),
 CONSTRAINT requirement_list_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(division_id)
 );

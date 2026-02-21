@@ -671,9 +671,22 @@ var SupabaseProvider = (function () {
      * List divisions where clinic = 'rotate'.
      */
     listRotateDivisions: function () {
-      // Fetch rotate divisions
+      // Fetch divisions that are enabled for Non-Main-Clinic-Patient entries
       return _get(
-        "/rest/v1/divisions?clinic=eq.rotate&select=*&order=name.asc",
+        "/rest/v1/divisions?have_non_main_patient_requirements=eq.true&select=*&order=name.asc",
+      );
+    },
+
+    /**
+     * List verified records for a specific student for requirement aggregation.
+     * @param {string} studentId
+     * @returns {Array}
+     */
+    listVerifiedRecordsByStudent: function (studentId) {
+      return _get(
+        "/rest/v1/treatment_records?student_id=eq." +
+          studentId +
+          "&status=eq.verified&select=requirement_id,rsu_units,cda_units",
       );
     },
 
@@ -685,6 +698,14 @@ var SupabaseProvider = (function () {
         "/rest/v1/requirement_list?division_id=eq." +
           divisionId +
           "&select=*&order=requirement_type.asc",
+      );
+    },
+
+    listNonMCRequirementsByDivision: function (divisionId) {
+      return _get(
+        "/rest/v1/requirement_list?division_id=eq." +
+          divisionId +
+          "&non_mc_pateint_req=eq.true&select=*&order=requirement_type.asc",
       );
     },
 

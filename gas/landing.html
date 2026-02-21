@@ -205,6 +205,15 @@
             </template>
             <span x-text="profile.role"></span>
           </span>
+          <template x-if="profile.role === 'student'">
+            <div class="mt-2 flex justify-center">
+              <a href="<?= appUrl ?>?page=vault" target="_blank"
+                 class="text-xs font-bold text-gold hover:text-gold-light hover:underline flex items-center gap-1 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                Requirement Vault
+              </a>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -238,7 +247,7 @@
               <button @click="openRotateModal()" 
                       class="text-sm font-semibold text-navy hover:text-navy-light hover:underline flex items-center justify-center gap-1 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                Add Rotate Clinic Requirement
+                Add Requirement (rotate clinic and out of MC patients)
               </button>
             </div>
           </div>
@@ -661,7 +670,7 @@
       
       <!-- Header -->
       <div class="bg-navy px-6 py-4 flex justify-between items-center text-white shrink-0">
-        <h3 class="text-lg font-bold">Add Rotate Requirement</h3>
+        <h3 class="text-lg font-bold">Add Non-Main-Clinic-Patient Requirement</h3>
         <button @click="rotateModalOpen = false" class="text-white/70 hover:text-white">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
@@ -678,7 +687,7 @@
           
           <!-- 1. Division -->
           <div>
-            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Rotate Clinic</label>
+            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Division</label>
             <select x-model="rotateForm.division_id" @change="onRotateDivisionChange()"
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy">
               <option value="">-- Select Clinic --</option>
@@ -710,8 +719,8 @@
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">RSU Requirement</label>
                 <div class="flex items-center gap-2">
                    <input type="number" step="0.1" x-model="rotateForm.rsu_units" 
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy"
-                          :disabled="rotateForm.min_rsu === 0">
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy bg-gray-50"
+                          disabled>
                    <span class="text-xs text-gray-500 font-medium" x-show="rotateForm.rsu_unit" x-text="rotateForm.rsu_unit"></span>
                 </div>
              </div>
@@ -719,8 +728,8 @@
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">CDA Requirement</label>
                 <div class="flex items-center gap-2">
                    <input type="number" step="0.1" x-model="rotateForm.cda_units" 
-                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy"
-                          :disabled="rotateForm.min_cda === 0">
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy bg-gray-50"
+                          disabled>
                    <span class="text-xs text-gray-500 font-medium" x-show="rotateForm.cda_unit" x-text="rotateForm.cda_unit"></span>
                 </div>
              </div>
@@ -1115,7 +1124,7 @@
                 reqsDone = true;
                 checkAllDone();
              })
-             .studentListRequirementsByDivision(divId);
+             .studentListNonMCRequirementsByDivision(divId);
              
            // Fetch Instructors
            google.script.run
@@ -1155,12 +1164,9 @@
               this.rotateForm.cda_unit = req.cda_unit || '';
               this.rotateForm.is_patient_treatment = req.is_patient_treatment === true;
               
-              // Preset units if they are fixed/min
-              if (this.rotateForm.min_rsu > 0) this.rotateForm.rsu_units = this.rotateForm.min_rsu;
-              else this.rotateForm.rsu_units = 0;
-              
-              if (this.rotateForm.min_cda > 0) this.rotateForm.cda_units = this.rotateForm.min_cda;
-              else this.rotateForm.cda_units = 0;
+              // Default to 1 unit if required, else 0
+              this.rotateForm.rsu_units = (this.rotateForm.min_rsu > 0) ? 1 : 0;
+              this.rotateForm.cda_units = (this.rotateForm.min_cda > 0) ? 1 : 0;
            }
         },
 
