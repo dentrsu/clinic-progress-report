@@ -651,6 +651,25 @@ function adminListInstructors() {
 }
 
 /**
+ * Consolidated data fetch for Admin Console initialization.
+ */
+function adminGetInitData() {
+  _assertAdmin();
+  return {
+    users: adminListUsers(),
+    instructors: adminListInstructors(),
+    students: adminListStudents(),
+    divisions: adminListDivisions(),
+    floors: adminListFloors(),
+    phases: adminListTreatmentPhases(),
+    catalog: adminListTreatmentCatalog(),
+    steps: adminListTreatmentSteps(),
+    requirements: adminListRequirements(),
+    caseTypes: adminListTypeOfCases(),
+  };
+}
+
+/**
  * List all students (Admin only).
  */
 function adminListStudents() {

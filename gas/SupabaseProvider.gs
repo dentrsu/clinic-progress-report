@@ -46,6 +46,32 @@ var SupabaseProvider = (function () {
   }
 
   /**
+   * Cached GET helper using CacheService.
+   */
+  function _getCached(path, ttlSeconds) {
+    var cache = CacheService.getScriptCache();
+    var cacheKey = "supabase_" + Utilities.base64Encode(path).substring(0, 100);
+    var cached = cache.get(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        console.warn("Cache parse error", e);
+      }
+    }
+
+    var data = _get(path);
+    if (data) {
+      try {
+        cache.put(cacheKey, JSON.stringify(data), ttlSeconds || 600); // Default 10 mins
+      } catch (e) {
+        console.warn("Cache put error (likely size limit)", e);
+      }
+    }
+    return data;
+  }
+
+  /**
    * Generic POST helper.
    */
   function _post(path, payload) {
@@ -175,7 +201,10 @@ var SupabaseProvider = (function () {
       // Returns all users, ordered by created_at desc
       // Join with students to get academic_id for student users
       var select = "*,students(academic_id)";
-      return _get("/rest/v1/users?select=" + select + "&order=created_at.desc");
+      return _getCached(
+        "/rest/v1/users?select=" + select + "&order=created_at.desc",
+        600,
+      );
     },
 
     deleteUser: function (userId) {
@@ -194,8 +223,9 @@ var SupabaseProvider = (function () {
      * List all instructors.
      */
     listInstructors: function () {
-      return _get(
+      return _getCached(
         "/rest/v1/instructors?select=*,users(name,email),divisions(code)",
+        600,
       );
     },
 
@@ -370,7 +400,7 @@ var SupabaseProvider = (function () {
      * @returns {Array}
      */
     listDivisions: function () {
-      return _get("/rest/v1/divisions?select=*&order=name.asc");
+      return _getCached("/rest/v1/divisions?select=*&order=name.asc", 3600);
     },
 
     /**
@@ -397,7 +427,7 @@ var SupabaseProvider = (function () {
      * @returns {Array}
      */
     listFloors: function () {
-      return _get("/rest/v1/floors?select=*&order=label.asc");
+      return _getCached("/rest/v1/floors?select=*&order=label.asc", 3600);
     },
 
     /**
@@ -487,7 +517,10 @@ var SupabaseProvider = (function () {
      * @returns {Array}
      */
     listTreatmentPhases: function () {
-      return _get("/rest/v1/treatment_phases?select=*&order=phase_order.asc");
+      return _getCached(
+        "/rest/v1/treatment_phases?select=*&order=phase_order.asc",
+        3600,
+      );
     },
 
     /**
@@ -518,8 +551,9 @@ var SupabaseProvider = (function () {
      * @returns {Array}
      */
     listTreatmentCatalog: function () {
-      return _get(
+      return _getCached(
         "/rest/v1/treatment_catalog?select=*,divisions(name,code)&order=treatment_name.asc",
+        900,
       );
     },
 
@@ -554,8 +588,9 @@ var SupabaseProvider = (function () {
      * @returns {Array}
      */
     listAllTreatmentSteps: function () {
-      return _get(
+      return _getCached(
         "/rest/v1/treatment_steps?select=*,treatment_catalog(treatment_name,divisions(name))&order=step_order.asc",
+        900,
       );
     },
 
@@ -587,8 +622,9 @@ var SupabaseProvider = (function () {
      * @returns {Array}
      */
     listRequirements: function () {
-      return _get(
+      return _getCached(
         "/rest/v1/requirement_list?select=*,divisions(name,code)&order=requirement_type.asc",
+        1200,
       );
     },
 
@@ -848,7 +884,10 @@ var SupabaseProvider = (function () {
      * List all students with user details.
      */
     listStudents: function () {
-      return _get("/rest/v1/students?select=*,users(name,email),floors(label)");
+      return _getCached(
+        "/rest/v1/students?select=*,users(name,email),floors(label)",
+        600,
+      );
     },
   };
 })();

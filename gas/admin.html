@@ -1283,16 +1283,7 @@
         syncResultMessage: '',
         
         init() {
-          this.loadData();
-          this.loadDivisions();
-          this.loadFloors();
-          this.loadInstructors();
-          this.loadStudents();
-          this.loadTreatmentPhases();
-          this.loadTreatmentCatalog();
-          this.loadTreatmentSteps();
-          this.loadRequirements();
-          this.loadTypeOfCases();
+          this.loadInitData();
           this.checkMaintenanceMode();
           this.checkSystemHealth();
           
@@ -1590,6 +1581,44 @@
         // ──────────────────────────────────────────────
         //  Data Loading
         // ──────────────────────────────────────────────
+
+        loadInitData() {
+          this.loading = true;
+          google.script.run
+            .withSuccessHandler(data => {
+              this.users = data.users || [];
+              this.instructors = data.instructors || [];
+              this.students = data.students || [];
+              this.divisions = data.divisions || [];
+              this.floors = data.floors || [];
+              this.phases = data.phases || [];
+              this.catalog = data.catalog || [];
+              this.steps = data.steps || [];
+              this.requirements = data.requirements || [];
+              this.caseTypes = data.caseTypes || [];
+              
+              // Initialize filtered lists
+              this.filterUsers();
+              this.filterStudents();
+              this.filterInstructors();
+              this.filterDivisions();
+              this.filterPhases();
+              this.filterCatalog();
+              this.filterSteps();
+              this.filterRequirements();
+              this.filterTypeOfCases();
+              
+              this.loading = false;
+            })
+            .withFailureHandler(err => {
+              console.error("Failed to load initial data", err);
+              this.warningType = 'error';
+              this.warningMessage = "Failed to load data from Supabase. Quota might be exceeded or connection is unstable.\n" + err.message;
+              this.warningOpen = true;
+              this.loading = false;
+            })
+            .adminGetInitData();
+        },
 
         loadUsers() {
           this.loading = true;
