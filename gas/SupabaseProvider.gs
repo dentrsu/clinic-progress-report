@@ -50,7 +50,10 @@ var SupabaseProvider = (function () {
    */
   function _getCached(path, ttlSeconds) {
     var cache = CacheService.getScriptCache();
-    var cacheKey = "supabase_" + Utilities.base64Encode(path).substring(0, 100);
+    var version = cache.get("sb_v") || "1";
+    var cacheKey =
+      "sb_" + version + "_" + Utilities.base64Encode(path).substring(0, 80);
+
     var cached = cache.get(cacheKey);
     if (cached) {
       try {
@@ -69,6 +72,16 @@ var SupabaseProvider = (function () {
       }
     }
     return data;
+  }
+
+  /**
+   * Invalidate all cached Supabase data by incrementing the version.
+   */
+  function _invalidateCache() {
+    var cache = CacheService.getScriptCache();
+    var v = parseInt(cache.get("sb_v") || "1");
+    cache.put("sb_v", (v + 1).toString(), 21600);
+    Logger.log("Supabase cache invalidated (new version: " + (v + 1) + ")");
   }
 
   /**
@@ -93,6 +106,7 @@ var SupabaseProvider = (function () {
           response.getContentText(),
       );
     }
+    _invalidateCache();
     return JSON.parse(response.getContentText());
   }
 
@@ -118,6 +132,7 @@ var SupabaseProvider = (function () {
           response.getContentText(),
       );
     }
+    _invalidateCache();
     // PATCH might return 204 No Content
     if (code === 204) return null;
     return JSON.parse(response.getContentText());
@@ -144,6 +159,7 @@ var SupabaseProvider = (function () {
           response.getContentText(),
       );
     }
+    _invalidateCache();
     return true;
   }
 
@@ -499,7 +515,8 @@ var SupabaseProvider = (function () {
       var select =
         "*" +
         ",treatment_phases(phase_name,phase_order)" +
-        ",treatment_catalog(treatment_name,division_id,divisions(name,code),requirement_list(requirement_type))" +
+        ",treatment_catalog(treatment_name,division_id,divisions(name,code))" +
+        ",requirement_list(requirement_type)" +
         ",treatment_steps(step_name,step_order)" +
         ",student:students!student_id(student_id,user:users(name))";
 
@@ -589,7 +606,7 @@ var SupabaseProvider = (function () {
      */
     listAllTreatmentSteps: function () {
       return _getCached(
-        "/rest/v1/treatment_steps?select=*,treatment_catalog(treatment_name,divisions(name))&order=step_order.asc",
+        "/rest/v1/treatment_steps?select=*,treatment_catalog(treatment_name,division_id,divisions(name))&order=step_order.asc",
         900,
       );
     },
@@ -718,11 +735,11 @@ var SupabaseProvider = (function () {
      * @param {string} studentId
      * @returns {Array}
      */
-    listVerifiedRecordsByStudent: function (studentId) {
+    listVaultRecordsByStudent: function (studentId) {
       return _get(
         "/rest/v1/treatment_records?student_id=eq." +
           studentId +
-          "&status=eq.verified&select=requirement_id,rsu_units,cda_units",
+          "&status=in.(verified,completed)&select=requirement_id,rsu_units,cda_units,status",
       );
     },
 

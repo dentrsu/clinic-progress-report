@@ -88,7 +88,11 @@
                                                 <div class="flex items-end justify-between mb-1.5 px-0.5">
                                                     <span class="text-[10px] font-bold text-navy uppercase tracking-tighter">RSU</span>
                                                     <span class="text-xs font-black text-gray-900">
-                                                        <span x-text="req.current_rsu"></span><span class="text-gray-400 font-medium"> / <span x-text="req.minimum_rsu"></span></span>
+                                                        <span x-text="req.current_rsu"></span>
+                                                        <template x-if="req.pending_rsu > 0">
+                                                            <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'(+' + req.pending_rsu + ' pnd)'"></span>
+                                                        </template>
+                                                        <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_rsu"></span></span>
                                                     </span>
                                                 </div>
                                                 <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 p-[1px]">
@@ -107,7 +111,11 @@
                                                 <div class="flex items-end justify-between mb-1.5 px-0.5">
                                                     <span class="text-[10px] font-bold text-amber-600 uppercase tracking-tighter">CDA</span>
                                                     <span class="text-xs font-black text-gray-900">
-                                                        <span x-text="req.current_cda"></span><span class="text-gray-400 font-medium"> / <span x-text="req.minimum_cda"></span></span>
+                                                        <span x-text="req.current_cda"></span>
+                                                        <template x-if="req.pending_cda > 0">
+                                                            <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'(+' + req.pending_cda + ' pnd)'"></span>
+                                                        </template>
+                                                        <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_cda"></span></span>
                                                     </span>
                                                 </div>
                                                 <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 p-[1px]">

@@ -106,10 +106,8 @@ CREATE TABLE public.treatment_catalog (
 treatment_id uuid NOT NULL DEFAULT gen_random_uuid(),
 division_id uuid NOT NULL,
 treatment_name text NOT NULL,
-main_requirement_id uuid,
 CONSTRAINT treatment_catalog_pkey PRIMARY KEY (treatment_id),
-CONSTRAINT treatment_catalog_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(division_id),
-CONSTRAINT treatment_catalog_main_requirement_id_fkey FOREIGN KEY (main_requirement_id) REFERENCES public.requirement_list(requirement_id)
+CONSTRAINT treatment_catalog_division_id_fkey FOREIGN KEY (division_id) REFERENCES public.divisions(division_id)
 );
 CREATE TABLE public.treatment_records (
 record_id uuid NOT NULL DEFAULT gen_random_uuid(),

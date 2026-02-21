@@ -393,19 +393,28 @@ function getStudentVaultData() {
   // 1. Fetch all requirements
   var requirements = SupabaseProvider.listRequirements() || [];
 
-  // 2. Fetch all verified records for this student
+  // 2. Fetch all verified/completed records for this student
   var records =
-    SupabaseProvider.listVerifiedRecordsByStudent(profile.student_id) || [];
+    SupabaseProvider.listVaultRecordsByStudent(profile.student_id) || [];
 
   // 3. Aggregate progress
-  var progressMap = {}; // requirement_id -> { total_rsu, total_cda }
+  var progressMap = {}; // requirement_id -> { total_rsu, total_cda, pending_rsu, pending_cda }
   records.forEach(function (rec) {
     if (!rec.requirement_id) return;
     if (!progressMap[rec.requirement_id]) {
-      progressMap[rec.requirement_id] = { rsu: 0, cda: 0 };
+      progressMap[rec.requirement_id] = { rsu: 0, cda: 0, p_rsu: 0, p_cda: 0 };
     }
-    progressMap[rec.requirement_id].rsu += parseFloat(rec.rsu_units) || 0;
-    progressMap[rec.requirement_id].cda += parseFloat(rec.cda_units) || 0;
+
+    var rsu = parseFloat(rec.rsu_units) || 0;
+    var cda = parseFloat(rec.cda_units) || 0;
+
+    if (rec.status === "verified") {
+      progressMap[rec.requirement_id].rsu += rsu;
+      progressMap[rec.requirement_id].cda += cda;
+    } else if (rec.status === "completed") {
+      progressMap[rec.requirement_id].p_rsu += rsu;
+      progressMap[rec.requirement_id].p_cda += cda;
+    }
   });
 
   // 4. Map requirements with progress and group by division
@@ -420,7 +429,12 @@ function getStudentVaultData() {
       };
     }
 
-    var prog = progressMap[req.requirement_id] || { rsu: 0, cda: 0 };
+    var prog = progressMap[req.requirement_id] || {
+      rsu: 0,
+      cda: 0,
+      p_rsu: 0,
+      p_cda: 0,
+    };
 
     divisions[divName].requirements.push({
       requirement_id: req.requirement_id,
@@ -429,6 +443,8 @@ function getStudentVaultData() {
       minimum_cda: req.minimum_cda || 0,
       current_rsu: Math.round(prog.rsu * 100) / 100,
       current_cda: Math.round(prog.cda * 100) / 100,
+      pending_rsu: Math.round(prog.p_rsu * 100) / 100,
+      pending_cda: Math.round(prog.p_cda * 100) / 100,
       rsu_unit: req.rsu_unit || "Case",
       cda_unit: req.cda_unit || "Case",
     });

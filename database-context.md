@@ -181,8 +181,8 @@ create table public.treatment_records (
 
 1. **Planned:** Student adds a treatment to a patient's chart.
 2. **In Progress:** Student begins clinical work on a specific step.
-3. **Completed:** Student finishes the work and requests verification.
-4. **Verified:** Instructor reviews work and "signs off" (triggers RSU unit credit).
+3. **Completed:** Student finishes the work and requests verification. Recorded in the **Requirement Vault** as "Pending Verification" progress.
+4. **Verified:** Instructor reviews work and "signs off". The status changes to "Verified" in the **Requirement Vault**, contributing to the final graduation progress.
 
 ### D. Auto-Calculation Logic (PERIO)
 

@@ -1832,8 +1832,13 @@
             // Treatment Steps
             if (mode === 'create') {
               this.stepForm = { step_id: null, treatment_id: '', step_order: '', step_name: '' };
+              // Don't reset stepDivisionFilter, user might be adding multiple steps for same division
             } else {
               this.stepForm = { step_id: item.step_id, treatment_id: item.treatment_id || '', step_order: item.step_order || '', step_name: item.step_name || '' };
+              // Set the division filter so the correct treatment catalog is shown
+              if (item.treatment_catalog && item.treatment_catalog.division_id) {
+                this.stepDivisionFilter = item.treatment_catalog.division_id;
+              }
             }
           } else if (this.activeTab === 'requirements') {
             // Requirements
