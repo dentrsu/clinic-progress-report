@@ -451,9 +451,11 @@
 
         <!-- Modal Footer -->
         <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-3">
-           <button @click="viewTreatmentPlan(editingPatient.hn)" class="w-full py-2 bg-white border border-navy text-navy font-semibold rounded-lg shadow-sm hover:bg-navy hover:text-white transition">
+           <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(editingPatient.hn)" 
+              target="_blank"
+              class="w-full py-2 bg-white border border-navy text-navy font-semibold rounded-lg shadow-sm hover:bg-navy hover:text-white transition flex justify-center items-center">
               View Treatment Plan
-           </button>
+           </a>
            <button @click="savePatient()" 
                    x-show="editingPatient.student_id_1 === profile.student_id"
                    class="w-full py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition flex justify-center items-center gap-2" :disabled="saving">
@@ -1023,18 +1025,6 @@
               .studentUpdatePatient(this.editingPatient.hn, JSON.parse(JSON.stringify(this.editingPatient)));
         },
 
-         viewTreatmentPlan(hn) {
-            if (!hn) {
-               console.warn("Treatment Plan: Missing HN", this.editingPatient);
-               this.showErrorModal("Cannot view treatment plan: Patient HN is missing.");
-               return;
-            }
-            // Navigate to standalone treatment_plan page
-            // Detect current base URL to use /dev or /exec accordingly
-            var baseUrl = '<?= appDevUrl ?>';
-            var url = baseUrl + '?page=treatment_plan&hn=' + encodeURIComponent(hn);
-            window.top.location.href = url;
-         },
 
          formatDate(d) {
             if (!d) return '-';
