@@ -371,7 +371,19 @@
                 </div>
               </div>
 
-              <!-- Row 3: Dates -->
+              <!-- Row 3: Exam RCT Case (ENDO only) -->
+              <div x-show="selectedDivisionCode === 'ENDO' && (selectedRequirementType.includes('Root Canal Treatment'))" x-transition class="mt-4">
+                <div class="flex items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" x-model="form.is_exam" class="sr-only peer">
+                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-navy"></div>
+                    <span class="ml-3 text-xs font-bold text-navy uppercase tracking-wide">Exam RCT Case</span>
+                  </label>
+                  <p class="text-[0.65rem] text-blue-600 italic leading-tight">Enable this for tracking as an Exam case in Endodontics.</p>
+                </div>
+              </div>
+
+              <!-- Row 4: Dates -->
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Start Date</label>
@@ -639,6 +651,7 @@
             page_number: '',
             book_number: '',
             page_number: '',
+            is_exam: false,
             status: 'planned',
             treatment_order: this.records.length + 1
           };
@@ -672,6 +685,7 @@
             this.form.severity = record.severity != null ? record.severity : '';
             this.form.book_number = record.book_number != null ? record.book_number : '';
             this.form.page_number = record.page_number != null ? record.page_number : '';
+            this.form.is_exam = !!record.is_exam;
             this.form.status = record.status || 'planned';
 
             // 3. Delay setting dependent fields (Catalog, Instructor, Requirement) to allow filters to update

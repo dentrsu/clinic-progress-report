@@ -152,7 +152,7 @@ create table public.treatment_records (
   page_number numeric,                               -- OPER division
   requirement_id uuid references public.requirement_list(requirement_id), -- Linked requirement
   verified_by uuid references public.users(user_id), -- The Instructor's user_id
-
+  is_exam boolean default false,                  -- Flag for Exam cases
   -- Validation: Step MUST belong to the Treatment
   constraint fk_treatment_step_validation
     foreign key (treatment_id, step_id)

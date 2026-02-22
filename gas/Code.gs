@@ -1878,6 +1878,7 @@ function studentCreateTreatmentRecord(hn, form) {
           : null,
       start_date: form.start_date || null,
       complete_date: form.complete_date || null,
+      is_exam: !!form.is_exam,
       // treatment_order: set below
     };
 
@@ -1951,6 +1952,7 @@ function studentUpdateTreatmentRecord(recordId, form) {
           : null,
       start_date: form.start_date || null,
       complete_date: form.complete_date || null,
+      is_exam: !!form.is_exam,
       updated_at: new Date().toISOString(),
     };
 
