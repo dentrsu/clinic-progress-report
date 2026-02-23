@@ -367,6 +367,28 @@ function doGet(e) {
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
 
+  if (page === "student") {
+    var t = HtmlService.createTemplateFromFile("student");
+    t.appUrl = url;
+    t.appDevUrl = devUrl;
+    return t
+      .evaluate()
+      .setTitle("Student Portal — Clinic Progress Report")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
+  if (page === "instructor") {
+    var t = HtmlService.createTemplateFromFile("instructor");
+    t.appUrl = url;
+    t.appDevUrl = devUrl;
+    return t
+      .evaluate()
+      .setTitle("Instructor Portal — Clinic Progress Report")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
   var t = HtmlService.createTemplateFromFile("landing");
   t.appUrl = url;
   t.appDevUrl = devUrl;
