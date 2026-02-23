@@ -439,7 +439,15 @@
     </div>
 
     <!-- Divisions Table -->
-    <div x-show="!loading && activeTab === 'divisions'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in" style="display: none;">
+    <div x-show="!loading && activeTab === 'divisions'" class="space-y-4 animate-fade-in">
+       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+         <h2 class="text-lg font-bold text-gray-800">Divisions</h2>
+         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+           Add Division
+         </button>
+       </div>
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
       <table class="w-full text-left border-collapse">
         <thead>
           <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
@@ -470,14 +478,23 @@
             </tr>
           </template>
           <tr x-show="filteredDivisions.length === 0">
-            <td colspan="3" class="px-6 py-12 text-center text-gray-500 italic">No divisions found.</td>
+            <td colspan="5" class="px-6 py-12 text-center text-gray-500 italic">No divisions found.</td>
           </tr>
         </tbody>
       </table>
     </div>
+    </div>
 
     <!-- Floors Tab Content -->
-    <div x-show="!loading && activeTab === 'floors'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+    <div x-show="!loading && activeTab === 'floors'" class="space-y-4 animate-fade-in">
+       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+         <h2 class="text-lg font-bold text-gray-800">Floors</h2>
+         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+           Add Floor
+         </button>
+       </div>
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
        <table class="w-full text-left border-collapse">
          <thead class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
            <tr>
@@ -502,9 +519,18 @@
          </tbody>
        </table>
     </div>
+    </div>
 
     <!-- Treatment Phases Tab Content -->
-    <div x-show="!loading && activeTab === 'phases'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+    <div x-show="!loading && activeTab === 'phases'" class="space-y-4 animate-fade-in">
+       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+         <h2 class="text-lg font-bold text-gray-800">Treatment Phases</h2>
+         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+           Add Phase
+         </button>
+       </div>
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
        <table class="w-full text-left border-collapse">
          <thead class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
            <tr>
@@ -538,9 +564,18 @@
          </tbody>
        </table>
     </div>
+    </div>
 
     <!-- Treatment Catalog Tab Content -->
-    <div x-show="!loading && activeTab === 'catalog'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+    <div x-show="!loading && activeTab === 'catalog'" class="space-y-4 animate-fade-in">
+       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+         <h2 class="text-lg font-bold text-gray-800">Treatment Catalog</h2>
+         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+           Add Treatment
+         </button>
+       </div>
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
        <table class="w-full text-left border-collapse">
          <thead class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
            <tr>
@@ -574,9 +609,18 @@
          </tbody>
        </table>
     </div>
+    </div>
 
     <!-- Case Types Tab Content -->
-    <div x-show="!loading && activeTab === 'caseTypes'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+    <div x-show="!loading && activeTab === 'caseTypes'" class="space-y-4 animate-fade-in">
+       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+         <h2 class="text-lg font-bold text-gray-800">Case Types</h2>
+         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+           Add Case Type
+         </button>
+       </div>
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
        <table class="w-full text-left border-collapse">
          <thead class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
            <tr>
@@ -606,9 +650,18 @@
          </tbody>
        </table>
     </div>
+    </div>
 
     <!-- Treatment Steps Tab Content -->
-    <div x-show="!loading && activeTab === 'steps'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+    <div x-show="!loading && activeTab === 'steps'" class="space-y-4 animate-fade-in">
+       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+         <h2 class="text-lg font-bold text-gray-800">Treatment Steps</h2>
+         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+           Add Step
+         </button>
+       </div>
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
        <table class="w-full text-left border-collapse">
          <thead class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
            <tr>
@@ -645,14 +698,23 @@
              </tr>
            </template>
            <tr x-show="filteredSteps.length === 0">
-             <td colspan="4" class="px-6 py-8 text-center text-gray-500">No treatment steps found.</td>
+             <td colspan="5" class="px-6 py-8 text-center text-gray-500">No treatment steps found.</td>
            </tr>
          </tbody>
        </table>
     </div>
+    </div>
 
     <!-- Requirements Tab Content -->
-    <div x-show="!loading && activeTab === 'requirements'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
+    <div x-show="!loading && activeTab === 'requirements'" class="space-y-4 animate-fade-in">
+       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+         <h2 class="text-lg font-bold text-gray-800">Requirement List</h2>
+         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+           Add Requirement
+         </button>
+       </div>
+       <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
        <table class="w-full text-left border-collapse">
          <thead class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
            <tr>
@@ -707,10 +769,11 @@
              </tr>
            </template>
            <tr x-show="filteredRequirements.length === 0">
-             <td colspan="5" class="px-6 py-8 text-center text-gray-500">No requirements found.</td>
+             <td colspan="7" class="px-6 py-8 text-center text-gray-500">No requirements found.</td>
            </tr>
          </tbody>
        </table>
+    </div>
     </div>
 
        <!-- Patients Tab Content -->
@@ -744,10 +807,10 @@
     
     <!-- Panel -->
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative z-10 animate-fade-in">
-      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : 'Requirement'))))))))"></h2>
+      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'instructors' ? 'Instructor' : (activeTab === 'students' ? 'Student' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : 'Requirement'))))))))))"></h2>
       
       <!-- User Form -->
-      <div x-show="activeTab === 'users'" class="space-y-4">
+      <div x-show="['users', 'instructors', 'students'].includes(activeTab)" class="space-y-4">
         <div>
           <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Email</label>
           <input type="email" x-model="userForm.email" :disabled="mode === 'edit'"
@@ -1594,8 +1657,13 @@
               this.phases = data.phases || [];
               this.catalog = data.catalog || [];
               this.steps = data.steps || [];
-              this.requirements = data.requirements || [];
               this.caseTypes = data.caseTypes || [];
+              this.requirements = (data.requirements || []).sort((a, b) => {
+                const divA = (a.divisions ? a.divisions.name : '').toLowerCase();
+                const divB = (b.divisions ? b.divisions.name : '').toLowerCase();
+                if (divA !== divB) return divA.localeCompare(divB);
+                return (a.requirement_type || '').toLowerCase().localeCompare((b.requirement_type || '').toLowerCase());
+              });
               
               // Initialize filtered lists
               this.filterUsers();
@@ -1772,7 +1840,7 @@
           this.errorMsg = '';
           this.modalOpen = true;
 
-          if (this.activeTab === 'users') {
+          if (this.activeTab === 'users' || this.activeTab === 'instructors' || this.activeTab === 'students') {
             if (mode === 'create') {
               this.userForm = {
                 user_id: null,
@@ -1887,7 +1955,7 @@
         },
 
         saveData() {
-          if (this.activeTab === 'users') this.saveUser();
+          if (this.activeTab === 'users' || this.activeTab === 'instructors' || this.activeTab === 'students') this.saveUser();
           else if (this.activeTab === 'divisions') this.saveDivision();
           else if (this.activeTab === 'phases') this.saveTreatmentPhase();
           else if (this.activeTab === 'catalog') this.saveTreatmentCatalog();
@@ -1910,7 +1978,8 @@
               }
               this.closeModal();
               this.loadUsers(); 
-            } else {
+              if(this.activeTab === 'instructors') this.loadInstructors();
+              if(this.activeTab === 'students') this.loadStudents();            } else {
               this.errorMsg = res.error || 'Unknown error occurred.';
             }
           };
