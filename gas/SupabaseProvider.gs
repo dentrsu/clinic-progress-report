@@ -380,9 +380,55 @@ var SupabaseProvider = (function () {
       var rows = _get(
         "/rest/v1/students?student_id=eq." +
           studentId +
-          "&select=student_id,academic_id,user:users(name)",
+          "&select=*,user:users(name,email)",
       );
       return rows.length > 0 ? rows[0] : null;
+    },
+
+    /**
+     * List all students assigned to a specific team leader (as 1 or 2).
+     * @param {string} instructorId
+     * @returns {Array}
+     */
+    listStudentsByTeamLeader: function (instructorId) {
+      var query =
+        "team_leader_1_id.eq." +
+        instructorId +
+        ",team_leader_2_id.eq." +
+        instructorId;
+      // also join floor to display it if needed later
+      var select = "*,user:users(name,email),floor:floors(label)";
+      return _get(
+        "/rest/v1/students?or=(" +
+          query +
+          ")&select=" +
+          select +
+          "&order=academic_id.asc",
+      );
+    },
+
+    /**
+     * List all students assigned to an instructor as division advisor.
+     * @param {string} columnName e.g., 'oper_instructor_id'
+     * @param {string} instructorId the UUID of the instructor
+     * @returns {Array}
+     */
+    listStudentsByDivisionInstructor: function (columnName, instructorId) {
+      var params = encodeURIComponent(columnName) + "=eq." + instructorId;
+      var select = "*,user:users(name,email),floor:floors(label)";
+      // Need to catch potential error if the column name is invalid
+      try {
+        return _get(
+          "/rest/v1/students?" +
+            params +
+            "&select=" +
+            select +
+            "&order=academic_id.asc",
+        );
+      } catch (e) {
+        console.error("Failed to list advisees for column: " + columnName, e);
+        throw new Error("Invalid division column or database error.");
+      }
     },
 
     /**
@@ -395,6 +441,20 @@ var SupabaseProvider = (function () {
         "/rest/v1/instructors?user_id=eq." +
           userId +
           "&select=*,divisions(name,code)",
+      );
+      return rows.length > 0 ? rows[0] : null;
+    },
+
+    /**
+     * Get instructor by instructor_id (with user email for notifications).
+     * @param {string} instructorId
+     * @returns {Object|null}
+     */
+    getInstructorById: function (instructorId) {
+      var rows = _get(
+        "/rest/v1/instructors?instructor_id=eq." +
+          instructorId +
+          "&select=*,users(name,email),divisions(name,code)",
       );
       return rows.length > 0 ? rows[0] : null;
     },
@@ -739,7 +799,8 @@ var SupabaseProvider = (function () {
       return _get(
         "/rest/v1/treatment_records?student_id=eq." +
           studentId +
-          "&status=in.(verified,completed)&select=requirement_id,rsu_units,cda_units,status",
+          "&status=in.(verified,completed)" +
+          "&select=requirement_id,rsu_units,cda_units,status,is_exam,hn,patient_name,area,patient:patients(hn,name)",
       );
     },
 
@@ -798,6 +859,24 @@ var SupabaseProvider = (function () {
     deleteTreatmentRecord: function (recordId) {
       var rows = _delete("/rest/v1/treatment_records?record_id=eq." + recordId);
       return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * Get a single treatment record with necessary joins.
+     * @param {string} recordId
+     * @returns {Object|null}
+     */
+    getTreatmentRecord: function (recordId) {
+      if (!recordId) return null;
+      var select =
+        "*,treatment_catalog(treatment_name,division_id),treatment_steps(step_name,step_order),patient:patients(hn,name),student:students(user:users(name))";
+      var rows = _get(
+        "/rest/v1/treatment_records?record_id=eq." +
+          recordId +
+          "&select=" +
+          select,
+      );
+      return rows && rows.length > 0 ? rows[0] : null;
     },
 
     /**

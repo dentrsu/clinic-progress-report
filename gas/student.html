@@ -873,10 +873,38 @@
         _getInitials(name) {
           if (!name) return '?';
           var parts = name.trim().split(/\s+/);
-          if (parts.length >= 2) {
-            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+          if (parts.length === 0) return '?';
+          
+          var firstPart = '';
+          var lastPart = '';
+          var firstWord = parts[0];
+
+          if (firstWord.indexOf('.') !== -1) {
+            var dotParts = firstWord.split('.');
+            var afterLastDot = dotParts[dotParts.length - 1];
+            if (afterLastDot.length > 0) {
+               firstPart = afterLastDot;
+            } else {
+               firstPart = parts.length > 1 ? parts[1] : '';
+            }
+          } else {
+            var knownTitles = ['นาย', 'นาง', 'นางสาว', 'นพ', 'ทพ', 'ดร', 'ทญ'];
+            if (knownTitles.indexOf(firstWord) !== -1 || parts.length >= 3) {
+              firstPart = parts.length > 1 ? parts[1] : '';
+            } else {
+              firstPart = firstWord;
+            }
           }
-          return parts[0][0].toUpperCase();
+          
+          lastPart = parts.length > 1 ? parts[parts.length - 1] : '';
+
+          function getConsonant(str) {
+            if (!str) return '';
+            var match = str.match(/[ก-ฮa-zA-Z]/);
+            return match ? match[0] : str.charAt(0);
+          }
+          var initials = getConsonant(firstPart) + (lastPart ? getConsonant(lastPart) : '');
+          return initials.toUpperCase();
         },
 
         getStudentYear() {

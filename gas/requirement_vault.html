@@ -7,6 +7,7 @@
     <title>Requirement Vault — Clinic Progress Report</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -15,11 +16,144 @@
         .text-navy { color: #002D72; }
         .border-navy { border-color: #002D72; }
         .progress-bar { transition: width 1s ease-in-out; }
+        .records-row { transition: all 0.2s ease; }
     </style>
+    <script>
+        function vaultApp() {
+            return {
+                loading: true,
+                divisions: [],
+                expandedReqs: new Set(),
+                radarChart: null,
+
+                init() {
+                    this.fetchData();
+                },
+
+                fetchData() {
+                    this.loading = true;
+                    google.script.run
+                        .withSuccessHandler(data => {
+                            this.divisions = data;
+                            this.loading = false;
+                            this.$nextTick(() => this.initRadarChart());
+                        })
+                        .withFailureHandler(err => {
+                            console.error(err);
+                            alert('Failed to load vault data: ' + err.message);
+                            this.loading = false;
+                        })
+                        .getStudentVaultData('<?= target_student_id ?>');
+                },
+
+                initRadarChart() {
+                    const canvas = document.getElementById('divisionRadarChart');
+                    if (!canvas || !this.divisions.length) return;
+                    if (this.radarChart) { this.radarChart.destroy(); }
+
+                    const labels = this.divisions.map(d => d.name);
+                    const rsuData = this.divisions.map(d => d.rsu_completion_pct || 0);
+                    const cdaData = this.divisions.map(d => d.cda_completion_pct || 0);
+
+                    this.radarChart = new Chart(canvas, {
+                        type: 'radar',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'RSU Progress',
+                                    data: rsuData,
+                                    backgroundColor: 'rgba(0,45,114,0.12)',
+                                    borderColor: '#002D72',
+                                    borderWidth: 2,
+                                    pointBackgroundColor: '#002D72',
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6,
+                                },
+                                {
+                                    label: 'CDA Progress',
+                                    data: cdaData,
+                                    backgroundColor: 'rgba(196,151,47,0.12)',
+                                    borderColor: '#C4972F',
+                                    borderWidth: 2,
+                                    pointBackgroundColor: '#C4972F',
+                                    pointRadius: 4,
+                                    pointHoverRadius: 6,
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            scales: {
+                                r: {
+                                    min: 0,
+                                    max: 100,
+                                    ticks: {
+                                        stepSize: 25,
+                                        callback: v => v + '%',
+                                        font: { size: 10 },
+                                        color: '#9ca3af',
+                                        backdropColor: 'transparent',
+                                    },
+                                    grid: { color: 'rgba(0,0,0,0.06)' },
+                                    angleLines: { color: 'rgba(0,0,0,0.08)' },
+                                    pointLabels: {
+                                        font: { size: 11, weight: '600' },
+                                        color: '#374151',
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { font: { size: 12 }, padding: 16 }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%`
+                                    }
+                                }
+                            }
+                        }
+                    });
+                },
+
+                toggleReq(key) {
+                    if (this.expandedReqs.has(key)) {
+                        this.expandedReqs.delete(key);
+                    } else {
+                        this.expandedReqs.add(key);
+                    }
+                    this.expandedReqs = new Set(this.expandedReqs); // trigger reactivity
+                },
+
+                getPercent(current, min) {
+                    if (!min || min <= 0) return current > 0 ? 100 : 0;
+                    let p = (current / min) * 100;
+                    return Math.min(Math.max(p, 0), 100);
+                },
+
+                getBarColor(current, min) {
+                    if (!min || min <= 0) return 'bg-navy';
+                    const p = (current / min) * 100;
+                    if (p >= 100) return 'bg-emerald-500';
+                    if (p >= 70) return 'bg-navy';
+                    if (p >= 30) return 'bg-blue-500';
+                    return 'bg-amber-400';
+                },
+
+                isCompleted(req) {
+                    const rsuDone = req.minimum_rsu <= 0 || req.current_rsu >= req.minimum_rsu;
+                    const cdaDone = req.minimum_cda <= 0 || req.current_cda >= req.minimum_cda;
+                    return rsuDone && cdaDone;
+                }
+            };
+        }
+    </script>
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-900" 
-      x-data="vaultApp()" 
-      x-init="init()">
+      x-data="vaultApp()">
 
     <!-- Header -->
     <header class="bg-navy text-white shadow-lg sticky top-0 z-50">
@@ -52,6 +186,25 @@
 
         <!-- Main Content -->
         <div x-show="!loading" x-cloak class="space-y-8 animate-fade-in">
+
+            <!-- Radar Chart -->
+            <section x-show="divisions.length > 0" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-navy flex items-center gap-2">
+                        <span class="w-2 h-6 bg-navy rounded-full"></span>
+                        Overall Progression
+                    </h2>
+                    <div class="flex items-center gap-4 text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-navy inline-block"></span>RSU</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>CDA</span>
+                    </div>
+                </div>
+                <div class="p-6 flex justify-center">
+                    <div class="w-full max-w-lg">
+                        <canvas id="divisionRadarChart"></canvas>
+                    </div>
+                </div>
+            </section>
             
             <template x-for="division in divisions" :key="division.name">
                 <section class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -65,120 +218,285 @@
                     </div>
 
                     <!-- RSU Requirements Table -->
-                    <div x-show="division.requirements.some(r => r.minimum_rsu > 0)">
-                        <div class="px-6 py-2 bg-navy/5 border-y border-gray-100 flex items-center gap-2">
+                    <div x-show="division.requirements.some(r => r.minimum_rsu > 0 || r.is_exam)">
+                        <div class="px-4 sm:px-6 py-2 bg-navy/5 border-y border-gray-100 flex items-center gap-2">
                              <span class="text-[10px] font-bold text-navy uppercase tracking-widest">RSU Requirements</span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="bg-gray-50/50 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">
-                                        <th class="px-6 py-4">Requirement Type</th>
-                                        <th class="px-6 py-4 text-center">RSU Progress</th>
-                                        <th class="px-6 py-4 text-right">Status</th>
+                                        <th class="px-4 sm:px-6 py-3 sm:py-4 pl-9 sm:pl-[2.875rem]">Requirement Type</th>
+                                        <th class="hidden sm:table-cell px-6 py-4 text-center">RSU Progress</th>
+                                        <th class="hidden sm:table-cell px-6 py-4 text-right">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-50">
                                     <template x-for="req in division.requirements" :key="'rsu_'+req.requirement_id">
-                                        <tr x-show="req.minimum_rsu > 0" class="hover:bg-gray-50/80 transition-colors group">
-                                            <td class="px-6 py-5">
-                                                <div class="text-sm font-bold text-gray-900 group-hover:text-navy transition" x-text="req.requirement_type"></div>
-                                            </td>
-                                            
-                                            <td class="px-6 py-5">
-                                                <div class="max-w-[140px] mx-auto">
-                                                    <div class="flex items-end justify-between mb-1.5 px-0.5">
-                                                        <span class="text-[10px] font-bold text-navy uppercase tracking-tighter">RSU</span>
-                                                        <span class="text-xs font-black text-gray-900">
-                                                            <span x-text="req.current_rsu"></span>
-                                                            <template x-if="req.pending_rsu > 0">
-                                                                <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'(+' + req.pending_rsu + ' pnd)'"></span>
-                                                            </template>
-                                                            <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_rsu"></span></span>
-                                                        </span>
-                                                    </div>
-                                                    <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 p-[1px]">
-                                                        <div class="h-full rounded-full transition-all duration-1000 progress-bar shadow-sm"
-                                                             :class="getBarColor(req.current_rsu, req.minimum_rsu)"
-                                                             :style="'width: ' + getPercent(req.current_rsu, req.minimum_rsu) + '%'">
+                                        <tbody x-show="req.minimum_rsu > 0 || req.is_exam" class="divide-y divide-gray-50">
+                                            <!-- Requirement Row (clickable) -->
+                                            <tr @click="toggleReq('rsu_'+req.requirement_id)"
+                                                class="hover:bg-blue-50/60 transition-colors group cursor-pointer select-none border-b border-gray-50">
+                                                <td class="px-4 sm:px-6 py-3 sm:py-4">
+                                                    <div class="flex items-start gap-2">
+                                                        <svg class="w-3.5 h-3.5 mt-0.5 text-gray-400 transition-transform duration-200 flex-shrink-0"
+                                                             :class="expandedReqs.has('rsu_'+req.requirement_id) ? 'rotate-90' : ''"
+                                                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
+                                                        </svg>
+                                                        <div class="flex-1 min-w-0">
+                                                            <div class="text-sm font-bold text-gray-900 group-hover:text-navy transition" x-text="req.requirement_type"></div>
+                                                            <!-- Mobile: inline progress + status -->
+                                                            <div class="sm:hidden mt-2 space-y-1.5">
+                                                                <div class="flex items-center justify-between gap-3">
+                                                                    <div class="flex-1">
+                                                                        <div class="flex items-end justify-between mb-1 px-0.5">
+                                                                            <span class="text-[9px] font-bold text-navy uppercase tracking-tighter">RSU</span>
+                                                                            <span class="text-xs font-black text-gray-900">
+                                                                                <span x-text="req.current_rsu"></span>
+                                                                                <template x-if="req.pending_rsu > 0">
+                                                                                    <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'(+' + req.pending_rsu + ' pending)'"></span>
+                                                                                </template>
+                                                                                <template x-if="req.minimum_rsu > 0">
+                                                                                    <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_rsu"></span></span>
+                                                                                </template>
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 p-[1px]">
+                                                                            <div class="h-full rounded-full transition-all duration-1000 progress-bar shadow-sm"
+                                                                                 :class="getBarColor(req.current_rsu, req.minimum_rsu)"
+                                                                                 :style="'width: ' + getPercent(req.current_rsu, req.minimum_rsu) + '%'">
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider shadow-sm flex-shrink-0"
+                                                                          :class="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu) ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'">
+                                                                        <span x-text="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu) ? '✓ Done' : 'Tracking'"></span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div class="text-[9px] text-gray-400 mt-1 uppercase text-right" x-text="req.rsu_unit"></div>
-                                                </div>
-                                            </td>
-
-                                            <td class="px-6 py-5 text-right">
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm"
-                                                      :class="(req.minimum_rsu <= 0 || req.current_rsu >= req.minimum_rsu) ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'">
-                                                    <svg x-show="req.minimum_rsu <= 0 || req.current_rsu >= req.minimum_rsu" class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                                                    </svg>
-                                                    <span x-text="(req.minimum_rsu <= 0 || req.current_rsu >= req.minimum_rsu) ? 'Completed' : 'Tracking'"></span>
-                                                </span>
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                <td class="hidden sm:table-cell px-6 py-4">
+                                                    <div class="max-w-[140px] mx-auto">
+                                                        <div class="flex items-end justify-between mb-1.5 px-0.5">
+                                                            <span class="text-[10px] font-bold text-navy uppercase tracking-tighter">RSU</span>
+                                                            <span class="text-xs font-black text-gray-900">
+                                                                <span x-text="req.current_rsu"></span>
+                                                                <template x-if="req.pending_rsu > 0">
+                                                                    <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'(+' + req.pending_rsu + ' pending)'"></span>
+                                                                </template>
+                                                                <template x-if="req.minimum_rsu > 0">
+                                                                    <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_rsu"></span></span>
+                                                                </template>
+                                                            </span>
+                                                        </div>
+                                                        <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 p-[1px]">
+                                                            <div class="h-full rounded-full transition-all duration-1000 progress-bar shadow-sm"
+                                                                 :class="getBarColor(req.current_rsu, req.minimum_rsu)"
+                                                                 :style="'width: ' + getPercent(req.current_rsu, req.minimum_rsu) + '%'">
+                                                            </div>
+                                                        </div>
+                                                        <div class="text-[9px] text-gray-400 mt-1 uppercase text-right" x-text="req.rsu_unit"></div>
+                                                    </div>
+                                                </td>
+                                                <td class="hidden sm:table-cell px-6 py-4 text-right">
+                                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                                                          :class="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu) ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'">
+                                                        <svg x-show="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu)" class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                                        </svg>
+                                                        <span x-text="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu) ? 'Completed' : 'Tracking'"></span>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <!-- Expanded Records Row -->
+                                            <tr x-show="expandedReqs.has('rsu_'+req.requirement_id)" class="records-row bg-blue-50/30">
+                                                <td colspan="3" class="px-2 sm:px-6 pb-4 pt-1">
+                                                    <template x-if="req.records && req.records.length > 0">
+                                                        <div class="rounded-xl overflow-hidden border border-blue-100">
+                                                            <table class="w-full text-left">
+                                                                <thead>
+                                                                    <tr class="bg-navy/5 text-[9px] font-bold text-navy uppercase tracking-widest">
+                                                                        <th class="px-3 sm:px-4 py-2">Patient</th>
+                                                                        <th class="hidden sm:table-cell px-4 py-2">Area</th>
+                                                                        <th class="px-3 sm:px-4 py-2 text-center">RSU</th>
+                                                                        <th class="px-3 sm:px-4 py-2 text-right">Status</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody class="divide-y divide-blue-100/60">
+                                                                    <template x-for="(rec, i) in req.records" :key="i">
+                                                                        <tr class="text-xs">
+                                                                            <td class="px-3 sm:px-4 py-2">
+                                                                                <div class="font-mono font-semibold text-gray-700" x-text="rec.hn"></div>
+                                                                                <div class="text-gray-500 text-[10px] mt-0.5" x-text="rec.patient_name"></div>
+                                                                                <!-- Mobile: show area inline -->
+                                                                                <div class="sm:hidden text-gray-400 text-[10px]" x-text="rec.area"></div>
+                                                                            </td>
+                                                                            <td class="hidden sm:table-cell px-4 py-2 text-gray-500" x-text="rec.area"></td>
+                                                                            <td class="px-3 sm:px-4 py-2 text-center font-semibold text-navy" x-text="rec.rsu_units"></td>
+                                                                            <td class="px-3 sm:px-4 py-2 text-right">
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase"
+                                                                                      :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                                                                                      x-text="rec.status === 'verified' ? 'Verified' : 'Pending'">
+                                                                                </span>
+                                                                            </td>
+                                                                        </tr>
+                                                                    </template>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="!req.records || req.records.length === 0">
+                                                        <p class="text-xs text-gray-400 italic py-2">No records yet.</p>
+                                                    </template>
+                                                </td>
+                                            </tr>
+                                        </tbody>
                                     </template>
-                                </tbody>
-                            </table>
+                                </table>
                         </div>
                     </div>
 
                     <!-- CDA Requirements Table -->
-                    <div x-show="division.requirements.some(r => r.minimum_cda > 0)" class="mt-4">
-                        <div class="px-6 py-2 bg-amber-50 border-y border-gray-100 flex items-center gap-2">
+                    <div x-show="division.requirements.some(r => r.minimum_cda > 0 || r.is_exam)" class="mt-4">
+                        <div class="px-4 sm:px-6 py-2 bg-amber-50 border-y border-gray-100 flex items-center gap-2">
                              <span class="text-[10px] font-bold text-amber-700 uppercase tracking-widest">CDA Requirements</span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
                                 <thead>
                                     <tr class="bg-gray-50/50 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-gray-100">
-                                        <th class="px-6 py-4">Requirement Type</th>
-                                        <th class="px-6 py-4 text-center">CDA Progress</th>
-                                        <th class="px-6 py-4 text-right">Status</th>
+                                        <th class="px-4 sm:px-6 py-3 sm:py-4 pl-9 sm:pl-[2.875rem]">Requirement Type</th>
+                                        <th class="hidden sm:table-cell px-6 py-4 text-center">CDA Progress</th>
+                                        <th class="hidden sm:table-cell px-6 py-4 text-right">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-50">
                                     <template x-for="req in division.requirements" :key="'cda_'+req.requirement_id">
-                                        <tr x-show="req.minimum_cda > 0" class="hover:bg-gray-50/80 transition-colors group">
-                                            <td class="px-6 py-5">
-                                                <div class="text-sm font-bold text-gray-900 group-hover:text-navy transition" x-text="req.requirement_type"></div>
-                                            </td>
-                                            
-                                            <td class="px-6 py-5">
-                                                <div class="max-w-[140px] mx-auto">
-                                                    <div class="flex items-end justify-between mb-1.5 px-0.5">
-                                                        <span class="text-[10px] font-bold text-amber-600 uppercase tracking-tighter">CDA</span>
-                                                        <span class="text-xs font-black text-gray-900">
-                                                            <span x-text="req.current_cda"></span>
-                                                            <template x-if="req.pending_cda > 0">
-                                                                <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'(+' + req.pending_cda + ' pnd)'"></span>
-                                                            </template>
-                                                            <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_cda"></span></span>
-                                                        </span>
-                                                    </div>
-                                                    <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 p-[1px]">
-                                                        <div class="h-full rounded-full transition-all duration-1000 progress-bar shadow-sm"
-                                                             :class="getBarColor(req.current_cda, req.minimum_cda)"
-                                                             :style="'width: ' + getPercent(req.current_cda, req.minimum_cda) + '%'">
+                                        <tbody x-show="req.minimum_cda > 0 || req.is_exam" class="divide-y divide-gray-50">
+                                            <!-- Requirement Row (clickable) -->
+                                            <tr @click="toggleReq('cda_'+req.requirement_id)"
+                                                class="hover:bg-amber-50/60 transition-colors group cursor-pointer select-none border-b border-gray-50">
+                                                <td class="px-4 sm:px-6 py-3 sm:py-4">
+                                                    <div class="flex items-start gap-2">
+                                                        <svg class="w-3.5 h-3.5 mt-0.5 text-gray-400 transition-transform duration-200 flex-shrink-0"
+                                                             :class="expandedReqs.has('cda_'+req.requirement_id) ? 'rotate-90' : ''"
+                                                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
+                                                        </svg>
+                                                        <div class="flex-1 min-w-0">
+                                                            <div class="text-sm font-bold text-gray-900 group-hover:text-amber-700 transition" x-text="req.cda_requirement_type || req.requirement_type"></div>
+                                                            <!-- Mobile: inline progress + status -->
+                                                            <div class="sm:hidden mt-2 space-y-1.5">
+                                                                <div class="flex items-center justify-between gap-3">
+                                                                    <div class="flex-1">
+                                                                        <div class="flex items-end justify-between mb-1 px-0.5">
+                                                                            <span class="text-[9px] font-bold text-amber-600 uppercase tracking-tighter">CDA</span>
+                                                                            <span class="text-xs font-black text-gray-900">
+                                                                                <span x-text="req.current_cda"></span>
+                                                                                <template x-if="req.pending_cda > 0">
+                                                                                    <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'(+' + req.pending_cda + ' pending)'"></span>
+                                                                                </template>
+                                                                                <template x-if="req.minimum_cda > 0">
+                                                                                    <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_cda"></span></span>
+                                                                                </template>
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 p-[1px]">
+                                                                            <div class="h-full rounded-full transition-all duration-1000 progress-bar shadow-sm"
+                                                                                 :class="getBarColor(req.current_cda, req.minimum_cda)"
+                                                                                 :style="'width: ' + getPercent(req.current_cda, req.minimum_cda) + '%'">
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider shadow-sm flex-shrink-0"
+                                                                          :class="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda) ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'">
+                                                                        <span x-text="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda) ? '✓ Done' : 'Tracking'"></span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div class="text-[9px] text-gray-400 mt-1 uppercase text-right" x-text="req.cda_unit"></div>
-                                                </div>
-                                            </td>
-
-                                            <td class="px-6 py-5 text-right">
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm"
-                                                      :class="(req.minimum_cda <= 0 || req.current_cda >= req.minimum_cda) ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'">
-                                                    <svg x-show="req.minimum_cda <= 0 || req.current_cda >= req.minimum_cda" class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                                                    </svg>
-                                                    <span x-text="(req.minimum_cda <= 0 || req.current_cda >= req.minimum_cda) ? 'Completed' : 'Tracking'"></span>
-                                                </span>
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                <td class="hidden sm:table-cell px-6 py-4">
+                                                    <div class="max-w-[140px] mx-auto">
+                                                        <div class="flex items-end justify-between mb-1.5 px-0.5">
+                                                            <span class="text-[10px] font-bold text-amber-600 uppercase tracking-tighter">CDA</span>
+                                                            <span class="text-xs font-black text-gray-900">
+                                                                <span x-text="req.current_cda"></span>
+                                                                <template x-if="req.pending_cda > 0">
+                                                                    <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'(+' + req.pending_cda + ' pending)'"></span>
+                                                                </template>
+                                                                <template x-if="req.minimum_cda > 0">
+                                                                    <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_cda"></span></span>
+                                                                </template>
+                                                            </span>
+                                                        </div>
+                                                        <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-200/50 p-[1px]">
+                                                            <div class="h-full rounded-full transition-all duration-1000 progress-bar shadow-sm"
+                                                                 :class="getBarColor(req.current_cda, req.minimum_cda)"
+                                                                 :style="'width: ' + getPercent(req.current_cda, req.minimum_cda) + '%'">
+                                                            </div>
+                                                        </div>
+                                                        <div class="text-[9px] text-gray-400 mt-1 uppercase text-right" x-text="req.cda_unit"></div>
+                                                    </div>
+                                                </td>
+                                                <td class="hidden sm:table-cell px-6 py-4 text-right">
+                                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                                                          :class="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda) ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500 border border-gray-200'">
+                                                        <svg x-show="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda)" class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                                        </svg>
+                                                        <span x-text="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda) ? 'Completed' : 'Tracking'"></span>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <!-- Expanded Records Row -->
+                                            <tr x-show="expandedReqs.has('cda_'+req.requirement_id)" class="records-row bg-amber-50/30">
+                                                <td colspan="3" class="px-2 sm:px-6 pb-4 pt-1">
+                                                    <template x-if="req.records && req.records.length > 0">
+                                                        <div class="rounded-xl overflow-hidden border border-amber-100">
+                                                            <table class="w-full text-left">
+                                                                <thead>
+                                                                    <tr class="bg-amber-50 text-[9px] font-bold text-amber-700 uppercase tracking-widest">
+                                                                        <th class="px-3 sm:px-4 py-2">Patient</th>
+                                                                        <th class="hidden sm:table-cell px-4 py-2">Area</th>
+                                                                        <th class="px-3 sm:px-4 py-2 text-center">CDA</th>
+                                                                        <th class="px-3 sm:px-4 py-2 text-right">Status</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody class="divide-y divide-amber-100/60">
+                                                                    <template x-for="(rec, i) in req.records" :key="i">
+                                                                        <tr class="text-xs">
+                                                                            <td class="px-3 sm:px-4 py-2">
+                                                                                <div class="font-mono font-semibold text-gray-700" x-text="rec.hn"></div>
+                                                                                <div class="text-gray-500 text-[10px] mt-0.5" x-text="rec.patient_name"></div>
+                                                                                <!-- Mobile: area inline -->
+                                                                                <div class="sm:hidden text-gray-400 text-[10px]" x-text="rec.area"></div>
+                                                                            </td>
+                                                                            <td class="hidden sm:table-cell px-4 py-2 text-gray-500" x-text="rec.area"></td>
+                                                                            <td class="px-3 sm:px-4 py-2 text-center font-semibold text-amber-700" x-text="rec.cda_units"></td>
+                                                                            <td class="px-3 sm:px-4 py-2 text-right">
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase"
+                                                                                      :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                                                                                      x-text="rec.status === 'verified' ? 'Verified' : 'Pending'">
+                                                                                </span>
+                                                                            </td>
+                                                                        </tr>
+                                                                    </template>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="!req.records || req.records.length === 0">
+                                                        <p class="text-xs text-gray-400 italic py-2">No records yet.</p>
+                                                    </template>
+                                                </td>
+                                            </tr>
+                                        </tbody>
                                     </template>
-                                </tbody>
-                            </table>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -193,55 +511,5 @@
             </div>
         </div>
     </main>
-
-    <script>
-        function vaultApp() {
-            return {
-                loading: true,
-                divisions: [],
-
-                init() {
-                    this.fetchData();
-                },
-
-                fetchData() {
-                    this.loading = true;
-                    google.script.run
-                        .withSuccessHandler(data => {
-                            this.divisions = data;
-                            this.loading = false;
-                        })
-                        .withFailureHandler(err => {
-                            console.error(err);
-                            alert('Failed to load vault data: ' + err.message);
-                            this.loading = false;
-                        })
-                        .getStudentVaultData();
-                },
-
-                getPercent(current, min) {
-                    if (!min || min <= 0) return current > 0 ? 100 : 0;
-                    let p = (current / min) * 100;
-                    return Math.min(Math.max(p, 0), 100);
-                },
-
-                getBarColor(current, min) {
-                    if (!min || min <= 0) return 'bg-navy';
-                    const p = (current / min) * 100;
-                    if (p >= 100) return 'bg-emerald-500';
-                    if (p >= 70) return 'bg-navy';
-                    if (p >= 30) return 'bg-blue-500';
-                    return 'bg-amber-400';
-                },
-
-                isCompleted(req) {
-                    // Completed if both RSU and CDA targets are met (or if no target exists for one)
-                    const rsuDone = req.minimum_rsu <= 0 || req.current_rsu >= req.minimum_rsu;
-                    const cdaDone = req.minimum_cda <= 0 || req.current_cda >= req.minimum_cda;
-                    return rsuDone && cdaDone;
-                }
-            };
-        }
-    </script>
 </body>
 </html>

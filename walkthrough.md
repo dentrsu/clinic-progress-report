@@ -65,12 +65,27 @@ In the Apps Script editor (Actions → Script Properties):
 
 - Google standard "You need permission" screen OR our custom "Access Restricted" card (depending on deployment settings).
 
-## Next Steps
+## 5.5 Advisor Portal Verification
 
-Once verified, we can proceed to:
+1. **Access**:
+   - Log in as an **instructor** user.
+   - On the landing page, click **"Enter Advisor Portal"**.
+   - Verify the header shows your division code (e.g., "My Advisees (OPER)").
 
-1.  Building the **Student Dashboard** (next major view).
-2.  Implementing the **Instructor Console**.
+2. **Student List**:
+   - Verify your assigned advisees appear as cards.
+   - If no students are assigned to your division column, the empty state message should appear.
+
+3. **Student Detail Modal**:
+   - Click on a student card.
+   - Verify the modal opens with student details (Academic ID, Floor/Unit, Team Leaders).
+   - Wait for the loading spinner to resolve under "Division Requirements".
+   - Verify RSU and CDA requirement tables appear with progress bars.
+   - Click on a requirement row to expand and see individual patient records.
+
+4. **Navigation**:
+   - Click **"Requirement Dashboard"** button → should open in a new tab.
+   - Click **"Lobby"** button → should return to landing page.
 
 ## 5. Admin Console Verification
 

@@ -29,6 +29,14 @@ A dedicated interface for administrators to manage users.
   - Dashboard with "My Patients" and "Referred Patients".
   - **Patient Management**: Detail modal to edit patient info and assign students (using Academic ID or Name).
   - **Treatment Plans**: Dedicated page for viewing/managing treatment records (in progress).
+  - **Requirement Vault**: Per-division progress tracking with RSU/CDA tables and radar chart.
+- **Instructor Portal**:
+  - View assigned students (team leader view).
+  - Student detail modal with patient list and requirement vault link.
+- **Advisor Portal** (`?page=advisor`):
+  - View advisee students filtered by the instructor's assigned division.
+  - Student detail modal with embedded division-specific requirement progress (RSU & CDA tables).
+  - Click-to-expand records for each requirement.
 - **Admin Console**:
   - Manage Users (Students/Instructors).
   - **Academic ID Support**: Manage Real-world Student IDs.
@@ -63,6 +71,11 @@ clinic-progress-report/
 │   ├── BackupScheduler.gs      # Nightly Supabase → Sheets backup + trigger mgmt
 │   ├── SheetsProvider.gs       # Google Sheets helper (used by BackupScheduler)
 │   ├── landing.html            # Landing page (Tailwind + Alpine.js)
+│   ├── instructor.html         # Instructor portal (team leader view)
+│   ├── advisor.html            # Advisor portal (division advisee view)
+│   ├── admin.html              # Admin console
+│   ├── treatment_plan.html     # Treatment plan page
+│   ├── requirement_vault.html  # Student requirement vault
 │   └── styles.html             # Shared CSS design tokens
 ├── database-context.md         # Database schema documentation
 └── table-order-and-constraints.md  # Table DDL reference

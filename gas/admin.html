@@ -654,12 +654,30 @@
 
     <!-- Treatment Steps Tab Content -->
     <div x-show="!loading && activeTab === 'steps'" class="space-y-4 animate-fade-in">
-       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
          <h2 class="text-lg font-bold text-gray-800">Treatment Steps</h2>
-         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
-           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-           Add Step
-         </button>
+         <div class="flex flex-wrap items-center gap-3">
+           <!-- Division Filter -->
+           <select x-model="stepsFilterDivision" @change="stepsFilterTreatment = ''; filterSteps();"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-transparent bg-white">
+             <option value="">All Divisions</option>
+             <template x-for="div in divisions" :key="div.division_id">
+               <option :value="div.division_id" x-text="div.name"></option>
+             </template>
+           </select>
+           <!-- Treatment Filter (filtered by selected division) -->
+           <select x-model="stepsFilterTreatment" @change="filterSteps()"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-transparent bg-white">
+             <option value="">All Treatments</option>
+             <template x-for="item in catalog.filter(c => !stepsFilterDivision || c.division_id === stepsFilterDivision)" :key="item.treatment_id">
+               <option :value="item.treatment_id" x-text="item.treatment_name"></option>
+             </template>
+           </select>
+           <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+             Add Step
+           </button>
+         </div>
        </div>
        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
        <table class="w-full text-left border-collapse">
@@ -720,10 +738,14 @@
            <tr>
              <th class="px-6 py-4">Division</th>
              <th class="px-6 py-4">Requirement Type</th>
+             <th class="px-6 py-4">CDA Type</th>
              <th class="px-6 py-4">Min RSU (Unit)</th>
               <th class="px-6 py-4">Min CDA (Unit)</th>
               <th class="px-6 py-4 text-center">Pt. Tx</th>
               <th class="px-6 py-4 text-center">Non-MC</th>
+              <th class="px-6 py-4 text-center">Selectable</th>
+              <th class="px-6 py-4 text-center">Exam</th>
+              <th class="px-6 py-4 text-center">Aggregation</th>
               <th class="px-6 py-4 text-right">Actions</th>
            </tr>
          </thead>
@@ -735,6 +757,9 @@
                </td>
                <td class="px-6 py-4 whitespace-nowrap">
                  <span class="text-sm font-medium text-gray-900" x-text="req.requirement_type"></span>
+               </td>
+               <td class="px-6 py-4 whitespace-nowrap">
+                 <span class="text-sm text-gray-700" x-text="req.cda_requirement_type || '-'"></span>
                </td>
                <td class="px-6 py-4 whitespace-nowrap">
                  <span class="text-sm text-gray-700" x-text="req.minimum_rsu + ' ' + (req.rsu_unit || '')"></span>
@@ -757,6 +782,25 @@
                   <span x-show="!req.non_mc_pateint_req" class="text-gray-300">
                     <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                   </span>
+                </td>
+                <!-- is_selectable -->
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                  <span x-show="req.is_selectable !== false" class="text-emerald-500" title="Appears in dropdown">
+                    <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  </span>
+                  <span x-show="req.is_selectable === false" class="text-amber-400 font-bold text-xs" title="Computed — hidden from dropdown">Derived</span>
+                </td>
+                <!-- is_exam -->
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                  <span x-show="req.is_exam" class="text-blue-500 font-bold text-xs">Exam</span>
+                  <span x-show="!req.is_exam" class="text-gray-300 text-xs">—</span>
+                </td>
+                <!-- aggregation_config -->
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                  <span x-show="!req.aggregation_config" class="text-gray-400 text-xs">sum</span>
+                  <span x-show="req.aggregation_config"
+                        class="inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-100"
+                        x-text="req.aggregation_config ? (req.aggregation_config.type || 'sum') : 'sum'"></span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                  <button @click="openModal('edit', req)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
@@ -806,7 +850,7 @@
     <div class="fixed inset-0 bg-navy/20 backdrop-blur-sm transition-opacity" @click="closeModal()"></div>
     
     <!-- Panel -->
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative z-10 animate-fade-in">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative z-10 animate-fade-in">
       <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'instructors' ? 'Instructor' : (activeTab === 'students' ? 'Student' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : 'Requirement'))))))))))"></h2>
       
       <!-- User Form -->
@@ -896,6 +940,91 @@
                 </template>
               </select>
             </div>
+           </div>
+
+           <p class="text-xs text-navy font-semibold mb-2 mt-4">Division Instructors</p>
+           <div class="grid grid-cols-3 gap-3">
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Operative</label>
+               <select x-model="userForm.oper_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('OPER')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Endodontics</label>
+               <select x-model="userForm.endo_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('ENDO')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Periodontics</label>
+               <select x-model="userForm.perio_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('PERIO')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Prosthodontics</label>
+               <select x-model="userForm.prosth_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('PROSTH')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Oral Diagnosis</label>
+               <select x-model="userForm.diag_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('DIAG')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Radiology</label>
+               <select x-model="userForm.radio_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('RADIO')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Oral Surgery</label>
+               <select x-model="userForm.sur_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('SUR')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Orthodontics</label>
+               <select x-model="userForm.ortho_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('ORTHO')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
+             <div>
+               <label class="block text-xs font-medium text-gray-500 mb-1">Pediatric</label>
+               <select x-model="userForm.pedo_instructor_id" class="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-navy">
+                 <option value="">(None)</option>
+                 <template x-for="inst in instructorsByDivCode('PEDO')" :key="inst.instructor_id">
+                   <option :value="inst.instructor_id" x-text="inst.name"></option>
+                 </template>
+               </select>
+             </div>
            </div>
         </div>
 
@@ -1062,10 +1191,17 @@
             </template>
           </select>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Requirement Type</label>
-          <input type="text" x-model="reqForm.requirement_type" placeholder="e.g. Total Unit"
-                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Requirement Type</label>
+            <input type="text" x-model="reqForm.requirement_type" placeholder="e.g. Total Unit"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">CDA Requirement Type</label>
+            <input type="text" x-model="reqForm.cda_requirement_type" placeholder="e.g. CDA 1"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          </div>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -1097,6 +1233,30 @@
               <input type="checkbox" x-model="reqForm.non_mc_pateint_req" class="rounded text-navy focus:ring-navy w-4 h-4 text-navy">
               <span class="text-sm text-gray-700">Non-Main-Clinic Patient Requirement</span>
             </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" x-model="reqForm.is_selectable" class="rounded text-navy focus:ring-navy w-4 h-4 text-navy">
+              <span class="text-sm text-gray-700">Selectable in Treatment Plan <span class="text-gray-400 text-xs">(uncheck for computed/derived requirements)</span></span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="checkbox" x-model="reqForm.is_exam" class="rounded text-navy focus:ring-navy w-4 h-4 text-navy">
+              <span class="text-sm text-gray-700">Exam-type requirement <span class="text-gray-400 text-xs">(counts exam records, not sum of units)</span></span>
+            </label>
+          </div>
+          <!-- Aggregation Config -->
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
+              Aggregation Config
+              <span class="normal-case text-gray-400 font-normal ml-1">(JSON — leave blank for default sum)</span>
+            </label>
+            <textarea x-model="reqForm.aggregation_config" rows="3"
+                      placeholder='e.g. {"type":"count_exam"} or {"type":"derived","source_ids":["uuid1"],"operation":"sum_both"}'
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-navy resize-none"></textarea>
+            <div class="mt-1 text-[10px] text-gray-400 space-y-0.5">
+              <div><code class="bg-gray-100 px-1 rounded">null</code> or blank — sum rsu_units/cda_units from linked records (default)</div>
+              <div><code class="bg-gray-100 px-1 rounded">{"type":"count"}</code> — count records (not sum)</div>
+              <div><code class="bg-gray-100 px-1 rounded">{"type":"count_exam"}</code> — count exam records in division</div>
+              <div><code class="bg-gray-100 px-1 rounded">{"type":"derived","source_ids":["uuid…"],"operation":"sum_both"}</code> — aggregate from other requirements</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1218,6 +1378,8 @@
         // Treatment Steps Data
         steps: [],
         filteredSteps: [],
+        stepsFilterDivision: '',
+        stepsFilterTreatment: '',
 
         // Requirements Data
         requirements: [],
@@ -1259,7 +1421,16 @@
           first_clinic_year: new Date().getFullYear(),
           teamleader_role: false,
           floor_id: '',
-          bay: ''
+          bay: '',
+          oper_instructor_id: '',
+          endo_instructor_id: '',
+          perio_instructor_id: '',
+          prosth_instructor_id: '',
+          diag_instructor_id: '',
+          radio_instructor_id: '',
+          sur_instructor_id: '',
+          ortho_instructor_id: '',
+          pedo_instructor_id: ''
         },
 
         get teamLeaders() {
@@ -1278,6 +1449,20 @@
                };
             })
             .sort((a,b) => a.name.localeCompare(b.name));
+        },
+
+        instructorsByDivCode(code) {
+          if (!this.instructors || this.instructors.length === 0) return [];
+          return this.instructors
+            .filter(i => i.divisions && i.divisions.code === code)
+            .map(i => {
+              const u = this.users.find(u => u.user_id === i.user_id);
+              return {
+                instructor_id: i.instructor_id,
+                name: u ? u.name : 'Unknown (' + i.user_id + ')'
+              };
+            })
+            .sort((a, b) => a.name.localeCompare(b.name));
         },
 
         // Division Form
@@ -1327,6 +1512,7 @@
           requirement_id: null,
           division_id: '',
           requirement_type: '',
+          cda_requirement_type: '',
           minimum_rsu: '',
           minimum_cda: '',
           rsu_unit: '',
@@ -1603,16 +1789,29 @@
 
         filterSteps() {
           if (!this.steps) return;
-          if (!this.search) {
-            this.filteredSteps = this.steps;
-            return;
+          let result = this.steps;
+
+          // Division filter
+          if (this.stepsFilterDivision) {
+            result = result.filter(s => s.treatment_catalog && s.treatment_catalog.division_id === this.stepsFilterDivision);
           }
-          const q = this.search.toLowerCase();
-          this.filteredSteps = this.steps.filter(s => 
-            (s.step_name && s.step_name.toLowerCase().includes(q)) || 
-            (s.treatment_catalog && s.treatment_catalog.treatment_name && s.treatment_catalog.treatment_name.toLowerCase().includes(q)) ||
-            String(s.step_order).includes(q)
-          );
+
+          // Treatment filter
+          if (this.stepsFilterTreatment) {
+            result = result.filter(s => s.treatment_id === this.stepsFilterTreatment);
+          }
+
+          // Text search
+          if (this.search) {
+            const q = this.search.toLowerCase();
+            result = result.filter(s => 
+              (s.step_name && s.step_name.toLowerCase().includes(q)) || 
+              (s.treatment_catalog && s.treatment_catalog.treatment_name && s.treatment_catalog.treatment_name.toLowerCase().includes(q)) ||
+              String(s.step_order).includes(q)
+            );
+          }
+
+          this.filteredSteps = result;
         },
 
         filterRequirements() {
@@ -1864,7 +2063,16 @@
                 teamleader_role: false,
                 division_id: item.division_id || '',
                 floor_id: item.floor_id || item.floor || '', // Support both for display
-                bay: item.bay || ''
+                bay: item.bay || '',
+                oper_instructor_id: item.oper_instructor_id || '',
+                endo_instructor_id: item.endo_instructor_id || '',
+                perio_instructor_id: item.perio_instructor_id || '',
+                prosth_instructor_id: item.prosth_instructor_id || '',
+                diag_instructor_id: item.diag_instructor_id || '',
+                radio_instructor_id: item.radio_instructor_id || '',
+                sur_instructor_id: item.sur_instructor_id || '',
+                ortho_instructor_id: item.ortho_instructor_id || '',
+                pedo_instructor_id: item.pedo_instructor_id || ''
               };
               this.fetchUserDetail(item.email);
             }
@@ -1911,9 +2119,9 @@
           } else if (this.activeTab === 'requirements') {
             // Requirements
             if (mode === 'create') {
-              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', is_patient_treatment: true, non_mc_pateint_req: true };
+              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '' };
             } else {
-              this.reqForm = { ...item, is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false };
+              this.reqForm = { ...item, cda_requirement_type: item.cda_requirement_type || '', is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false, is_selectable: item.is_selectable !== false, is_exam: item.is_exam === true, aggregation_config: item.aggregation_config ? JSON.stringify(item.aggregation_config, null, 2) : '' };
             }
           } else {
             // Floors
@@ -1938,7 +2146,16 @@
                  floor_id: fullUser.floor_id || fullUser.floor || '',
                  bay: fullUser.bay || '',
                  team_leader_1_id: fullUser.team_leader_1_id || '',
-                 team_leader_2_id: fullUser.team_leader_2_id || ''
+                 team_leader_2_id: fullUser.team_leader_2_id || '',
+                 oper_instructor_id: fullUser.oper_instructor_id || '',
+                 endo_instructor_id: fullUser.endo_instructor_id || '',
+                 perio_instructor_id: fullUser.perio_instructor_id || '',
+                 prosth_instructor_id: fullUser.prosth_instructor_id || '',
+                 diag_instructor_id: fullUser.diag_instructor_id || '',
+                 radio_instructor_id: fullUser.radio_instructor_id || '',
+                 sur_instructor_id: fullUser.sur_instructor_id || '',
+                 ortho_instructor_id: fullUser.ortho_instructor_id || '',
+                 pedo_instructor_id: fullUser.pedo_instructor_id || ''
                };
                this.saving = false;
                this.errorMsg = '';

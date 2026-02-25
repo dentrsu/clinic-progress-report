@@ -57,6 +57,15 @@ create table public.students (
   unit_id text,
   team_leader_1_id uuid references public.instructors(instructor_id),
   team_leader_2_id uuid references public.instructors(instructor_id),
+  oper_instructor_id uuid references public.instructors(instructor_id),
+  endo_instructor_id uuid references public.instructors(instructor_id),
+  perio_instructor_id uuid references public.instructors(instructor_id),
+  prosth_instructor_id uuid references public.instructors(instructor_id),
+  diag_instructor_id uuid references public.instructors(instructor_id),
+  radio_instructor_id uuid references public.instructors(instructor_id),
+  sur_instructor_id uuid references public.instructors(instructor_id),
+  ortho_instructor_id uuid references public.instructors(instructor_id),
+  pedo_instructor_id uuid references public.instructors(instructor_id),
   status public.user_status not null default 'active'
 );
 
@@ -101,18 +110,40 @@ create table public.treatment_steps (
 );
 
 
--- 3.5 Requirement List (Missing from previous context)
+-- 3.5 Requirement List
 create table public.requirement_list (
   requirement_id uuid primary key default gen_random_uuid(),
   division_id uuid not null references public.divisions(division_id),
-  requirement_type text not null,
+  requirement_type text not null,        -- RSU-side label (always set)
   minimum_rsu numeric not null default 0,
+  cda_requirement_type text,             -- CDA-side label (nullable; used when minimum_cda > 0)
   minimum_cda numeric not null default 0,
-  rsu_unit text, -- e.g. 'Case', 'Visit'
+  rsu_unit text,                         -- e.g. 'Case', 'Visit'
   cda_unit text,
   is_patient_treatment boolean not null default true,
-  non_mc_pateint_req boolean not null default true
+  non_mc_pateint_req boolean not null default true,  -- NOTE: typo in column name (pateint)
+  is_exam boolean not null default false,            -- True: count exam records (not sum units)
+  is_selectable boolean not null default true,       -- False: hide from treatment_plan.html dropdown
+  aggregation_config jsonb default null              -- Computation config (see rules below)
 );
+
+-- Key rules for requirement_list:
+--   • minimum_rsu > 0  → appears in RSU section of vault (label = requirement_type)
+--   • minimum_cda > 0  → appears in CDA section of vault (label = cda_requirement_type)
+--   • A single row can appear in BOTH sections if both minimums are non-zero
+--   • minimum_rsu = 0 AND minimum_cda = 0  → hidden from treatment_plan.html modal dropdown
+--   • is_selectable = false → hidden from dropdown (computed/derived requirements)
+--   • is_exam = true  → vault counts verified exam records, not sum of rsu_units/cda_units
+--
+-- aggregation_config shapes (JSON):
+--   null / omitted        → "sum"  default: sum rsu_units/cda_units from directly linked records
+--   {"type":"sum"}        → same as null
+--   {"type":"count"}      → count records linked to this requirement
+--   {"type":"count_exam"} → count is_exam=true records in this division
+--   {"type":"count_exam","source_ids":["uuid…"]} → scoped to specific source requirements
+--   {"type":"derived","source_ids":["uuid1","uuid2"],"operation":"sum_both"}
+--       operation: "sum_both" (default) | "sum_rsu" | "sum_cda"
+--       → two-pass: aggregates computed values from other requirements (processed first)
 
 -- 3.6 Patients
 -- create table public.patients (
@@ -210,6 +241,27 @@ To maintain clinical integrity, treatment records are strictly validated and sor
     - Example: Moving a "Systemic" record into the middle of "Disease Control" records will convert it to "Disease Control".
 3.  **Contextual Insert:**
     - When inserting a new record via the "Insert" button on an existing row, the new record is **locked** to that row's Phase and inserted immediately after it. The Order field is also locked to prevent accidental displacement.
+
+### F. Requirement Vault Logic (RSU vs CDA)
+
+A single `requirement_list` row can generate **two separate entries** in the vault:
+
+| condition | appears in | label field |
+|---|---|---|
+| `minimum_rsu > 0` | RSU section | `requirement_type` |
+| `minimum_cda > 0` | CDA section | `cda_requirement_type` |
+| both > 0 | both sections | respective fields above |
+| both = 0 | hidden from modal dropdown | — |
+
+**treatment_plan.html modal** filters the requirement dropdown to only show rows where `minimum_rsu > 0 OR minimum_cda > 0`. Each option shows `[RSU]`, `[CDA]`, or `[RSU+CDA]` badge so students know what they are submitting.
+
+**requirement_vault.html** shows ALL requirements for the student's divisions (even with zero progress), using a LEFT JOIN approach in `getStudentVaultData`. Each division also returns:
+- `rsu_completion_pct` — average of `min(current/minimum, 1)` across all RSU requirements (0–100)
+- `cda_completion_pct` — same for CDA requirements
+
+These percentages power the **radar chart** at the top of the vault page (Chart.js), which shows per-division progression for both RSU and CDA tracks.
+
+**Exam-type requirements** (`is_exam = true`): progress is tracked by **counting** verified exam records in that division, not by summing `rsu_units`/`cda_units`.
 
 ---
 

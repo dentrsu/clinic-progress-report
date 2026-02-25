@@ -286,6 +286,16 @@
              </a>
           </template>
 
+          <!-- Advisor Portal Route -->
+          <template x-if="profile.role === 'instructor'">
+             <a href="<?= appUrl ?>?page=advisor" target="_blank"
+                class="flex items-center justify-center gap-2 w-full py-2.5 bg-indigo-600 border border-transparent text-white text-sm font-semibold rounded-lg shadow-md hover:bg-indigo-700 hover:scale-[1.02] transition-all relative">
+               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+               Enter Advisor Portal
+               <div class="absolute right-3 opacity-50"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></div>
+             </a>
+          </template>
+
           <!-- Admin Portal Route -->
           <template x-if="profile.role === 'admin'">
              <a href="<?= appUrl ?>?page=admin" target="_blank"
@@ -374,10 +384,38 @@
         _getInitials(name) {
           if (!name) return '?';
           var parts = name.trim().split(/\s+/);
-          if (parts.length >= 2) {
-            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+          if (parts.length === 0) return '?';
+          
+          var firstPart = '';
+          var lastPart = '';
+          var firstWord = parts[0];
+
+          if (firstWord.indexOf('.') !== -1) {
+            var dotParts = firstWord.split('.');
+            var afterLastDot = dotParts[dotParts.length - 1];
+            if (afterLastDot.length > 0) {
+               firstPart = afterLastDot;
+            } else {
+               firstPart = parts.length > 1 ? parts[1] : '';
+            }
+          } else {
+            var knownTitles = ['นาย', 'นาง', 'นางสาว', 'นพ', 'ทพ', 'ดร', 'ทญ'];
+            if (knownTitles.indexOf(firstWord) !== -1 || parts.length >= 3) {
+              firstPart = parts.length > 1 ? parts[1] : '';
+            } else {
+              firstPart = firstWord;
+            }
           }
-          return parts[0][0].toUpperCase();
+          
+          lastPart = parts.length > 1 ? parts[parts.length - 1] : '';
+
+          function getConsonant(str) {
+            if (!str) return '';
+            var match = str.match(/[ก-ฮa-zA-Z]/);
+            return match ? match[0] : str.charAt(0);
+          }
+          var initials = getConsonant(firstPart) + (lastPart ? getConsonant(lastPart) : '');
+          return initials.toUpperCase();
         },
 
         getStudentYear() {

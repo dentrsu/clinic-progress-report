@@ -11,37 +11,320 @@
             navy:      { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
             gold:      { DEFAULT: '#C4972F', light: '#D4AD4E' },
             surface:   '#F8F7F4',
+            cardwhite: '#FFFFFF',
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.3s ease-out',
+            'scale-in': 'scaleIn 0.2s ease-out'
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            scaleIn: {
+              '0%': { opacity: '0', transform: 'scale(0.95)' },
+              '100%': { opacity: '1', transform: 'scale(1)' },
+            }
           }
         }
       }
     }
   </script>
+  <style>
+    .spinner {
+      border-top-color: transparent !important;
+      border-right-color: transparent !important;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <?!= include('styles') ?>
 </head>
-<body class="min-h-screen bg-surface flex items-center justify-center p-4">
-
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden text-center">
-    <div class="bg-navy px-6 py-5">
-      <h1 class="text-white text-lg font-bold">Instructor Portal</h1>
-      <p class="text-white/60 text-sm">Under Construction</p>
-    </div>
+<body class="min-h-screen bg-surface flex flex-col p-4 md:p-8"
+      x-data="instructorApp()"
+      x-init="init()">
     
-    <div class="p-8">
-      <div class="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
-        <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-        </svg>
+  <!-- Loading state -->
+  <div x-show="state === 'loading'" class="flex-grow flex flex-col items-center justify-center animate-fade-in">
+    <div class="w-16 h-16 rounded-full bg-navy flex items-center justify-center shadow-lg mb-5">
+      <svg class="w-8 h-8 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"/>
+      </svg>
+    </div>
+    <div class="spinner border-4 border-navy/20 border-t-navy w-10 h-10 rounded-full animate-spin mb-4"></div>
+    <p class="text-sm text-gray-500 font-medium">Loading Instructor Portal...</p>
+  </div>
+
+  <!-- Error state -->
+  <div x-show="state === 'error'" style="display: none;" class="flex-grow flex items-center justify-center animate-fade-in">
+    <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm">
+      <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
       </div>
-      <h2 class="text-lg font-semibold text-gray-800 mb-2">Coming Soon</h2>
-      <p class="text-sm text-gray-500 mb-6">The Instructor Portal is currently being developed.</p>
-      
-      <a href="<?= appUrl ?>" 
-         class="inline-flex items-center justify-center gap-2 w-full py-2 bg-gray-100 border border-transparent text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition">
-         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-         Back to Lobby
-      </a>
+      <h3 class="text-lg font-bold text-gray-800 mb-2">Access Error</h3>
+      <p class="text-sm text-gray-500 mb-6" x-text="errorMessage"></p>
+      <a href="<?= appUrl ?>" class="block w-full py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition">Back to Lobby</a>
     </div>
   </div>
 
+  <!-- Main Portal -->
+  <div x-show="state === 'loaded'" style="display: none;" class="w-full max-w-6xl mx-auto space-y-8 animate-fade-in">
+    <!-- Header -->
+    <div class="bg-navy rounded-2xl p-6 md:px-8 md:py-6 text-white flex flex-col md:flex-row justify-between items-center shadow-lg gap-4">
+      <div class="flex items-center gap-5">
+        <div class="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center border border-white/5">
+            <svg class="w-7 h-7 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"/>
+            </svg>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">Instructor Portal</h1>
+          <p class="text-white/70 text-sm mt-0.5">My Team Students</p>
+        </div>
+      </div>
+      <a href="<?= appUrl ?>" class="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition text-white border border-white/20">
+         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+         Lobby
+      </a>
+    </div>
+
+    <!-- Students Grid -->
+    <div>
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 px-1">Active Team (Filtered by Year & Assignments)</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <template x-for="s in students" :key="s.student_id">
+          <div @click="openModal(s)" class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:border-navy/30 hover:shadow-md transition-all cursor-pointer flex flex-col group relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-navy opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            
+            <div class="flex items-start gap-4 mb-5">
+               <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-lg uppercase shadow-sm border border-emerald-100 shrink-0">
+                  <span x-text="getInitials(s.name)"></span>
+               </div>
+               <div class="truncate">
+                 <h3 class="font-bold text-gray-800 text-base truncate" x-text="s.name"></h3>
+                 <p class="text-[0.7rem] font-mono text-gray-500 mt-1" x-text="'ID: ' + s.academic_id"></p>
+               </div>
+            </div>
+            
+            <div class="mt-auto space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-gray-400 font-medium uppercase tracking-wider">Student Year</span>
+                <span class="font-bold text-navy bg-navy/5 px-2 py-0.5 rounded" x-text="s.calculated_year"></span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-gray-400 font-medium uppercase tracking-wider">Status</span>
+                <span class="capitalize font-medium flex items-center gap-1.5" :class="s.status === 'active' ? 'text-emerald-600' : 'text-gray-500'">
+                   <span class="w-1.5 h-1.5 rounded-full" :class="s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                   <span x-text="s.status"></span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </template>
+        
+        <div x-show="students.length === 0" class="col-span-full py-16 text-center bg-white rounded-xl border border-dashed border-gray-300">
+           <div class="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-3">
+              <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+           </div>
+           <p class="text-gray-500 font-medium">No students found matching your team criteria.</p>
+           <p class="text-xs text-gray-400 mt-1">(5th years match Team Leader 1, other years match Team Leader 2)</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Student Profile Modal -->
+  <div x-show="modalOpen" style="display: none;"
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+       x-transition.opacity>
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in"
+         @click.outside="modalOpen = false">
+      <template x-if="selectedStudent">
+        <div class="flex flex-col max-h-[90vh]">
+           <!-- Modal Header (Navy block) -->
+           <div class="bg-navy px-6 py-6 relative text-center shrink-0">
+             <button @click="modalOpen = false" class="absolute top-4 right-4 text-white/50 hover:text-white transition">
+               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+             </button>
+             
+             <!-- Avatar -->
+             <div class="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white mx-auto mb-3 flex items-center justify-center text-3xl font-bold uppercase shadow-lg border-2 border-white/20">
+                <span x-text="getInitials(selectedStudent.name)"></span>
+             </div>
+             
+             <h2 class="text-xl font-bold text-white tracking-tight leading-tight" x-text="selectedStudent.name"></h2>
+             <p class="text-sm font-mono text-white/70 mt-1" x-text="selectedStudent.email"></p>
+             
+             <div class="mt-4 flex justify-center">
+                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white border border-white/20 flex items-center gap-1.5 shadow-sm">
+                   Student Year <span class="bg-white text-navy px-1.5 py-0.5 rounded text-[0.6rem] ml-0.5" x-text="selectedStudent.calculated_year"></span>
+                </span>
+             </div>
+           </div>
+           
+           <!-- Modal Body (Details) -->
+           <div class="p-6 space-y-4 overflow-y-auto">
+             <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                <span class="text-gray-500 font-medium">Academic ID</span>
+                <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.academic_id"></span>
+             </div>
+             <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                <span class="text-gray-500 font-medium">Student Year</span>
+                <span class="font-medium text-gray-800" x-text="selectedStudent.calculated_year"></span>
+             </div>
+             <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                <span class="text-gray-500 font-medium">Floor / Unit</span>
+                <span class="font-medium text-gray-800">
+                  <span x-text="selectedStudent.floor_label"></span> / <span x-text="selectedStudent.unit_id"></span>
+                </span>
+             </div>
+             
+             <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+               <div class="flex flex-col gap-1 text-xs mb-3">
+                  <span class="text-gray-400 uppercase tracking-wider font-semibold">Team Leader 1</span>
+                  <span class="font-medium text-gray-800" x-text="selectedStudent.team_leader_1_name"></span>
+               </div>
+               <div class="flex flex-col gap-1 text-xs">
+                  <span class="text-gray-400 uppercase tracking-wider font-semibold">Team Leader 2</span>
+                  <span class="font-medium text-gray-800" x-text="selectedStudent.team_leader_2_name"></span>
+               </div>
+             </div>
+             
+             <div class="mt-4 pt-4 border-t border-gray-100">
+               <a :href="'<?= appUrl ?>?page=vault&student_id=' + selectedStudent.student_id" target="_blank"
+                  class="w-full flex justify-center items-center gap-2 py-2 bg-navy text-white font-medium rounded-lg hover:bg-navy-light transition shadow-sm text-sm">
+                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                 Student's Requirement Vault
+               </a>
+             </div>
+
+             <div class="mt-4 pt-4 border-t border-gray-100">
+               <h3 class="text-sm font-bold text-gray-800 mb-3">Assigned Patients</h3>
+               
+               <div x-show="loadingPatients" class="py-4 text-center">
+                 <div class="spinner border-2 border-navy/20 border-t-navy w-5 h-5 rounded-full mx-auto animate-spin mb-2"></div>
+                 <span class="text-xs text-gray-400">Loading patients...</span>
+               </div>
+               
+               <div x-show="!loadingPatients && studentPatients.length === 0" class="py-3 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                 <span class="text-xs text-gray-400 italic">No assigned patients</span>
+               </div>
+               
+               <div x-show="!loadingPatients && studentPatients.length > 0" class="space-y-3 max-h-60 overflow-y-auto pr-1">
+                 <template x-for="p in studentPatients" :key="p.hn">
+                   <div class="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+                     <div class="flex justify-between items-start mb-2">
+                       <div>
+                         <div class="font-bold text-navy text-sm" x-text="p.name"></div>
+                         <div class="text-[0.65rem] font-mono text-gray-500 mt-0.5">HN: <span x-text="p.hn"></span></div>
+                       </div>
+                       <span class="px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide border bg-gray-50 text-gray-600 border-gray-100" x-text="p.status"></span>
+                     </div>
+                     <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                       <span class="font-medium text-gray-400">Type:</span> <span x-text="p.type_of_case || '-'"></span>
+                     </div>
+                     <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(p.hn)" target="_blank"
+                        class="w-full flex justify-center items-center gap-1.5 py-1.5 bg-gray-50 text-navy font-semibold rounded-lg hover:bg-gray-100 transition border border-gray-200 text-xs text-center">
+                       View Treatment Plan
+                     </a>
+                   </div>
+                 </template>
+               </div>
+             </div>
+           </div>
+           
+           <!-- Modal Footer -->
+           <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 shrink-0">
+              <button @click="modalOpen = false" class="w-full py-2 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition shadow-sm text-sm">Close</button>
+           </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    function instructorApp() {
+      return {
+        state: 'loading',
+        errorMessage: '',
+        students: [],
+        modalOpen: false,
+        selectedStudent: null,
+        studentPatients: [],
+        loadingPatients: false,
+        
+        init() {
+          google.script.run
+            .withSuccessHandler(res => {
+              this.students = res || [];
+              this.state = 'loaded';
+            })
+            .withFailureHandler(err => {
+              this.errorMessage = err.message || "An unexpected error occurred.";
+              this.state = 'error';
+            })
+            .instructorGetTeamStudents();
+        },
+        
+        getInitials(name) {
+          if (!name) return '?';
+          var parts = name.trim().split(/\s+/);
+          if (parts.length === 0) return '?';
+          
+          var firstPart = '';
+          var lastPart = '';
+          var firstWord = parts[0];
+
+          if (firstWord.indexOf('.') !== -1) {
+            var dotParts = firstWord.split('.');
+            var afterLastDot = dotParts[dotParts.length - 1];
+            if (afterLastDot.length > 0) {
+               firstPart = afterLastDot;
+            } else {
+               firstPart = parts.length > 1 ? parts[1] : '';
+            }
+          } else {
+            var knownTitles = ['นาย', 'นาง', 'นางสาว', 'นพ', 'ทพ', 'ดร', 'ทญ'];
+            if (knownTitles.indexOf(firstWord) !== -1 || parts.length >= 3) {
+              firstPart = parts.length > 1 ? parts[1] : '';
+            } else {
+              firstPart = firstWord;
+            }
+          }
+          
+          lastPart = parts.length > 1 ? parts[parts.length - 1] : '';
+
+          function getConsonant(str) {
+            if (!str) return '';
+            var match = str.match(/[ก-ฮa-zA-Z]/);
+            return match ? match[0] : str.charAt(0);
+          }
+          var initials = getConsonant(firstPart) + (lastPart ? getConsonant(lastPart) : '');
+          return initials.toUpperCase();
+        },
+        
+        openModal(student) {
+          this.selectedStudent = student;
+          this.studentPatients = [];
+          this.loadingPatients = true;
+          this.modalOpen = true;
+
+          google.script.run
+            .withSuccessHandler(res => {
+               this.studentPatients = res || [];
+               this.loadingPatients = false;
+            })
+            .withFailureHandler(err => {
+               console.error(err);
+               this.loadingPatients = false;
+            })
+            .getStudentPatients(student.student_id);
+        }
+      }
+    }
+  </script>
 </body>
 </html>
