@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:    { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
+            gold:    { DEFAULT: '#C4972F', light: '#D4AD4E' },
+            surface: '#F8F7F4',
+          },
+          animation: { 'fade-in': 'fadeIn 0.3s ease-out' },
+          keyframes: { fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } } },
+        }
+      }
+    }
+  </script>
+  <style>
+    .spinner { border-top-color: transparent !important; border-right-color: transparent !important; animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    [x-cloak] { display: none !important; }
+    @media print {
+      .print\:hidden   { display: none !important; }
+      header           { position: static !important; }
+      body             { background: white !important; }
+      *                { box-shadow: none !important; }
+      table            { font-size: 10px !important; }
+      .rounded-xl      { page-break-inside: avoid; }
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <?!= include('styles') ?>
+</head>
+<body class="min-h-screen bg-surface font-[Inter,sans-serif]"
+      x-data="dashboardApp()"
+      x-init="init()"
+      x-cloak>
+
+  <!-- ── Loading ─────────────────────────────────────────────── -->
+  <div x-show="state === 'loading'" class="min-h-screen flex flex-col items-center justify-center animate-fade-in">
+    <div class="w-16 h-16 rounded-full bg-navy flex items-center justify-center shadow-lg mb-5">
+      <svg class="w-8 h-8 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+      </svg>
+    </div>
+    <div class="spinner border-4 border-navy/20 border-t-navy w-10 h-10 rounded-full mb-4"></div>
+    <p class="text-sm text-gray-500 font-medium">Loading Dashboard...</p>
+  </div>
+
+  <!-- ── Error ────────────────────────────────────────────────── -->
+  <div x-show="state === 'error'" style="display:none" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm">
+      <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      </div>
+      <h3 class="text-lg font-bold text-gray-800 mb-2">Access Error</h3>
+      <p class="text-sm text-gray-500 mb-6" x-text="errorMessage"></p>
+      <a href="<?= appUrl ?>" class="block w-full py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition text-sm">Back to Lobby</a>
+    </div>
+  </div>
+
+  <!-- ── Main ─────────────────────────────────────────────────── -->
+  <div x-show="state === 'loaded'" style="display:none" class="animate-fade-in">
+
+    <!-- View-switch loading overlay -->
+    <div x-show="viewLoading" style="display:none"
+         class="fixed inset-0 z-40 bg-white/70 backdrop-blur-sm flex items-center justify-center print:hidden">
+      <div class="spinner border-4 border-navy/20 border-t-navy w-10 h-10 rounded-full"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-navy text-white px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-lg print:static print:shadow-none">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base md:text-lg font-bold leading-tight">Division Dashboard</h1>
+          <p class="text-white/60 text-xs" x-text="profile ? profile.division.code + ' — ' + profile.division.name : ''"></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 print:hidden">
+        <!-- Desktop view toggle -->
+        <div class="hidden sm:flex bg-white/10 rounded-lg p-0.5 border border-white/20 text-xs font-medium">
+          <button @click="switchView('advisor')"
+                  :class="viewMode === 'advisor' ? 'bg-white text-navy' : 'text-white/70 hover:text-white'"
+                  class="px-3 py-1.5 rounded-md transition whitespace-nowrap">My Advisees</button>
+          <button @click="switchView('division')"
+                  :class="viewMode === 'division' ? 'bg-white text-navy' : 'text-white/70 hover:text-white'"
+                  class="px-3 py-1.5 rounded-md transition whitespace-nowrap">Whole Division</button>
+        </div>
+        <!-- Print -->
+        <button @click="printDashboard()"
+                class="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          Print
+        </button>
+        <!-- Back -->
+        <a href="<?= appUrl ?>?page=advisor"
+           class="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          <span class="hidden sm:inline">Advisor Portal</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Mobile view toggle -->
+    <div class="sm:hidden flex bg-navy/90 px-4 pb-3 gap-1 print:hidden">
+      <button @click="switchView('advisor')"
+              :class="viewMode === 'advisor' ? 'bg-white text-navy font-semibold' : 'bg-white/10 text-white/70'"
+              class="flex-1 py-2 rounded-lg text-xs transition">My Advisees</button>
+      <button @click="switchView('division')"
+              :class="viewMode === 'division' ? 'bg-white text-navy font-semibold' : 'bg-white/10 text-white/70'"
+              class="flex-1 py-2 rounded-lg text-xs transition">Whole Division</button>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex flex-wrap items-center gap-3 print:hidden">
+      <label class="flex items-center gap-2 text-xs text-gray-600 font-medium">
+        Year
+        <select x-model="filterYear" class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-navy">
+          <option value="all">All Years</option>
+          <template x-for="yr in availableYears()" :key="yr">
+            <option :value="yr" x-text="'Year ' + yr"></option>
+          </template>
+        </select>
+      </label>
+      <label x-show="floors.length > 0" class="flex items-center gap-2 text-xs text-gray-600 font-medium">
+        Floor
+        <select x-model="filterFloor" class="border border-gray-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-navy">
+          <option value="all">All Floors</option>
+          <template x-for="f in floors" :key="f.floor_id">
+            <option :value="f.floor_id" x-text="f.label"></option>
+          </template>
+        </select>
+      </label>
+      <span class="ml-auto text-xs text-gray-500">
+        Showing <span class="font-bold text-navy" x-text="filteredStudents().length"></span>
+        <span class="text-gray-400">/ <span x-text="students.length"></span> students</span>
+      </span>
+    </div>
+
+    <!-- Stats strip -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 px-4 md:px-6 py-4 bg-surface border-b border-gray-200">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-navy" x-text="filteredStudents().length"></div>
+        <div class="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-semibold">Students</div>
+      </div>
+      <div class="bg-white rounded-xl border border-emerald-100 shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-emerald-600" x-text="studentsWithCompletedPct() + '%'"></div>
+        <div class="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-semibold">≥1 Completed</div>
+      </div>
+      <div class="bg-white rounded-xl border border-amber-100 shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-amber-500" x-text="pendingVerifCount()"></div>
+        <div class="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-semibold">Pending Verif.</div>
+      </div>
+      <div class="bg-white rounded-xl border border-red-100 shadow-sm p-4 text-center">
+        <div class="text-2xl font-bold text-red-500" x-text="atRiskCount()"></div>
+        <div class="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-semibold">At Risk</div>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-center col-span-2 md:col-span-1">
+        <div class="text-sm font-bold text-gray-700 truncate leading-tight" x-text="biggestGapReq() ? biggestGapReq().requirement_type : '—'"></div>
+        <div class="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-semibold">Biggest Gap</div>
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="bg-white border-b border-gray-200 px-4 md:px-6 flex print:hidden">
+      <template x-for="tab in [{id:'overview',label:'Overview'},{id:'students',label:'Student Overview'},{id:'requirement',label:'Requirement'}]" :key="tab.id">
+        <button @click="activeTab = tab.id"
+                :class="activeTab === tab.id
+                  ? 'border-b-2 border-navy text-navy font-semibold'
+                  : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'"
+                class="px-4 py-3 text-sm transition-colors whitespace-nowrap"
+                x-text="tab.label">
+        </button>
+      </template>
+    </div>
+
+    <!-- Content -->
+    <div class="px-4 md:px-6 py-6 max-w-7xl mx-auto">
+
+      <!-- ════════ TAB: OVERVIEW ════════ -->
+      <div x-show="activeTab === 'overview'" style="display:none">
+        <div x-show="requirements.length === 0" class="py-16 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+          <p class="text-sm text-gray-400">No requirements found for this division.</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <template x-for="req in requirements" :key="req.requirement_id">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <!-- Card header -->
+              <div class="px-4 pt-4 pb-3 border-b border-gray-100 flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <h3 class="text-sm font-bold text-gray-800" x-text="req.requirement_type"></h3>
+                  <template x-if="req.cda_requirement_type">
+                    <p class="text-[10px] text-gray-400 mt-0.5" x-text="'CDA: ' + req.cda_requirement_type"></p>
+                  </template>
+                </div>
+                <span class="shrink-0 text-[10px] font-bold px-2 py-1 rounded-full"
+                      :class="filteredStudents().length > 0 && studentsMetMinimum(req) >= filteredStudents().length
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : studentsMetMinimum(req) > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'"
+                      x-text="studentsMetMinimum(req) + '/' + filteredStudents().length + ' met'">
+                </span>
+              </div>
+              <!-- Distribution bar -->
+              <div class="px-4 py-3">
+                <div class="h-3 flex rounded-full overflow-hidden bg-gray-100">
+                  <template x-if="reqTotal(req) > 0">
+                    <div class="flex w-full">
+                      <div class="bg-slate-400 transition-all h-full"
+                           :style="'width:' + (progressMap()[req.requirement_id].planned   / reqTotal(req) * 100) + '%'"></div>
+                      <div class="bg-amber-400 transition-all h-full"
+                           :style="'width:' + (progressMap()[req.requirement_id].inProgress / reqTotal(req) * 100) + '%'"></div>
+                      <div class="bg-emerald-500 transition-all h-full"
+                           :style="'width:' + (progressMap()[req.requirement_id].completed  / reqTotal(req) * 100) + '%'"></div>
+                    </div>
+                  </template>
+                </div>
+                <!-- Legend -->
+                <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px]">
+                  <span class="flex items-center gap-1 text-gray-500">
+                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
+                    Planned <span class="font-bold text-gray-700 ml-0.5" x-text="progressMap()[req.requirement_id].planned"></span>
+                  </span>
+                  <span class="flex items-center gap-1 text-gray-500">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+                    In Progress <span class="font-bold text-gray-700 ml-0.5" x-text="progressMap()[req.requirement_id].inProgress"></span>
+                  </span>
+                  <span class="flex items-center gap-1 text-gray-500">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                    Completed <span class="font-bold text-gray-700 ml-0.5" x-text="progressMap()[req.requirement_id].completed"></span>
+                  </span>
+                </div>
+              </div>
+              <!-- Students meeting minimum bar -->
+              <template x-if="req.minimum_rsu > 0 || req.is_exam">
+                <div class="px-4 pb-4">
+                  <div class="flex justify-between text-[10px] text-gray-500 mb-1">
+                    <span>Students meeting minimum</span>
+                    <span class="font-semibold text-gray-700"
+                          x-text="filteredStudents().length > 0
+                            ? Math.round(studentsMetMinimum(req) / filteredStudents().length * 100) + '%'
+                            : '0%'"></span>
+                  </div>
+                  <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 rounded-full transition-all"
+                         :style="'width:' + (filteredStudents().length > 0
+                           ? Math.round(studentsMetMinimum(req) / filteredStudents().length * 100) : 0) + '%'"></div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- ════════ TAB: STUDENT OVERVIEW ════════ -->
+      <div x-show="activeTab === 'students'" style="display:none">
+        <!-- Search -->
+        <div class="relative mb-4">
+          <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input type="search" x-model="studentSearch"
+                 placeholder="Search by name or academic ID..."
+                 class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:border-navy shadow-sm" />
+        </div>
+        <!-- Empty -->
+        <div x-show="searchedStudents().length === 0"
+             class="py-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+          <p class="text-sm text-gray-400" x-text="studentSearch ? 'No students match your search.' : 'No students found.'"></p>
+        </div>
+        <!-- Student list -->
+        <div class="space-y-2">
+          <template x-for="s in searchedStudents()" :key="s.student_id">
+            <div class="bg-white rounded-xl border overflow-hidden transition-all shadow-sm"
+                 :class="selectedStudent && selectedStudent.student_id === s.student_id
+                   ? 'border-navy/30 shadow-md' : 'border-gray-200'">
+              <!-- Row -->
+              <div @click="selectStudent(s)" class="flex items-center gap-3 px-4 py-3 cursor-pointer select-none hover:bg-gray-50 transition-colors">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm"
+                     :class="s.calculated_year === 5 ? 'bg-gradient-to-br from-amber-400 to-amber-600'
+                       : s.calculated_year === 4 ? 'bg-gradient-to-br from-blue-400 to-blue-600'
+                       : 'bg-gradient-to-br from-navy to-navy-light'"
+                     x-text="getInitials(s.name)">
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-gray-800 text-sm" x-text="s.name"></span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                          :class="s.calculated_year === 5 ? 'bg-amber-100 text-amber-700'
+                            : s.calculated_year === 4 ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'"
+                          x-text="'Year ' + s.calculated_year">
+                    </span>
+                    <template x-if="isAtRisk(s)">
+                      <span class="flex items-center gap-1 text-[10px] font-semibold text-red-500">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>At Risk
+                      </span>
+                    </template>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-0.5">
+                    <span class="font-mono" x-text="s.academic_id"></span>
+                    <span class="mx-1 text-gray-300">·</span>
+                    <span x-text="s.floor_label"></span>
+                  </div>
+                </div>
+                <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200"
+                     :class="selectedStudent && selectedStudent.student_id === s.student_id ? 'rotate-90' : ''"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </div>
+
+              <!-- Inline vault -->
+              <div x-show="selectedStudent && selectedStudent.student_id === s.student_id"
+                   class="border-t border-gray-100 bg-gray-50/40">
+                <!-- Loading -->
+                <div x-show="inlineVaultLoading" class="py-8 flex flex-col items-center">
+                  <div class="spinner border-2 border-navy/20 border-t-navy w-6 h-6 rounded-full mb-2"></div>
+                  <p class="text-xs text-gray-400">Loading vault...</p>
+                </div>
+                <!-- Error -->
+                <div x-show="!inlineVaultLoading && inlineVaultError" class="p-4">
+                  <p class="text-xs text-red-500 bg-red-50 p-3 rounded-lg" x-text="inlineVaultError"></p>
+                </div>
+                <!-- Vault content -->
+                <template x-if="!inlineVaultLoading && !inlineVaultError && inlineVaultData">
+                  <div class="p-4 space-y-4">
+                    <!-- Full vault link -->
+                    <div class="flex justify-end">
+                      <a :href="'<?= appUrl ?>?page=vault&student_id=' + s.student_id"
+                         target="_blank"
+                         class="inline-flex items-center gap-1.5 text-xs text-navy font-medium hover:underline">
+                        Open Full Vault
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                      </a>
+                    </div>
+                    <!-- Empty -->
+                    <div x-show="inlineVaultData.requirements.length === 0"
+                         class="py-4 text-center bg-white rounded-lg border border-dashed border-gray-200">
+                      <p class="text-xs text-gray-400">No requirements in this division.</p>
+                    </div>
+                    <!-- RSU section -->
+                    <div x-show="inlineVaultData.requirements.some(r => r.minimum_rsu > 0 || r.is_exam)"
+                         class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                      <div class="px-3 py-2 bg-navy/5 border-b border-gray-100">
+                        <span class="text-[10px] font-bold text-navy uppercase tracking-widest">RSU</span>
+                      </div>
+                      <div class="divide-y divide-gray-50">
+                        <template x-for="req in inlineVaultData.requirements" :key="'irsu_' + req.requirement_id">
+                          <div x-show="req.minimum_rsu > 0 || req.is_exam">
+                            <div @click="toggleInlineReq('irsu_' + req.requirement_id)"
+                                 class="px-3 py-3 hover:bg-indigo-50/50 cursor-pointer select-none">
+                              <div class="flex items-start gap-2">
+                                <svg class="w-3.5 h-3.5 mt-0.5 text-gray-400 transition-transform flex-shrink-0"
+                                     :class="inlineExpandedReqs.has('irsu_' + req.requirement_id) ? 'rotate-90' : ''"
+                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                                </svg>
+                                <div class="flex-1 min-w-0">
+                                  <div class="text-sm font-bold text-gray-800" x-text="req.requirement_type"></div>
+                                  <div class="mt-1.5 flex items-center justify-between gap-3">
+                                    <div class="flex-1">
+                                      <div class="flex items-end justify-between mb-1">
+                                        <span class="text-[9px] font-bold text-navy">PROGRESS</span>
+                                        <span class="text-xs font-black text-gray-900">
+                                          <span x-text="req.current_rsu"></span>
+                                          <template x-if="req.pending_rsu > 0">
+                                            <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'+' + req.pending_rsu"></span>
+                                          </template>
+                                          <template x-if="req.minimum_rsu > 0">
+                                            <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_rsu"></span></span>
+                                          </template>
+                                        </span>
+                                      </div>
+                                      <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                        <div class="h-full rounded-full transition-all"
+                                             :class="getBarColor(req.current_rsu, req.minimum_rsu)"
+                                             :style="'width:' + getPercent(req.current_rsu, req.minimum_rsu) + '%'"></div>
+                                      </div>
+                                    </div>
+                                    <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                                          :class="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu)
+                                            ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'"
+                                          x-text="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu)
+                                            ? '✓ Done' : 'Track'">
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <!-- Expanded records -->
+                            <div x-show="inlineExpandedReqs.has('irsu_' + req.requirement_id)"
+                                 class="px-3 pb-3 pt-1 bg-indigo-50/30 border-t border-indigo-50">
+                              <template x-if="req.rsu_records && req.rsu_records.length > 0">
+                                <div class="mt-2 rounded-xl overflow-hidden border border-blue-100">
+                                  <table class="w-full text-left text-xs">
+                                    <thead>
+                                      <tr class="bg-navy/5 text-[9px] font-bold text-navy uppercase tracking-widest">
+                                        <th class="px-3 py-2">Patient</th>
+                                        <th class="px-3 py-2">Area</th>
+                                        <th class="px-3 py-2 text-center">RSU</th>
+                                        <th class="px-3 py-2 text-right">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-blue-100/60">
+                                      <template x-for="(rec, i) in req.rsu_records" :key="i">
+                                        <tr :class="rec.transferred_from ? 'bg-violet-50/60' : ''">
+                                          <td class="px-3 py-2">
+                                            <div class="flex items-center gap-1 flex-wrap">
+                                              <span class="font-mono font-semibold text-gray-700" x-text="rec.hn"></span>
+                                              <template x-if="rec.transferred_from">
+                                                <span class="px-1 py-0.5 rounded text-[9px] bg-violet-100 text-violet-700 font-semibold" x-text="'← ' + rec.transferred_from"></span>
+                                              </template>
+                                            </div>
+                                            <div class="text-gray-500 text-[10px]" x-text="rec.patient_name"></div>
+                                          </td>
+                                          <td class="px-3 py-2 text-gray-500 text-[11px]" x-text="rec.area"></td>
+                                          <td class="px-3 py-2 text-center font-semibold text-navy" x-text="rec.rsu_units"></td>
+                                          <td class="px-3 py-2 text-right">
+                                            <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                                                  :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                                                  x-text="rec.status === 'verified' ? 'Verified' : 'Pending'"></span>
+                                          </td>
+                                        </tr>
+                                      </template>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </template>
+                              <template x-if="!req.rsu_records || req.rsu_records.length === 0">
+                                <p class="text-xs text-gray-400 italic py-1 pl-6">No records yet.</p>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+
+                    <!-- CDA section -->
+                    <div x-show="inlineVaultData.requirements.some(r => r.minimum_cda > 0 || r.is_exam)"
+                         class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                      <div class="px-3 py-2 bg-amber-50 border-b border-gray-100">
+                        <span class="text-[10px] font-bold text-amber-700 uppercase tracking-widest">CDA</span>
+                      </div>
+                      <div class="divide-y divide-gray-50">
+                        <template x-for="req in inlineVaultData.requirements" :key="'icda_' + req.requirement_id">
+                          <div x-show="req.minimum_cda > 0 || req.is_exam">
+                            <div @click="toggleInlineReq('icda_' + req.requirement_id)"
+                                 class="px-3 py-3 hover:bg-amber-50/50 cursor-pointer select-none">
+                              <div class="flex items-start gap-2">
+                                <svg class="w-3.5 h-3.5 mt-0.5 text-gray-400 transition-transform flex-shrink-0"
+                                     :class="inlineExpandedReqs.has('icda_' + req.requirement_id) ? 'rotate-90' : ''"
+                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                                </svg>
+                                <div class="flex-1 min-w-0">
+                                  <div class="text-sm font-bold text-gray-800" x-text="req.cda_requirement_type || req.requirement_type"></div>
+                                  <div class="mt-1.5 flex items-center justify-between gap-3">
+                                    <div class="flex-1">
+                                      <div class="flex items-end justify-between mb-1">
+                                        <span class="text-[9px] font-bold text-amber-600">PROGRESS</span>
+                                        <span class="text-xs font-black text-gray-900">
+                                          <span x-text="req.current_cda"></span>
+                                          <template x-if="req.pending_cda > 0">
+                                            <span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'+' + req.pending_cda"></span>
+                                          </template>
+                                          <template x-if="req.minimum_cda > 0">
+                                            <span class="text-gray-400 font-medium"> / <span x-text="req.minimum_cda"></span></span>
+                                          </template>
+                                        </span>
+                                      </div>
+                                      <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                        <div class="h-full rounded-full transition-all"
+                                             :class="getBarColor(req.current_cda, req.minimum_cda)"
+                                             :style="'width:' + getPercent(req.current_cda, req.minimum_cda) + '%'"></div>
+                                      </div>
+                                    </div>
+                                    <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                                          :class="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda)
+                                            ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'"
+                                          x-text="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda)
+                                            ? '✓ Done' : 'Track'">
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div x-show="inlineExpandedReqs.has('icda_' + req.requirement_id)"
+                                 class="px-3 pb-3 pt-1 bg-amber-50/30 border-t border-amber-50">
+                              <template x-if="req.cda_records && req.cda_records.length > 0">
+                                <div class="mt-2 rounded-xl overflow-hidden border border-amber-100">
+                                  <table class="w-full text-left text-xs">
+                                    <thead>
+                                      <tr class="bg-amber-50 text-[9px] font-bold text-amber-700 uppercase tracking-widest">
+                                        <th class="px-3 py-2">Patient</th>
+                                        <th class="px-3 py-2">Area</th>
+                                        <th class="px-3 py-2 text-center">CDA</th>
+                                        <th class="px-3 py-2 text-right">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-amber-100/60">
+                                      <template x-for="(rec, i) in req.cda_records" :key="i">
+                                        <tr :class="rec.transferred_from ? 'bg-violet-50/60' : ''">
+                                          <td class="px-3 py-2">
+                                            <div class="flex items-center gap-1 flex-wrap">
+                                              <span class="font-mono font-semibold text-gray-700" x-text="rec.hn"></span>
+                                              <template x-if="rec.transferred_from">
+                                                <span class="px-1 py-0.5 rounded text-[9px] bg-violet-100 text-violet-700 font-semibold" x-text="'← ' + rec.transferred_from"></span>
+                                              </template>
+                                            </div>
+                                            <div class="text-gray-500 text-[10px]" x-text="rec.patient_name"></div>
+                                          </td>
+                                          <td class="px-3 py-2 text-gray-500 text-[11px]" x-text="rec.area"></td>
+                                          <td class="px-3 py-2 text-center font-semibold text-amber-700" x-text="rec.cda_units"></td>
+                                          <td class="px-3 py-2 text-right">
+                                            <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                                                  :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                                                  x-text="rec.status === 'verified' ? 'Verified' : 'Pending'"></span>
+                                          </td>
+                                        </tr>
+                                      </template>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </template>
+                              <template x-if="!req.cda_records || req.cda_records.length === 0">
+                                <p class="text-xs text-gray-400 italic py-1 pl-6">No records yet.</p>
+                              </template>
+                            </div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- ════════ TAB: REQUIREMENT ════════ -->
+      <div x-show="activeTab === 'requirement'" style="display:none">
+        <!-- Pill selector -->
+        <div class="flex gap-2 overflow-x-auto pb-3 mb-4">
+          <template x-for="req in requirements" :key="req.requirement_id">
+            <button @click="selectedReqId = (selectedReqId === req.requirement_id ? null : req.requirement_id)"
+                    :class="selectedReqId === req.requirement_id
+                      ? 'bg-navy text-white border-navy'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'"
+                    class="px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap shrink-0 transition shadow-sm"
+                    x-text="req.requirement_type">
+            </button>
+          </template>
+        </div>
+        <!-- Placeholder -->
+        <div x-show="!selectedReqId"
+             class="py-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+          <p class="text-sm text-gray-400">Select a requirement above to view the student matrix.</p>
+        </div>
+        <!-- Matrix -->
+        <template x-if="selectedReqId">
+          <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="px-4 py-3 bg-navy/5 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <span class="text-xs font-bold text-navy uppercase tracking-wider" x-text="selectedReqLabel()"></span>
+                <span class="text-xs text-gray-500 ml-2" x-text="selectedReqMin() > 0 ? 'Min: ' + selectedReqMin() : ''"></span>
+              </div>
+              <span class="text-[10px] text-gray-500"
+                    x-text="studentsMetMinimum(selectedReq()) + ' / ' + filteredStudents().length + ' students met minimum'"></span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-[10px] uppercase font-bold tracking-widest text-gray-500 bg-gray-50 border-b border-gray-100">
+                    <th class="px-4 py-3 text-left">Student</th>
+                    <th class="px-3 py-3 text-center">Year</th>
+                    <th class="px-3 py-3 text-center">Floor</th>
+                    <th class="px-3 py-3 text-center cursor-pointer hover:text-gray-800 select-none"
+                        @click="toggleSort('planned')">
+                      Planned <span x-text="sortField === 'planned' ? (sortDir === 'desc' ? '↓' : '↑') : ''"></span>
+                    </th>
+                    <th class="px-3 py-3 text-center cursor-pointer hover:text-gray-800 select-none"
+                        @click="toggleSort('inProgress')">
+                      In Progress <span x-text="sortField === 'inProgress' ? (sortDir === 'desc' ? '↓' : '↑') : ''"></span>
+                    </th>
+                    <th class="px-3 py-3 text-center cursor-pointer hover:text-gray-800 select-none"
+                        @click="toggleSort('completed')">
+                      Completed <span x-text="sortField === 'completed' ? (sortDir === 'desc' ? '↓' : '↑') : ''"></span>
+                    </th>
+                    <th class="px-3 py-3 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="row in studentRowsForReq(selectedReqId)" :key="row.student.student_id">
+                    <tr class="hover:bg-gray-50 transition-colors">
+                      <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <div class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                               :class="row.student.calculated_year === 5 ? 'bg-amber-400'
+                                 : row.student.calculated_year === 4 ? 'bg-blue-400' : 'bg-navy/60'"
+                               x-text="getInitials(row.student.name)">
+                          </div>
+                          <div>
+                            <div class="font-semibold text-gray-800 text-xs" x-text="row.student.name"></div>
+                            <div class="text-[10px] text-gray-400 font-mono" x-text="row.student.academic_id"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="px-3 py-3 text-center">
+                        <span class="text-xs font-semibold px-1.5 py-0.5 rounded"
+                              :class="row.student.calculated_year === 5 ? 'bg-amber-100 text-amber-700'
+                                : row.student.calculated_year === 4 ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-100 text-gray-600'"
+                              x-text="row.student.calculated_year">
+                        </span>
+                      </td>
+                      <td class="px-3 py-3 text-center text-xs text-gray-500" x-text="row.student.floor_label"></td>
+                      <td class="px-3 py-3 text-center">
+                        <span class="text-xs font-bold text-slate-500" x-text="row.planned"></span>
+                      </td>
+                      <td class="px-3 py-3 text-center">
+                        <span class="text-xs font-bold text-amber-600" x-text="row.inProgress"></span>
+                      </td>
+                      <td class="px-3 py-3 text-center">
+                        <span class="inline-block px-2 py-0.5 rounded text-xs font-bold"
+                              :class="heatColor(row.completed / Math.max(1, selectedReqMin()))"
+                              x-text="row.completed">
+                        </span>
+                      </td>
+                      <td class="px-3 py-3 text-center">
+                        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold"
+                              :class="row.completed >= selectedReqMin() ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'"
+                              x-text="row.completed >= selectedReqMin() ? 'Met' : 'Below'">
+                        </span>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+  <script>
+    function dashboardApp() {
+      return {
+        state: 'loading',
+        errorMessage: '',
+        profile: null,
+        students: [],
+        requirements: [],
+        records: [],
+        floors: [],
+
+        viewMode: 'advisor',
+        viewLoading: false,
+        filterYear: 'all',
+        filterFloor: 'all',
+
+        activeTab: 'overview',
+
+        studentSearch: '',
+        selectedStudent: null,
+        inlineVaultData: null,
+        inlineVaultLoading: false,
+        inlineVaultError: '',
+        inlineExpandedReqs: new Set(),
+
+        selectedReqId: null,
+        sortField: 'completed',
+        sortDir: 'desc',
+
+        // ── Init ──────────────────────────────────────────────
+        init() { this.load('advisor'); },
+
+        load(viewMode) {
+          this.state = 'loading';
+          this.viewMode = viewMode;
+          google.script.run
+            .withSuccessHandler(data => {
+              this.profile      = data.profile;
+              this.students     = data.students     || [];
+              this.requirements = data.requirements || [];
+              this.records      = data.records      || [];
+              this.floors       = data.floors       || [];
+              this.viewLoading  = false;
+              this.state = 'loaded';
+            })
+            .withFailureHandler(err => {
+              this.errorMessage = err.message || String(err);
+              this.viewLoading  = false;
+              this.state = 'error';
+            })
+            .advisorGetDashboardData(viewMode);
+        },
+
+        switchView(mode) {
+          if (mode === this.viewMode || this.viewLoading) return;
+          this.viewLoading = true;
+          this.selectedStudent = null;
+          this.inlineVaultData = null;
+          this.filterYear  = 'all';
+          this.filterFloor = 'all';
+          this.selectedReqId = null;
+          this.load(mode);
+        },
+
+        // ── Filters ───────────────────────────────────────────
+        filteredStudents() {
+          return this.students.filter(s => {
+            if (this.filterYear  !== 'all' && s.calculated_year !== this.filterYear)  return false;
+            if (this.filterFloor !== 'all' && s.floor_id        !== this.filterFloor) return false;
+            return true;
+          });
+        },
+
+        availableYears() {
+          var years = new Set();
+          this.students.forEach(s => { if (s.calculated_year !== '-') years.add(s.calculated_year); });
+          return Array.from(years).sort((a, b) => b - a);
+        },
+
+        filteredStudentIds() {
+          return new Set(this.filteredStudents().map(s => s.student_id));
+        },
+
+        filteredRecords() {
+          var ids = this.filteredStudentIds();
+          return this.records.filter(r => ids.has(r.student_id));
+        },
+
+        // ── 3-group classifier ────────────────────────────────
+        recordGroup(rec) {
+          if (rec.step_name === 'Treatment Plan Approved') return 'planned';
+          var done = ['completed', 'pending verification', 'verified', 'rejected'];
+          if (done.indexOf(rec.status) >= 0) return 'completed';
+          return 'inProgress';
+        },
+
+        // ── Progress map ──────────────────────────────────────
+        progressMap() {
+          var map = {};
+          this.requirements.forEach(r => {
+            map[r.requirement_id] = { planned: 0, inProgress: 0, completed: 0 };
+          });
+          this.filteredRecords().forEach(rec => {
+            if (!map[rec.requirement_id]) return;
+            map[rec.requirement_id][this.recordGroup(rec)]++;
+          });
+          return map;
+        },
+
+        reqTotal(req) {
+          var m = this.progressMap()[req.requirement_id];
+          return m ? m.planned + m.inProgress + m.completed : 0;
+        },
+
+        // ── Stats ─────────────────────────────────────────────
+        studentsWithCompletedPct() {
+          var total = this.filteredStudents().length;
+          if (!total) return 0;
+          var withCompleted = new Set();
+          this.filteredRecords().forEach(r => {
+            if (this.recordGroup(r) === 'completed') withCompleted.add(r.student_id);
+          });
+          return Math.round(withCompleted.size / total * 100);
+        },
+
+        pendingVerifCount() {
+          return this.filteredRecords().filter(r => r.status === 'pending verification').length;
+        },
+
+        studentsMetMinimum(req) {
+          if (!req) return 0;
+          var min = req.is_exam ? 1 : req.minimum_rsu;
+          if (!min) return 0;
+          var byStudent = {};
+          this.filteredRecords().forEach(r => {
+            if (r.requirement_id !== req.requirement_id) return;
+            if (this.recordGroup(r) !== 'completed') return;
+            byStudent[r.student_id] = (byStudent[r.student_id] || 0) + 1;
+          });
+          var met = 0;
+          Object.values(byStudent).forEach(cnt => { if (cnt >= min) met++; });
+          return met;
+        },
+
+        atRiskCount() {
+          var countable = this.requirements.filter(r => r.minimum_rsu > 0 || r.is_exam);
+          if (!countable.length) return 0;
+          var byStudentReq = {};
+          this.filteredRecords().forEach(r => {
+            if (this.recordGroup(r) !== 'completed') return;
+            if (!byStudentReq[r.student_id]) byStudentReq[r.student_id] = {};
+            byStudentReq[r.student_id][r.requirement_id] = (byStudentReq[r.student_id][r.requirement_id] || 0) + 1;
+          });
+          var atRisk = new Set();
+          this.filteredStudents().forEach(s => {
+            var byReq = byStudentReq[s.student_id] || {};
+            for (var i = 0; i < countable.length; i++) {
+              var req = countable[i];
+              var min = req.is_exam ? 1 : req.minimum_rsu;
+              if ((byReq[req.requirement_id] || 0) < min * 0.5) { atRisk.add(s.student_id); break; }
+            }
+          });
+          return atRisk.size;
+        },
+
+        isAtRisk(student) {
+          var countable = this.requirements.filter(r => r.minimum_rsu > 0 || r.is_exam);
+          if (!countable.length) return false;
+          var byReq = {};
+          this.filteredRecords()
+            .filter(r => r.student_id === student.student_id && this.recordGroup(r) === 'completed')
+            .forEach(r => { byReq[r.requirement_id] = (byReq[r.requirement_id] || 0) + 1; });
+          return countable.some(req => {
+            var min = req.is_exam ? 1 : req.minimum_rsu;
+            return (byReq[req.requirement_id] || 0) < min * 0.5;
+          });
+        },
+
+        biggestGapReq() {
+          var countable = this.requirements.filter(r => r.minimum_rsu > 0 || r.is_exam);
+          if (!countable.length || !this.filteredStudents().length) return null;
+          var worst = null, worstRatio = Infinity;
+          countable.forEach(req => {
+            var ratio = this.studentsMetMinimum(req) / this.filteredStudents().length;
+            if (ratio < worstRatio) { worstRatio = ratio; worst = req; }
+          });
+          return worst;
+        },
+
+        // ── Student Overview ──────────────────────────────────
+        searchedStudents() {
+          var q = this.studentSearch.trim().toLowerCase();
+          if (!q) return this.filteredStudents();
+          return this.filteredStudents().filter(s =>
+            s.name.toLowerCase().includes(q) || String(s.academic_id).toLowerCase().includes(q)
+          );
+        },
+
+        selectStudent(s) {
+          if (this.selectedStudent && this.selectedStudent.student_id === s.student_id) {
+            this.selectedStudent = null;
+            this.inlineVaultData = null;
+            this.inlineVaultError = '';
+            this.inlineExpandedReqs = new Set();
+            return;
+          }
+          this.selectedStudent = s;
+          this.inlineVaultData = null;
+          this.inlineVaultError = '';
+          this.inlineExpandedReqs = new Set();
+          this.inlineVaultLoading = true;
+          google.script.run
+            .withSuccessHandler(div => {
+              this.inlineVaultData = div;
+              this.inlineVaultLoading = false;
+            })
+            .withFailureHandler(err => {
+              this.inlineVaultError = err.message || String(err);
+              this.inlineVaultLoading = false;
+            })
+            .advisorGetStudentDivisionVault(s.student_id, this.profile.division.name);
+        },
+
+        toggleInlineReq(key) {
+          var s = new Set(this.inlineExpandedReqs);
+          s.has(key) ? s.delete(key) : s.add(key);
+          this.inlineExpandedReqs = s;
+        },
+
+        // ── Requirement matrix ────────────────────────────────
+        selectedReq() {
+          return this.requirements.find(r => r.requirement_id === this.selectedReqId) || null;
+        },
+
+        selectedReqLabel() {
+          var r = this.selectedReq();
+          return r ? r.requirement_type : '';
+        },
+
+        selectedReqMin() {
+          var r = this.selectedReq();
+          if (!r) return 1;
+          return r.is_exam ? 1 : (r.minimum_rsu || 1);
+        },
+
+        studentRowsForReq(reqId) {
+          var byStudent = {};
+          this.filteredStudents().forEach(s => {
+            byStudent[s.student_id] = { student: s, planned: 0, inProgress: 0, completed: 0 };
+          });
+          this.filteredRecords().forEach(r => {
+            if (r.requirement_id !== reqId || !byStudent[r.student_id]) return;
+            byStudent[r.student_id][this.recordGroup(r)]++;
+          });
+          var rows = Object.values(byStudent);
+          var field = this.sortField;
+          var dir   = this.sortDir === 'desc' ? -1 : 1;
+          rows.sort((a, b) => {
+            var diff = (a[field] - b[field]) * dir;
+            return diff !== 0 ? diff : String(a.student.academic_id).localeCompare(String(b.student.academic_id));
+          });
+          return rows;
+        },
+
+        toggleSort(field) {
+          if (this.sortField === field) {
+            this.sortDir = this.sortDir === 'desc' ? 'asc' : 'desc';
+          } else {
+            this.sortField = field;
+            this.sortDir = 'desc';
+          }
+        },
+
+        // ── Heatmap ───────────────────────────────────────────
+        heatColor(fraction) {
+          if (fraction >= 1.0) return 'bg-emerald-100 text-emerald-800';
+          if (fraction >= 0.75) return 'bg-lime-100 text-lime-800';
+          if (fraction >= 0.50) return 'bg-yellow-100 text-yellow-800';
+          if (fraction >= 0.25) return 'bg-orange-100 text-orange-700';
+          if (fraction > 0)     return 'bg-red-100 text-red-700';
+          return 'bg-gray-100 text-gray-400';
+        },
+
+        // ── Shared helpers ────────────────────────────────────
+        getInitials(name) {
+          if (!name) return '?';
+          var parts = name.trim().split(/\s+/);
+          return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+        },
+
+        getPercent(current, min) {
+          if (!min || min <= 0) return current > 0 ? 100 : 0;
+          return Math.min(100, Math.round(current / min * 100));
+        },
+
+        getBarColor(current, min) {
+          var pct = min > 0 ? current / min : (current > 0 ? 1 : 0);
+          if (pct >= 1)    return 'bg-emerald-500';
+          if (pct >= 0.75) return 'bg-indigo-400';
+          if (pct >= 0.5)  return 'bg-amber-400';
+          return 'bg-red-400';
+        },
+
+        printDashboard() { window.print(); },
+      };
+    }
+  </script>
+</body>
+</html>

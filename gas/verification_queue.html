@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:    { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
+            gold:    { DEFAULT: '#C4972F', light: '#D4AD4E' },
+            surface: '#F8F7F4',
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+        },
+      },
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <?!= include('styles') ?>
+  <style>
+    [x-cloak] { display: none !important; }
+    .spinner {
+      border-top-color: transparent !important;
+      border-right-color: transparent !important;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="min-h-screen bg-surface font-sans"
+      x-data="verificationQueueApp()"
+      x-init="init()">
+
+  <!-- ── Header ── -->
+  <header class="bg-navy text-white px-6 py-5 flex items-center justify-between shadow-md sticky top-0 z-30">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight leading-none">Verification Queue</h1>
+        <p class="text-white/60 text-xs mt-0.5">Pending verification records — my team students</p>
+      </div>
+    </div>
+    <a href="<?= appUrl ?>?page=instructor"
+       class="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition border border-white/20 text-white">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      Instructor Portal
+    </a>
+  </header>
+
+  <!-- ── Loading ── -->
+  <div x-show="loading" class="flex flex-col items-center justify-center py-32 gap-4">
+    <div class="spinner border-4 border-navy/20 border-t-navy w-10 h-10 rounded-full"></div>
+    <p class="text-sm text-gray-500 font-medium">Loading pending verifications…</p>
+  </div>
+
+  <!-- ── Error ── -->
+  <div x-show="errorMsg && !loading" x-cloak class="max-w-xl mx-auto mt-16 p-6 bg-red-50 border border-red-200 rounded-xl text-center">
+    <p class="text-red-700 font-medium text-sm" x-text="errorMsg"></p>
+    <button @click="init()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition">Retry</button>
+  </div>
+
+  <!-- ── Main Content ── -->
+  <div x-show="!loading && !errorMsg" x-cloak class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Summary counts -->
+    <div x-show="studentGroups.length > 0" class="grid grid-cols-2 gap-4">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 flex items-center gap-4">
+        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-gray-800" x-text="studentGroups.length"></div>
+          <div class="text-xs text-gray-400 font-medium mt-0.5">Student<span x-show="studentGroups.length !== 1">s</span></div>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 flex items-center gap-4">
+        <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          </svg>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-gray-800" x-text="totalPending()"></div>
+          <div class="text-xs text-gray-400 font-medium mt-0.5">Pending Record<span x-show="totalPending() !== 1">s</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result banner -->
+    <template x-if="result">
+      <div :class="result.errors.length ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'"
+           class="flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium">
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span x-text="result.count + ' record(s) ' + (lastAction === 'verified' ? 'verified' : 'rejected') + ' successfully.' + (result.errors.length ? ' ' + result.errors.length + ' failed.' : '')"></span>
+        <button @click="result = null" class="ml-auto opacity-60 hover:opacity-100 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </template>
+
+    <!-- Empty state -->
+    <div x-show="studentGroups.length === 0 && !loading" class="flex flex-col items-center justify-center py-24 text-center">
+      <div class="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
+        <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <h3 class="text-lg font-bold text-gray-700 mb-1">All clear!</h3>
+      <p class="text-sm text-gray-400">No pending verification records for your team students.</p>
+    </div>
+
+    <!-- Bulk action bar (sticky below header) -->
+    <div x-show="studentGroups.length > 0"
+         class="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 shadow-sm sticky top-[72px] z-20">
+      <span class="text-sm font-medium text-gray-700">
+        <span x-text="totalSelected()"></span> record<span x-show="totalSelected() !== 1">s</span> selected
+      </span>
+      <div class="ml-auto flex gap-2">
+        <button @click="bulkAction('verified')"
+                :disabled="totalSelected() === 0 || submitting"
+                :class="totalSelected() === 0 || submitting ? 'opacity-40 cursor-not-allowed' : 'hover:bg-emerald-700'"
+                class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium transition">
+          <template x-if="submitting && lastAction === 'verified'">
+            <div class="spinner border-2 border-white/30 border-t-white w-4 h-4 rounded-full"></div>
+          </template>
+          <template x-if="!(submitting && lastAction === 'verified')">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          </template>
+          Verify Selected
+        </button>
+        <button @click="bulkAction('rejected')"
+                :disabled="totalSelected() === 0 || submitting"
+                :class="totalSelected() === 0 || submitting ? 'opacity-40 cursor-not-allowed' : 'hover:bg-red-600'"
+                class="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium transition">
+          <template x-if="submitting && lastAction === 'rejected'">
+            <div class="spinner border-2 border-white/30 border-t-white w-4 h-4 rounded-full"></div>
+          </template>
+          <template x-if="!(submitting && lastAction === 'rejected')">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </template>
+          Reject Selected
+        </button>
+      </div>
+    </div>
+
+    <!-- Per-student groups -->
+    <template x-for="group in studentGroups" :key="group.student_id">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+
+        <!-- Student header -->
+        <div class="bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center gap-3">
+          <!-- Select-all checkbox -->
+          <input type="checkbox"
+                 class="w-4 h-4 rounded border-gray-300 text-amber-600 cursor-pointer"
+                 :checked="isAllStudentSelected(group.student_id)"
+                 :indeterminate.prop="someStudentSelected(group.student_id) && !isAllStudentSelected(group.student_id)"
+                 @change="toggleStudent(group.student_id)"
+                 :title="'Select all records for ' + group.name" />
+          <div class="flex items-center gap-2 flex-1 min-w-0">
+            <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-sm flex items-center justify-center shrink-0 border border-amber-200">
+              <span x-text="group.name.charAt(0).toUpperCase()"></span>
+            </div>
+            <div class="min-w-0">
+              <span class="font-semibold text-gray-800 text-sm truncate block" x-text="group.name"></span>
+              <span class="text-xs text-gray-500 font-mono" x-text="'ID ' + group.academic_id + ' · Year ' + group.calculated_year"></span>
+            </div>
+          </div>
+          <span class="ml-auto shrink-0 text-xs font-semibold px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full border border-amber-200"
+                x-text="group.records.length + ' pending'"></span>
+        </div>
+
+        <!-- Records table — desktop -->
+        <div class="hidden sm:block overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                <th class="w-8 px-4 py-2.5 text-center font-medium"></th>
+                <th class="px-4 py-2.5 text-left font-medium">Patient</th>
+                <th class="px-4 py-2.5 text-left font-medium">Treatment · Step</th>
+                <th class="px-4 py-2.5 text-left font-medium">Requirement</th>
+                <th class="px-4 py-2.5 text-left font-medium">Area</th>
+                <th class="px-4 py-2.5 text-center font-medium">RSU</th>
+                <th class="px-4 py-2.5 text-center font-medium">CDA</th>
+                <th class="px-4 py-2.5 text-left font-medium">Submitted</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="rec in group.records" :key="rec.record_id">
+                <tr :class="isSelected(rec.record_id) ? 'bg-indigo-50' : 'hover:bg-gray-50'"
+                    class="transition-colors cursor-pointer"
+                    @click="toggleRecord(rec.record_id)">
+                  <td class="px-4 py-3 text-center" @click.stop>
+                    <input type="checkbox"
+                           class="w-4 h-4 rounded border-gray-300 text-indigo-600 cursor-pointer"
+                           :checked="isSelected(rec.record_id)"
+                           @change="toggleRecord(rec.record_id)" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="font-medium text-gray-800 text-xs" x-text="rec.patient_name"></div>
+                    <div class="font-mono text-[0.65rem] text-gray-400 mt-0.5" x-text="'HN ' + rec.hn"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="text-gray-800 text-xs font-medium" x-text="rec.treatment_name"></div>
+                    <div class="text-gray-400 text-[0.65rem] mt-0.5" x-text="rec.step_name !== '-' ? rec.step_name : ''"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="inline-block text-[0.65rem] font-medium px-2 py-0.5 rounded bg-navy/5 text-navy border border-navy/10"
+                          x-text="rec.requirement_type"></span>
+                  </td>
+                  <td class="px-4 py-3 text-gray-500 text-xs" x-text="rec.area"></td>
+                  <td class="px-4 py-3 text-center font-mono text-xs text-indigo-700 font-semibold" x-text="rec.rsu_units"></td>
+                  <td class="px-4 py-3 text-center font-mono text-xs text-amber-700 font-semibold" x-text="rec.cda_units"></td>
+                  <td class="px-4 py-3 text-gray-400 text-[0.65rem]" x-text="formatDate(rec.updated_at)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Records — mobile cards -->
+        <div class="sm:hidden divide-y divide-gray-100">
+          <template x-for="rec in group.records" :key="rec.record_id + '_m'">
+            <div :class="isSelected(rec.record_id) ? 'bg-indigo-50' : 'bg-white'"
+                 class="px-4 py-3 flex gap-3 transition-colors cursor-pointer"
+                 @click="toggleRecord(rec.record_id)">
+              <div class="pt-0.5" @click.stop>
+                <input type="checkbox"
+                       class="w-4 h-4 rounded border-gray-300 text-indigo-600 cursor-pointer"
+                       :checked="isSelected(rec.record_id)"
+                       @change="toggleRecord(rec.record_id)" />
+              </div>
+              <div class="flex-1 min-w-0 space-y-1">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="font-semibold text-gray-800 text-sm" x-text="rec.patient_name"></div>
+                    <div class="font-mono text-[0.65rem] text-gray-400">HN <span x-text="rec.hn"></span></div>
+                  </div>
+                  <div class="flex gap-2 shrink-0">
+                    <span class="text-[0.65rem] font-mono font-bold text-indigo-700" x-text="rec.rsu_units + ' RSU'"></span>
+                    <span class="text-[0.65rem] font-mono font-bold text-amber-700" x-text="rec.cda_units + ' CDA'"></span>
+                  </div>
+                </div>
+                <div class="text-xs text-gray-600">
+                  <span x-text="rec.treatment_name"></span>
+                  <span x-show="rec.step_name !== '-'" class="text-gray-400"> · <span x-text="rec.step_name"></span></span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[0.65rem] font-medium px-1.5 py-0.5 rounded bg-navy/5 text-navy border border-navy/10"
+                        x-text="rec.requirement_type"></span>
+                  <span class="text-[0.65rem] text-gray-400" x-text="formatDate(rec.updated_at)"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+      </div>
+    </template>
+
+  </div><!-- /main content -->
+
+  <script>
+    function verificationQueueApp() {
+      return {
+        loading: true,
+        errorMsg: '',
+        submitting: false,
+        lastAction: '',
+        result: null,
+        studentGroups: [], // [{ student_id, name, academic_id, calculated_year, records[] }]
+        selected: {},      // { [record_id]: true }
+
+        // ── Computed helpers ──────────────────────────────────────────────────
+
+        totalPending() {
+          return this.studentGroups.reduce((sum, g) => sum + g.records.length, 0);
+        },
+
+        totalSelected() {
+          return Object.keys(this.selected).length;
+        },
+
+        isSelected(id) {
+          return !!this.selected[id];
+        },
+
+        isAllStudentSelected(studentId) {
+          var group = this.studentGroups.find(g => g.student_id === studentId);
+          if (!group || group.records.length === 0) return false;
+          return group.records.every(r => !!this.selected[r.record_id]);
+        },
+
+        someStudentSelected(studentId) {
+          var group = this.studentGroups.find(g => g.student_id === studentId);
+          if (!group) return false;
+          return group.records.some(r => !!this.selected[r.record_id]);
+        },
+
+        // ── Actions ──────────────────────────────────────────────────────────
+
+        toggleRecord(id) {
+          if (this.selected[id]) {
+            delete this.selected[id];
+          } else {
+            this.selected[id] = true;
+          }
+          // Force reactivity — replace the object reference
+          this.selected = Object.assign({}, this.selected);
+        },
+
+        toggleStudent(studentId) {
+          var group = this.studentGroups.find(g => g.student_id === studentId);
+          if (!group) return;
+          var allSelected = this.isAllStudentSelected(studentId);
+          var updated = Object.assign({}, this.selected);
+          group.records.forEach(r => {
+            if (allSelected) {
+              delete updated[r.record_id];
+            } else {
+              updated[r.record_id] = true;
+            }
+          });
+          this.selected = updated;
+        },
+
+        bulkAction(action) {
+          var selectedIds = Object.keys(this.selected);
+          if (selectedIds.length === 0) return;
+          if (this.submitting) return;
+
+          // Build enriched record list for backend (carries student email/name for notifications)
+          var allRecords = [];
+          this.studentGroups.forEach(g => {
+            g.records.forEach(r => {
+              if (this.selected[r.record_id]) allRecords.push(r);
+            });
+          });
+
+          this.submitting = true;
+          this.lastAction = action;
+          this.result = null;
+
+          google.script.run
+            .withSuccessHandler(res => {
+              this.submitting = false;
+              this.result = res;
+              if (res.success) {
+                // Remove actioned records from UI
+                this.studentGroups = this.studentGroups
+                  .map(g => ({
+                    ...g,
+                    records: g.records.filter(r => !this.selected[r.record_id])
+                  }))
+                  .filter(g => g.records.length > 0);
+                this.selected = {};
+              }
+            })
+            .withFailureHandler(err => {
+              this.submitting = false;
+              alert('Error: ' + (err.message || 'Unknown error'));
+            })
+            .instructorBulkUpdateRecordStatus({ records: allRecords, action: action });
+        },
+
+        // ── Utilities ─────────────────────────────────────────────────────────
+
+        formatDate(iso) {
+          if (!iso) return '-';
+          try {
+            var d = new Date(iso);
+            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) +
+                   ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          } catch (e) { return iso; }
+        },
+
+        // ── Init ──────────────────────────────────────────────────────────────
+
+        init() {
+          this.loading = true;
+          this.errorMsg = '';
+          google.script.run
+            .withSuccessHandler(data => {
+              this.studentGroups = data || [];
+              this.loading = false;
+            })
+            .withFailureHandler(err => {
+              this.errorMsg = err.message || 'Failed to load pending verifications.';
+              this.loading = false;
+            })
+            .instructorGetPendingVerifications();
+        },
+      };
+    }
+  </script>
+</body>
+</html>

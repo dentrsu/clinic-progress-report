@@ -985,5 +985,67 @@ var SupabaseProvider = (function () {
         600,
       );
     },
+
+    /**
+     * List treatment records with 'pending verification' status for a set of students.
+     * Used by the instructor verification queue.
+     * @param {Array<string>} studentIds — UUIDs
+     * @returns {Array}
+     */
+    listPendingRecordsByStudentIds: function (studentIds) {
+      if (!studentIds || studentIds.length === 0) return [];
+      var inClause = "in.(" + studentIds.join(",") + ")";
+      var select = [
+        "record_id",
+        "student_id",
+        "hn",
+        "patient_name",
+        "area",
+        "rsu_units",
+        "cda_units",
+        "status",
+        "is_exam",
+        "updated_at",
+        "treatment_catalog(treatment_name,divisions(name,code))",
+        "treatment_steps(step_name)",
+        "requirement_list(requirement_type)",
+        "patient:patients(hn,name)",
+      ].join(",");
+      return _get(
+        "/rest/v1/treatment_records?student_id=" +
+          inClause +
+          "&status=eq.pending verification" +
+          "&select=" +
+          select +
+          "&order=updated_at.asc",
+      );
+    },
+
+    /**
+     * Batch-fetch all non-void treatment records for a set of students.
+     * Used by the advisor division dashboard to build progress summaries.
+     * Batches 40 student IDs per request to stay within URL length limits.
+     * @param {Array<string>} studentIds — UUIDs
+     * @returns {Array}
+     */
+    listRecordsForDashboard: function (studentIds) {
+      if (!studentIds || studentIds.length === 0) return [];
+      var BATCH = 40;
+      var results = [];
+      var select =
+        "record_id,student_id,requirement_id,status,rsu_units,cda_units,is_exam," +
+        "treatment_steps(step_name)";
+      for (var i = 0; i < studentIds.length; i += BATCH) {
+        var batch = studentIds.slice(i, i + BATCH);
+        var rows = _get(
+          "/rest/v1/treatment_records?student_id=in.(" +
+            batch.join(",") +
+            ")&status=neq.void&requirement_id=not.is.null&select=" +
+            select,
+        );
+        results = results.concat(rows || []);
+      }
+      return results;
+    },
   };
 })();

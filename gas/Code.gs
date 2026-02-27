@@ -715,6 +715,28 @@ function doGet(e) {
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
 
+  if (page === "verification_queue") {
+    var t = HtmlService.createTemplateFromFile("verification_queue");
+    t.appUrl = url;
+    t.appDevUrl = devUrl;
+    return t
+      .evaluate()
+      .setTitle("Verification Queue — Clinic Progress Report")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
+  if (page === "dashboard") {
+    var t = HtmlService.createTemplateFromFile("dashboard");
+    t.appUrl = url;
+    t.appDevUrl = devUrl;
+    return t
+      .evaluate()
+      .setTitle("Division Dashboard — Clinic Progress Report")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
   var t = HtmlService.createTemplateFromFile("landing");
   t.appUrl = url;
   t.appDevUrl = devUrl;
@@ -1879,6 +1901,356 @@ function advisorGetStudentDivisionVault(studentId, divisionName) {
 }
 
 /**
+ * Aggregate all treatment records for an advisor's division into a flat dataset
+ * used by the division dashboard page.
+ * @param {string} viewMode  'advisor' (my advisees only) | 'division' (all division students)
+ * @returns {{ profile, students, requirements, records, floors }}
+ */
+function advisorGetDashboardData(viewMode) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "instructor") {
+    throw new Error("User is not an active instructor.");
+  }
+  if (!profile.division || !profile.division.code) {
+    throw new Error("Instructor is not assigned to a division.");
+  }
+
+  var divCode = profile.division.code.toLowerCase();
+  var columnName = divCode + "_instructor_id";
+
+  // 1. Students by view mode
+  var rawStudents;
+  if (viewMode === "advisor") {
+    rawStudents =
+      SupabaseProvider.listStudentsByDivisionInstructor(
+        columnName,
+        profile.instructor_id,
+      ) || [];
+  } else {
+    rawStudents = (SupabaseProvider.listStudents() || []).filter(function (s) {
+      return s[columnName] != null;
+    });
+  }
+
+  // 2. Format students + compute year (same logic as advisorGetAdvisees)
+  var today = new Date();
+  var yr = today.getFullYear();
+  var isNewAY =
+    today.getMonth() > 7 ||
+    (today.getMonth() === 7 && today.getDate() >= 20);
+
+  var students = rawStudents.map(function (s) {
+    var calcYear = "-";
+    if (s.first_clinic_year) {
+      calcYear = isNewAY
+        ? yr - s.first_clinic_year + 5
+        : yr - s.first_clinic_year + 4;
+    }
+    var uObj = s.user || s.users || {};
+    var fObj = s.floor || s.floors || {};
+    return {
+      student_id: s.student_id,
+      academic_id: s.academic_id || "-",
+      name: uObj.name || "Unknown",
+      email: uObj.email || "-",
+      calculated_year: calcYear,
+      floor_id: s.floor_id || null,
+      floor_label: fObj.label || "-",
+      unit_id: s.unit_id || "-",
+      status: s.status || "active",
+    };
+  });
+
+  students.sort(function (a, b) {
+    var ya = typeof a.calculated_year === "number" ? a.calculated_year : 0;
+    var yb = typeof b.calculated_year === "number" ? b.calculated_year : 0;
+    if (ya !== yb) return yb - ya;
+    return String(a.academic_id).localeCompare(String(b.academic_id));
+  });
+
+  // 3. Requirements for this division only
+  var allReqs = SupabaseProvider.listRequirements() || [];
+  var divReqs = allReqs
+    .filter(function (r) {
+      return (
+        r.divisions &&
+        r.divisions.code &&
+        r.divisions.code.toLowerCase() === divCode
+      );
+    })
+    .map(function (r) {
+      return {
+        requirement_id: r.requirement_id,
+        requirement_type: r.requirement_type,
+        cda_requirement_type: r.cda_requirement_type || null,
+        minimum_rsu: r.minimum_rsu || 0,
+        minimum_cda: r.minimum_cda || 0,
+        is_exam: r.is_exam || false,
+        is_selectable: r.is_selectable !== false,
+      };
+    });
+
+  // 4. Batch-fetch records for all students
+  var studentIds = students.map(function (s) {
+    return s.student_id;
+  });
+  var rawRecords =
+    studentIds.length > 0
+      ? SupabaseProvider.listRecordsForDashboard(studentIds)
+      : [];
+
+  var records = rawRecords.map(function (r) {
+    return {
+      record_id: r.record_id,
+      student_id: r.student_id,
+      requirement_id: r.requirement_id,
+      status: r.status,
+      rsu_units: r.rsu_units,
+      cda_units: r.cda_units,
+      is_exam: r.is_exam || false,
+      step_name: r.treatment_steps ? r.treatment_steps.step_name : null,
+    };
+  });
+
+  // 5. Unique floors for filter dropdown
+  var floorSet = {};
+  students.forEach(function (s) {
+    if (s.floor_id) floorSet[s.floor_id] = s.floor_label;
+  });
+  var floors = Object.keys(floorSet).map(function (id) {
+    return { floor_id: id, label: floorSet[id] };
+  });
+  floors.sort(function (a, b) {
+    return a.label.localeCompare(b.label);
+  });
+
+  return {
+    profile: {
+      instructor_id: profile.instructor_id,
+      name: profile.name,
+      division: profile.division,
+    },
+    students: students,
+    requirements: divReqs,
+    records: records,
+    floors: floors,
+  };
+}
+
+/**
+ * Get all pending-verification treatment records for the instructor's team students.
+ * Returns records grouped by student, sorted by year desc then academic_id.
+ * @returns {Array} [{ student_id, academic_id, name, email, calculated_year, records[] }]
+ */
+function instructorGetPendingVerifications() {
+  _assertInstructor();
+
+  var profile = getUserProfile(Session.getActiveUser().getEmail());
+  var instructorId = profile.instructor_id;
+  if (!instructorId) throw new Error("Instructor record not found.");
+
+  // 1. Get team students
+  var students =
+    SupabaseProvider.listStudentsByTeamLeader(instructorId) || [];
+  if (students.length === 0) return [];
+
+  // 2. Compute year and build student map (same filter logic as instructorGetTeamStudents)
+  var today = new Date();
+  var currentYear = today.getFullYear();
+  var isNewAY =
+    today.getMonth() > 7 ||
+    (today.getMonth() === 7 && today.getDate() >= 20);
+
+  var studentMap = {};
+  students.forEach(function (s) {
+    if (!s.first_clinic_year) return;
+    var yr = isNewAY
+      ? currentYear - s.first_clinic_year + 5
+      : currentYear - s.first_clinic_year + 4;
+    if (yr === 5 && s.team_leader_1_id !== instructorId) return;
+    if (yr !== 5 && s.team_leader_2_id !== instructorId) return;
+    studentMap[s.student_id] = {
+      student_id: s.student_id,
+      academic_id: s.academic_id,
+      name: s.user ? s.user.name : "Unknown",
+      email: s.user ? s.user.email : null,
+      calculated_year: yr,
+      records: [],
+    };
+  });
+
+  var studentIds = Object.keys(studentMap);
+  if (studentIds.length === 0) return [];
+
+  // 3. Fetch pending verification records for all team students in one query
+  var records =
+    SupabaseProvider.listPendingRecordsByStudentIds(studentIds) || [];
+
+  // 4. Attach records to their student
+  records.forEach(function (rec) {
+    var stu = studentMap[rec.student_id];
+    if (!stu) return;
+    stu.records.push({
+      record_id: rec.record_id,
+      student_email: stu.email,
+      student_name: stu.name,
+      hn: rec.hn || (rec.patient && rec.patient.hn) || "-",
+      patient_name:
+        rec.patient_name || (rec.patient && rec.patient.name) || "-",
+      area: rec.area || "-",
+      rsu_units: rec.rsu_units != null ? rec.rsu_units : "-",
+      cda_units: rec.cda_units != null ? rec.cda_units : "-",
+      treatment_name: rec.treatment_catalog
+        ? rec.treatment_catalog.treatment_name
+        : "-",
+      step_name: rec.treatment_steps ? rec.treatment_steps.step_name : "-",
+      division_name:
+        rec.treatment_catalog && rec.treatment_catalog.divisions
+          ? rec.treatment_catalog.divisions.name
+          : "-",
+      requirement_type: rec.requirement_list
+        ? rec.requirement_list.requirement_type
+        : "-",
+      updated_at: rec.updated_at || null,
+    });
+  });
+
+  // 5. Return only students with pending records
+  return Object.values(studentMap)
+    .filter(function (s) {
+      return s.records.length > 0;
+    })
+    .sort(function (a, b) {
+      if (a.calculated_year !== b.calculated_year) {
+        return b.calculated_year - a.calculated_year;
+      }
+      return String(a.academic_id).localeCompare(String(b.academic_id));
+    });
+}
+
+/**
+ * Bulk verify or reject a set of treatment records (Instructor only).
+ * Sends one summary email per affected student.
+ *
+ * @param {Object} payload
+ *   payload.records  — Array of enriched record objects (must have record_id, student_email,
+ *                      student_name, treatment_name, step_name, hn/patient_hn)
+ *   payload.action   — 'verified' | 'rejected'
+ * @returns {{ success: boolean, count: number, errors: Array }}
+ */
+function instructorBulkUpdateRecordStatus(payload) {
+  _assertInstructor();
+
+  var records = payload.records || [];
+  var action = payload.action;
+
+  if (!records.length) return { success: false, error: "No records selected." };
+  if (action !== "verified" && action !== "rejected") {
+    return { success: false, error: "Invalid action." };
+  }
+
+  var profile = getUserProfile(Session.getActiveUser().getEmail());
+  var successCount = 0;
+  var errors = [];
+  var studentSummary = {}; // email -> { name, items[] }
+
+  records.forEach(function (rec) {
+    try {
+      var updates = {
+        status: action,
+        updated_at: new Date().toISOString(),
+      };
+      if (action === "verified") {
+        updates.verified_by = profile.user_id;
+        updates.verified_at = new Date().toISOString();
+      }
+      SupabaseProvider.updateTreatmentRecord(rec.record_id, updates);
+      successCount++;
+
+      // Accumulate for per-student summary email
+      if (rec.student_email) {
+        if (!studentSummary[rec.student_email]) {
+          studentSummary[rec.student_email] = {
+            name: rec.student_name || "Student",
+            items: [],
+          };
+        }
+        studentSummary[rec.student_email].items.push(rec);
+      }
+    } catch (e) {
+      errors.push({ record_id: rec.record_id, error: e.message });
+    }
+  });
+
+  // Send one summary email per student
+  var statusLabel = action === "verified" ? "Verified ✅" : "Rejected ❌";
+  var instructorName = profile.name || "Your instructor";
+  Object.keys(studentSummary).forEach(function (email) {
+    try {
+      var sum = studentSummary[email];
+      var rows = sum.items
+        .map(function (r) {
+          return (
+            "<tr>" +
+            "<td style='padding:6px 8px;border-bottom:1px solid #edf2f7;'>" +
+            (r.hn || r.patient_hn || "-") +
+            "</td>" +
+            "<td style='padding:6px 8px;border-bottom:1px solid #edf2f7;'>" +
+            (r.treatment_name || "-") +
+            (r.step_name && r.step_name !== "-"
+              ? " &middot; " + r.step_name
+              : "") +
+            "</td>" +
+            "<td style='padding:6px 8px;border-bottom:1px solid #edf2f7;'>" +
+            (r.requirement_type || "-") +
+            "</td>" +
+            "</tr>"
+          );
+        })
+        .join("");
+      MailApp.sendEmail({
+        to: email,
+        subject:
+          sum.items.length +
+          " Treatment Record(s) " +
+          (action === "verified" ? "Verified" : "Rejected"),
+        htmlBody:
+          "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;" +
+          "padding:20px;border:1px solid #e0e0e0;border-radius:8px;'>" +
+          "<h2 style='color:#1a365d;border-bottom:2px solid #e2e8f0;padding-bottom:10px;'>" +
+          "Treatment Records " +
+          statusLabel +
+          "</h2>" +
+          "<p>" +
+          sum.items.length +
+          " record(s) have been <b>" +
+          action +
+          "</b> by " +
+          instructorName +
+          ".</p>" +
+          "<table style='width:100%;border-collapse:collapse;margin:16px 0;'>" +
+          "<thead><tr style='background:#f7fafc;'>" +
+          "<th style='padding:6px 8px;text-align:left;font-size:12px;color:#718096;'>Patient HN</th>" +
+          "<th style='padding:6px 8px;text-align:left;font-size:12px;color:#718096;'>Treatment</th>" +
+          "<th style='padding:6px 8px;text-align:left;font-size:12px;color:#718096;'>Requirement</th>" +
+          "</tr></thead><tbody>" +
+          rows +
+          "</tbody></table></div>",
+      });
+    } catch (mailErr) {
+      Logger.log(
+        "Bulk action email failed for " + email + ": " + mailErr.message,
+      );
+    }
+  });
+
+  return { success: true, count: successCount, errors: errors };
+}
+
+/**
  * Get the Web App URL (backend helper).
  * @returns {string}
  */
@@ -2067,6 +2439,19 @@ function _assertAdmin() {
   var user = SupabaseProvider.getUserByEmail(email);
   if (!user || user.role !== "admin") {
     throw new Error("Access denied: Unauthorized.");
+  }
+  return user;
+}
+
+/**
+ * Ensure current user is an instructor or admin.
+ * @throws {Error} if not instructor/admin
+ */
+function _assertInstructor() {
+  var email = Session.getActiveUser().getEmail();
+  var user = SupabaseProvider.getUserByEmail(email);
+  if (!user || (user.role !== "instructor" && user.role !== "admin")) {
+    throw new Error("Access denied: Instructors only.");
   }
   return user;
 }
