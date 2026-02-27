@@ -127,3 +127,31 @@ After re-deploying the script:
 > - If you are testing in **Developer Mode** (`/dev` URL), clicking the button will take you to the _Published_ version.
 > - If you haven't published a new version recently, this link may point to an old version or return a "You need access" error.
 > - **Workaround**: Manually append `?page=admin` to your `/dev` URL in the browser address bar to test the Admin Console in developer mode, or **Deploy a New Version** to update the published app.
+
+---
+
+## 6. Verification Workflow
+
+Follow these steps to verify the verification request and status flow.
+
+1. **Request Verification (Student)**:
+   - Log in as a **student**.
+   - Go to **Treatment Plans**.
+   - Find a record with status **'Completed'**.
+   - Click the **Edit** icon (pencil).
+   - In the modal, click **"Request Email Verification"**.
+   - **Verify**: The record status in the table and modal should change to a yellow/amber **'Pending Verification'** badge. An email should be sent to the assigned advisor.
+
+2. **Re-requesting (Student)**:
+   - Open the same record again (now in 'Pending Verification' or 'Rejected' status).
+   - The **"Request Email Verification"** button should still be visible and clickable.
+   - Click it again.
+   - **Verify**: The email is re-sent successfully without "Access Denied" errors.
+
+3. **Vault Progress**:
+   - Go to the **Requirement Vault**.
+   - Find the requirement linked to the record you just processed.
+   - **Verify**: The record should appear in the expanded list and contribute to the **Estimated** progress totals (amber progress bar).
+
+> [!NOTE]
+> The 'Pending Verification' and 'Rejected' statuses act as "Estimated" progress, while 'Verified' acts as "Verified" progress.

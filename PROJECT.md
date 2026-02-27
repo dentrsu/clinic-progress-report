@@ -28,8 +28,9 @@ A dedicated interface for administrators to manage users.
 - **Student Portal**:
   - Dashboard with "My Patients" and "Referred Patients".
   - **Patient Management**: Detail modal to edit patient info and assign students (using Academic ID or Name).
-  - **Treatment Plans**: Dedicated page for viewing/managing treatment records (in progress).
-  - **Requirement Vault**: Per-division progress tracking with RSU/CDA tables and radar chart.
+  - **Treatment Plans**: Dedicated page for viewing/managing treatment records.
+    - **Verification Workflow**: Students can request email verification for 'Completed' records (automatically shifts to 'Pending Verification'). Supports re-requests if 'Rejected'.
+  - **Requirement Vault**: Per-division progress tracking with RSU/CDA tables and radar chart. Tracks both 'Verified' and 'Estimated' status (Completed/Pending/Rejected).
 - **Instructor Portal**:
   - View assigned students (team leader view).
   - Student detail modal with patient list and requirement vault link.

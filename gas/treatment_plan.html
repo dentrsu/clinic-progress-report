@@ -162,6 +162,7 @@
                                'bg-gray-100 text-gray-500': r.status === 'planned',
                                'bg-blue-50 text-blue-600': r.status === 'in_progress',
                                'bg-emerald-50 text-emerald-600': r.status === 'completed' || r.status === 'verified',
+                                'bg-amber-50 text-amber-600': r.status === 'pending verification',
                                'bg-red-50 text-red-500': r.status === 'rejected' || r.status === 'void'
                              }"
                              x-text="r.status"></span>
@@ -449,7 +450,8 @@
                   :class="{
                     'bg-gray-200 text-gray-600': form.status === 'planned',
                     'bg-blue-100 text-blue-700': form.status === 'in_progress',
-                    'bg-emerald-100 text-emerald-700': form.status === 'completed'
+                    'bg-emerald-100 text-emerald-700': form.status === 'completed',
+                    'bg-amber-100 text-amber-700': form.status === 'pending verification'
                   }"
                   x-text="form.status"></span>
           </div>
@@ -565,13 +567,23 @@
         get canRequestVerification() {
           if (!this.editingRecord) return false;
           if (this.currentUser && this.currentUser.role !== 'student') return false;
-          if (this.form.status !== 'completed') return false;
           if (!this.form.instructor_id) return false;
           if (!this.form.requirement_id) return false;
           if (this.form.rsu_units === '' || this.form.rsu_units === null) return false;
           if (this.form.cda_units === '' || this.form.cda_units === null) return false;
           if (!this.form.start_date) return false;
           if (!this.form.complete_date) return false;
+
+          // PERIO Exception: Allow requesting if step is at least 4 (even if not 'completed')
+          if (this.selectedDivisionCode === 'PERIO') {
+             var stepId = this.form.step_id;
+             var step = this.allSteps.find(function(s) { return s.step_id === stepId; });
+             var stepOrder = step ? step.step_order : 0;
+             if (this.form.status !== 'completed' && this.form.status !== 'pending verification' && this.form.status !== 'rejected' && stepOrder < 4) return false;
+          } else {
+             if (this.form.status !== 'completed' && this.form.status !== 'pending verification' && this.form.status !== 'rejected') return false;
+          }
+
           return true;
         },
 

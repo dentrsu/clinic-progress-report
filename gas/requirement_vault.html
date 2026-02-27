@@ -23,8 +23,15 @@
             return {
                 loading: true,
                 divisions: [],
+                selectedDivision: 'All',
                 expandedReqs: new Set(),
                 radarChart: null,
+
+                get filteredDivisions() {
+                    return this.selectedDivision === 'All'
+                        ? this.divisions
+                        : this.divisions.filter(d => d.name === this.selectedDivision);
+                },
 
                 init() {
                     this.fetchData();
@@ -187,8 +194,24 @@
         <!-- Main Content -->
         <div x-show="!loading" x-cloak class="space-y-8 animate-fade-in">
 
+            <!-- Controls -->
+            <div x-show="divisions.length > 0" class="flex justify-between items-center bg-white px-6 py-4 rounded-3xl shadow-sm border border-gray-100">
+                <div class="text-sm font-semibold text-gray-700">Filter View</div>
+                <div class="relative">
+                    <select x-model="selectedDivision" class="appearance-none bg-gray-50 border border-gray-200 text-gray-700 py-2 pl-4 pr-10 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy transition-colors font-medium text-sm cursor-pointer w-48 sm:w-64">
+                        <option value="All">All Divisions</option>
+                        <template x-for="div in divisions" :key="div.name">
+                            <option :value="div.name" x-text="div.name"></option>
+                        </template>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </div>
+                </div>
+            </div>
+
             <!-- Radar Chart -->
-            <section x-show="divisions.length > 0" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <section x-show="divisions.length > 0 && selectedDivision === 'All'" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                     <h2 class="text-lg font-bold text-navy flex items-center gap-2">
                         <span class="w-2 h-6 bg-navy rounded-full"></span>
@@ -206,7 +229,7 @@
                 </div>
             </section>
             
-            <template x-for="division in divisions" :key="division.name">
+            <template x-for="division in filteredDivisions" :key="division.name">
                 <section class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                     <!-- Division Header -->
                     <div class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
@@ -221,6 +244,21 @@
                     <div x-show="division.requirements.some(r => r.minimum_rsu > 0 || r.is_exam)">
                         <div class="px-4 sm:px-6 py-2 bg-navy/5 border-y border-gray-100 flex items-center gap-2">
                              <span class="text-[10px] font-bold text-navy uppercase tracking-widest">RSU Requirements</span>
+                             <div class="relative group">
+                                 <svg class="w-3.5 h-3.5 text-navy/40 hover:text-navy/70 cursor-help transition-colors" fill="currentColor" viewBox="0 0 20 20">
+                                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                 </svg>
+                                 <div class="pointer-events-none absolute hidden group-hover:block left-0 top-5 z-50 w-64 p-3 bg-gray-900 text-white text-[11px] leading-relaxed rounded-lg shadow-xl">
+                                     <p class="font-semibold mb-1.5">How RSU progress is tallied:</p>
+                                     <ul class="space-y-1 text-gray-300">
+                                         <li><span class="text-white font-medium">Sum</span> — adds RSU units from all linked records</li>
+                                         <li><span class="text-white font-medium">Count</span> — counts the number of records (units ignored)</li>
+                                         <li><span class="text-white font-medium">Exam</span> — counts records flagged as an exam</li>
+                                         <li><span class="text-white font-medium">Derived</span> — computed from totals of other requirements</li>
+                                         <li><span class="text-white font-medium">Met</span> — counts how many linked requirements are fully completed</li>
+                                     </ul>
+                                 </div>
+                             </div>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
@@ -245,6 +283,21 @@
                                                         </svg>
                                                         <div class="flex-1 min-w-0">
                                                             <div class="text-sm font-bold text-gray-900 group-hover:text-navy transition" x-text="req.requirement_type"></div>
+                                                            <span class="relative inline-flex mt-0.5 cursor-default">
+                                                                <span class="peer inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                                                                      :class="{
+                                                                        'bg-indigo-50 text-indigo-500': req.calc_method === 'Sum',
+                                                                        'bg-teal-50 text-teal-600': req.calc_method === 'Count',
+                                                                        'bg-purple-50 text-purple-600': req.calc_method === 'Exam',
+                                                                        'bg-gray-100 text-gray-400': req.calc_method === 'Derived',
+                                                                        'bg-emerald-50 text-emerald-600': req.calc_method === 'Met'
+                                                                      }"
+                                                                      x-text="req.calc_method"></span>
+                                                                <template x-if="req.rsu_calc_hint">
+                                                                    <span class="pointer-events-none absolute opacity-0 peer-hover:opacity-100 transition-opacity duration-150 bottom-full left-0 mb-1 z-50 w-max max-w-[280px] whitespace-pre-wrap p-2 bg-gray-900 text-white text-[10px] leading-snug rounded-lg shadow-xl"
+                                                                          x-text="req.rsu_calc_hint"></span>
+                                                                </template>
+                                                            </span>
                                                             <!-- Mobile: inline progress + status -->
                                                             <div class="sm:hidden mt-2 space-y-1.5">
                                                                 <div class="flex items-center justify-between gap-3">
@@ -313,7 +366,7 @@
                                             <!-- Expanded Records Row -->
                                             <tr x-show="expandedReqs.has('rsu_'+req.requirement_id)" class="records-row bg-blue-50/30">
                                                 <td colspan="3" class="px-2 sm:px-6 pb-4 pt-1">
-                                                    <template x-if="req.records && req.records.length > 0">
+                                                    <template x-if="req.rsu_records && req.rsu_records.length > 0">
                                                         <div class="rounded-xl overflow-hidden border border-blue-100">
                                                             <table class="w-full text-left">
                                                                 <thead>
@@ -325,10 +378,20 @@
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody class="divide-y divide-blue-100/60">
-                                                                    <template x-for="(rec, i) in req.records" :key="i">
-                                                                        <tr class="text-xs">
+                                                                    <template x-for="(rec, i) in req.rsu_records" :key="i">
+                                                                        <tr class="text-xs" :class="rec.transferred_to ? 'bg-teal-50/60' : rec.transferred_from ? 'bg-violet-50/60' : ''">
                                                                             <td class="px-3 sm:px-4 py-2">
-                                                                                <div class="font-mono font-semibold text-gray-700" x-text="rec.hn"></div>
+                                                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                                                    <span class="font-mono font-semibold text-gray-700" x-text="rec.hn"></span>
+                                                                                    <template x-if="rec.transferred_from">
+                                                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-violet-100 text-violet-700 border border-violet-200 whitespace-nowrap"
+                                                                                              x-text="'← ' + rec.transferred_from"></span>
+                                                                                    </template>
+                                                                                    <template x-if="rec.transferred_to">
+                                                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-teal-100 text-teal-700 border border-teal-200 whitespace-nowrap"
+                                                                                              x-text="'→ ' + rec.transferred_to"></span>
+                                                                                    </template>
+                                                                                </div>
                                                                                 <div class="text-gray-500 text-[10px] mt-0.5" x-text="rec.patient_name"></div>
                                                                                 <!-- Mobile: show area inline -->
                                                                                 <div class="sm:hidden text-gray-400 text-[10px]" x-text="rec.area"></div>
@@ -347,7 +410,7 @@
                                                             </table>
                                                         </div>
                                                     </template>
-                                                    <template x-if="!req.records || req.records.length === 0">
+                                                    <template x-if="!req.rsu_records || req.rsu_records.length === 0">
                                                         <p class="text-xs text-gray-400 italic py-2">No records yet.</p>
                                                     </template>
                                                 </td>
@@ -362,6 +425,21 @@
                     <div x-show="division.requirements.some(r => r.minimum_cda > 0 || r.is_exam)" class="mt-4">
                         <div class="px-4 sm:px-6 py-2 bg-amber-50 border-y border-gray-100 flex items-center gap-2">
                              <span class="text-[10px] font-bold text-amber-700 uppercase tracking-widest">CDA Requirements</span>
+                             <div class="relative group">
+                                 <svg class="w-3.5 h-3.5 text-amber-400 hover:text-amber-600 cursor-help transition-colors" fill="currentColor" viewBox="0 0 20 20">
+                                     <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                 </svg>
+                                 <div class="pointer-events-none absolute hidden group-hover:block left-0 top-5 z-50 w-64 p-3 bg-gray-900 text-white text-[11px] leading-relaxed rounded-lg shadow-xl">
+                                     <p class="font-semibold mb-1.5">How CDA progress is tallied:</p>
+                                     <ul class="space-y-1 text-gray-300">
+                                         <li><span class="text-white font-medium">Sum</span> — adds CDA units from all linked records</li>
+                                         <li><span class="text-white font-medium">Count</span> — counts the number of records (units ignored)</li>
+                                         <li><span class="text-white font-medium">Exam</span> — counts records flagged as an exam</li>
+                                         <li><span class="text-white font-medium">Derived</span> — computed from totals of other requirements</li>
+                                         <li><span class="text-white font-medium">Met</span> — counts how many linked requirements are fully completed</li>
+                                     </ul>
+                                 </div>
+                             </div>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
@@ -386,6 +464,21 @@
                                                         </svg>
                                                         <div class="flex-1 min-w-0">
                                                             <div class="text-sm font-bold text-gray-900 group-hover:text-amber-700 transition" x-text="req.cda_requirement_type || req.requirement_type"></div>
+                                                            <span class="relative inline-flex mt-0.5 cursor-default">
+                                                                <span class="peer inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                                                                      :class="{
+                                                                        'bg-indigo-50 text-indigo-500': req.calc_method === 'Sum',
+                                                                        'bg-teal-50 text-teal-600': req.calc_method === 'Count',
+                                                                        'bg-purple-50 text-purple-600': req.calc_method === 'Exam',
+                                                                        'bg-gray-100 text-gray-400': req.calc_method === 'Derived',
+                                                                        'bg-emerald-50 text-emerald-600': req.calc_method === 'Met'
+                                                                      }"
+                                                                      x-text="req.calc_method"></span>
+                                                                <template x-if="req.cda_calc_hint">
+                                                                    <span class="pointer-events-none absolute opacity-0 peer-hover:opacity-100 transition-opacity duration-150 bottom-full left-0 mb-1 z-50 w-max max-w-[280px] whitespace-pre-wrap p-2 bg-gray-900 text-white text-[10px] leading-snug rounded-lg shadow-xl"
+                                                                          x-text="req.cda_calc_hint"></span>
+                                                                </template>
+                                                            </span>
                                                             <!-- Mobile: inline progress + status -->
                                                             <div class="sm:hidden mt-2 space-y-1.5">
                                                                 <div class="flex items-center justify-between gap-3">
@@ -454,7 +547,7 @@
                                             <!-- Expanded Records Row -->
                                             <tr x-show="expandedReqs.has('cda_'+req.requirement_id)" class="records-row bg-amber-50/30">
                                                 <td colspan="3" class="px-2 sm:px-6 pb-4 pt-1">
-                                                    <template x-if="req.records && req.records.length > 0">
+                                                    <template x-if="req.cda_records && req.cda_records.length > 0">
                                                         <div class="rounded-xl overflow-hidden border border-amber-100">
                                                             <table class="w-full text-left">
                                                                 <thead>
@@ -466,10 +559,20 @@
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody class="divide-y divide-amber-100/60">
-                                                                    <template x-for="(rec, i) in req.records" :key="i">
-                                                                        <tr class="text-xs">
+                                                                    <template x-for="(rec, i) in req.cda_records" :key="i">
+                                                                        <tr class="text-xs" :class="rec.transferred_to ? 'bg-teal-50/60' : rec.transferred_from ? 'bg-violet-50/60' : ''">
                                                                             <td class="px-3 sm:px-4 py-2">
-                                                                                <div class="font-mono font-semibold text-gray-700" x-text="rec.hn"></div>
+                                                                                <div class="flex items-center gap-1.5 flex-wrap">
+                                                                                    <span class="font-mono font-semibold text-gray-700" x-text="rec.hn"></span>
+                                                                                    <template x-if="rec.transferred_from">
+                                                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-violet-100 text-violet-700 border border-violet-200 whitespace-nowrap"
+                                                                                              x-text="'← ' + rec.transferred_from"></span>
+                                                                                    </template>
+                                                                                    <template x-if="rec.transferred_to">
+                                                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold bg-teal-100 text-teal-700 border border-teal-200 whitespace-nowrap"
+                                                                                              x-text="'→ ' + rec.transferred_to"></span>
+                                                                                    </template>
+                                                                                </div>
                                                                                 <div class="text-gray-500 text-[10px] mt-0.5" x-text="rec.patient_name"></div>
                                                                                 <!-- Mobile: area inline -->
                                                                                 <div class="sm:hidden text-gray-400 text-[10px]" x-text="rec.area"></div>
@@ -488,7 +591,7 @@
                                                             </table>
                                                         </div>
                                                     </template>
-                                                    <template x-if="!req.records || req.records.length === 0">
+                                                    <template x-if="!req.cda_records || req.cda_records.length === 0">
                                                         <p class="text-xs text-gray-400 italic py-2">No records yet.</p>
                                                     </template>
                                                 </td>
@@ -503,7 +606,7 @@
             </template>
 
             <!-- Empty State -->
-            <div x-show="divisions.length === 0" class="text-center py-20 bg-white rounded-3xl shadow-sm">
+            <div x-show="filteredDivisions.length === 0" class="text-center py-20 bg-white rounded-3xl shadow-sm">
                 <div class="text-gray-400 mb-2">
                     <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                 </div>

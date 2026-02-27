@@ -799,8 +799,8 @@ var SupabaseProvider = (function () {
       return _get(
         "/rest/v1/treatment_records?student_id=eq." +
           studentId +
-          "&status=in.(verified,completed)" +
-          "&select=requirement_id,rsu_units,cda_units,status,is_exam,hn,patient_name,area,patient:patients(hn,name)",
+          "&status=in.(verified,completed,pending verification,rejected)" +
+          "&select=record_id,requirement_id,rsu_units,cda_units,status,is_exam,hn,patient_name,area,patient:patients(hn,name)",
       );
     },
 

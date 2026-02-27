@@ -19,8 +19,8 @@ create extension if not exists "pgcrypto";
 
 -- TYPES & ENUMS
 -- user_role: student, instructor, admin
--- record_status: planned, in_progress, completed, verified, rejected, void
-create type public.record_status as enum ('planned', 'in_progress', 'completed', 'verified', 'rejected', 'void');
+-- record_status: planned, in_progress, completed, pending verification, verified, rejected, void
+create type public.record_status as enum ('planned', 'in_progress', 'completed', 'pending verification', 'verified', 'rejected', 'void');
 -- treatment_phase_order: 1=Systemic, 2=Acute, 3=Disease Control, 4=Definitive, 5=Maintenance
 -- patient_status: active, inactive, archived
 create type public.patient_status as enum (
@@ -136,14 +136,36 @@ create table public.requirement_list (
 --   • is_exam = true  → vault counts verified exam records, not sum of rsu_units/cda_units
 --
 -- aggregation_config shapes (JSON):
---   null / omitted        → "sum"  default: sum rsu_units/cda_units from directly linked records
---   {"type":"sum"}        → same as null
---   {"type":"count"}      → count records linked to this requirement
---   {"type":"count_exam"} → count is_exam=true records in this division
---   {"type":"count_exam","source_ids":["uuid…"]} → scoped to specific source requirements
+--
+--   PASS 1 types (sum/count/count_union/count_exam):
+--
+--   null / omitted
+--       → "sum" default: sum rsu_units / cda_units from directly linked records
+--   {"type":"sum"}
+--       → same as null
+--   {"type":"count"}
+--       → count records linked to this requirement (not sum units)
+--   {"type":"count_union","also_count":["uuid1","uuid2"]}
+--       → count records linked to this req PLUS records linked to also_count req IDs
+--       → used to merge alias requirements into a parent (e.g. Diastema Closure → Class IV)
+--   {"type":"count_exam"}
+--       → count is_exam=true records in this division
+--   {"type":"count_exam","source_ids":["uuid…"]}
+--       → scoped to specific source requirements
+--
+--   PASS 2 types (run after pass 1; read pass-1 progressMap values):
+--
 --   {"type":"derived","source_ids":["uuid1","uuid2"],"operation":"sum_both"}
 --       operation: "sum_both" (default) | "sum_rsu" | "sum_cda"
---       → two-pass: aggregates computed values from other requirements (processed first)
+--       → aggregates computed values from other requirements already processed in pass 1
+--   {"type":"count_met","source_ids":["uuid1","uuid2",...]}
+--       → counts how many source requirements have pass-1 verified progress >= their minimum
+--       → each qualifying source contributes 1 to this requirement's progress
+--       → used for "Recall (any)" style requirements (is_selectable=false)
+--       → p_rsu/p_cda intentionally left 0 (verified-only metric)
+--
+--   NOTE: complex cross-requirement overflow (e.g. OPER) is handled by
+--   DIVISION_PROCESSORS['OPER'] in Code.gs, which runs after both passes.
 
 -- 3.6 Patients
 -- create table public.patients (
@@ -212,8 +234,10 @@ create table public.treatment_records (
 
 1. **Planned:** Student adds a treatment to a patient's chart.
 2. **In Progress:** Student begins clinical work on a specific step.
-3. **Completed:** Student finishes the work and requests verification. Recorded in the **Requirement Vault** as "Pending Verification" progress.
-4. **Verified:** Instructor reviews work and "signs off". The status changes to "Verified" in the **Requirement Vault**, contributing to the final graduation progress.
+3. **Completed:** Student finishes the work. The status changes to "Completed".
+4. **Pending Verification:** Student requests email verification. The status changes to "Pending Verification". This still counts toward "Estimated" progress in the Requirement Vault.
+5. **Verified:** Instructor reviews work and "signs off". The status changes to "Verified" in the Requirement Vault, contributing to the final graduation progress.
+6. **Rejected:** Instructor rejects the work. Student can edit and re-request verification. Also counts toward "Estimated" progress.
 
 ### D. Auto-Calculation Logic (PERIO)
 
@@ -246,22 +270,87 @@ To maintain clinical integrity, treatment records are strictly validated and sor
 
 A single `requirement_list` row can generate **two separate entries** in the vault:
 
-| condition | appears in | label field |
-|---|---|---|
-| `minimum_rsu > 0` | RSU section | `requirement_type` |
-| `minimum_cda > 0` | CDA section | `cda_requirement_type` |
-| both > 0 | both sections | respective fields above |
-| both = 0 | hidden from modal dropdown | — |
+| condition         | appears in                 | label field             |
+| ----------------- | -------------------------- | ----------------------- |
+| `minimum_rsu > 0` | RSU section                | `requirement_type`      |
+| `minimum_cda > 0` | CDA section                | `cda_requirement_type`  |
+| both > 0          | both sections              | respective fields above |
+| both = 0          | hidden from modal dropdown | —                       |
 
 **treatment_plan.html modal** filters the requirement dropdown to only show rows where `minimum_rsu > 0 OR minimum_cda > 0`. Each option shows `[RSU]`, `[CDA]`, or `[RSU+CDA]` badge so students know what they are submitting.
 
 **requirement_vault.html** shows ALL requirements for the student's divisions (even with zero progress), using a LEFT JOIN approach in `getStudentVaultData`. Each division also returns:
+
 - `rsu_completion_pct` — average of `min(current/minimum, 1)` across all RSU requirements (0–100)
 - `cda_completion_pct` — same for CDA requirements
 
 These percentages power the **radar chart** at the top of the vault page (Chart.js), which shows per-division progression for both RSU and CDA tracks.
 
 **Exam-type requirements** (`is_exam = true`): progress is tracked by **counting** verified exam records in that division, not by summing `rsu_units`/`cda_units`.
+
+**Expanded record lists** — each requirement in the vault output carries two separate arrays:
+
+- `rsu_records` — records that count toward RSU progress (own records + transferred-in from other requirements)
+- `cda_records` — same for CDA progress (may differ from `rsu_records` when RSU/CDA transfer rules differ)
+
+Records carry transfer metadata for badge display:
+
+- `transferred_from` (string) — set on records that arrived **from** another requirement. Displayed as a violet **"← Class II"** badge with a violet-tinted row.
+- `transferred_to` (string) — set on records that were **counted for** another requirement but still shown in the source's list. Displayed as a teal **"→ Class I"** badge with a teal-tinted row.
+
+The `listVaultRecordsByStudent` query includes `record_id` so records can be matched precisely during transfer tracking.
+
+### G. Operative (OPER) Division — Vault Aggregation Override Rules
+
+OPER uses cross-requirement overflow and substitution logic that cannot be expressed in `aggregation_config` alone. It is implemented in `DIVISION_PROCESSORS['OPER']` in `Code.gs`, which runs after both aggregation passes.
+
+**Required `aggregation_config` on OPER `requirement_list` rows:**
+
+| requirement_type | aggregation_config                                                             | Notes                                                         |
+| ---------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| Class I          | `null` (sum)                                                                   | Receives transfer from Class II and PRR bonus                 |
+| Class II         | `null` (sum)                                                                   | Source for transfer to Class I (RSU) and Class I/III-IV (CDA) |
+| Class III        | `null` (sum)                                                                   | Receives transfer from Class IV                               |
+| Class IV         | `{"type":"sum_union","also_sum":["<DIASTEMA_UUID>"]}`                          | Sums rsu_units from Class IV + Diastema Closure records       |
+| Class V          | `null` (sum)                                                                   | Standard                                                      |
+| Class VI         | `null` (sum)                                                                   | Standard                                                      |
+| PRR              | `null` (sum)                                                                   | Bonus source for Class I RSU (max 1 record)                   |
+| Diastema Closure | `null` + `minimum_rsu=0`, `minimum_cda=0`                                      | Selectable but has no vault row; absorbed by Class IV         |
+| Recall (any)     | `{"type":"count_met","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>"]}` | `is_selectable=false`; computed in pass-2 from raw counts     |
+
+**Transfer algorithm (`greedyTransfer` helper):**
+
+The OPER processor uses a shared `greedyTransfer(records, unitField, minKeep)` function:
+
+1. Compute `total` = sum of `unitField` (e.g. `rsu_units`) across all verified records
+2. If `total <= minKeep` → no transfer (return empty)
+3. Sort records **ascending** by `unitField` value (smallest first, maximises transfer count)
+4. Greedily remove records one by one while `remaining >= minKeep`
+5. Return the removed records
+
+**Transfer rules applied by `DIVISION_PROCESSORS['OPER']` (RSU, in order):**
+
+All rules use **SUM-based semantics**: the source's `rsu_units` sum determines excess. Each transferred record adds exactly **1** to the target requirement's progress. The source's progress decreases by the actual `rsu_units` sum of the removed records.
+
+Example: Class II records [2,2,3,3] = 10 total, minimum = 6 →
+
+- Sort ascending: [2,2,3,3]; greedily remove rec(2), rec(2) → remaining 6 ≥ 6 ✓
+- Class II: 10 − 4 = **6**; Class I: 0 + 2 = **2** (1 per transferred record)
+
+1. **Class II → Class I (RSU)**: `greedyTransfer(Class II verified, 'rsu_units', minimum_rsu)`. Source loses actual units; target gains 1 per record. Records show `→ Class I` badge at source, `← Class II` badge at target.
+2. **Class IV → Class III (RSU)**: Same logic. Class IV pool includes Diastema Closure records (via `sum_union`). Records show `→ Class III` / `← Class IV` or `← Diastema Closure` badges.
+3. **PRR → Class I (RSU, max 1)**: If Class I is still below `minimum_rsu` after rule 1, transfer exactly 1 PRR record (last verified). Class I gains 1; PRR loses the record's `rsu_units`. Badges: `→ Class I` / `← PRR`.
+
+**Transfer rules applied by `DIVISION_PROCESSORS['OPER']` (CDA):**
+
+4. **Class II → Class I/III-IV (CDA)**: `greedyTransfer(Class II verified, 'cda_units', minimum_cda)`. Excess records fill Class I's CDA deficit first (1 per record), remainder goes to Class III or IV CDA. Class II CDA decreases by actual `cda_units` sum.
+
+**Recall computation:** Handled by `count_met` in pass-2 using **raw (pre-transfer) counts**. The OPER processor does NOT modify Recall.
+
+**Internal progressMap transfer fields** (set by OPER processor, consumed by output builder):
+
+- `transferred_in_rsu` / `transferred_in_cda` — array of detail-record objects (with `transferred_from` label) appended to target's record list
+- `transferred_out_ids_rsu` / `transferred_out_ids_cda` — array of `{ record_id, to_label }` objects; source records are kept in the list but stamped with `transferred_to` for display
 
 ---
 

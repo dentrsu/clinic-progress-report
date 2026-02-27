@@ -344,28 +344,28 @@ function studentRequestEmailVerification(recordId, instructorId) {
 
   try {
     // 1. Fetch Record & Validate
-    // Use SupabaseProvider to get record details. We'd need to fetch treatment & patient details for the email.
-    // Assuming SupabaseProvider has a way to get a single record. If not, we fetch student's records and find it.
+    // First confirm the record belongs to this student (authorization check).
     var records =
       SupabaseProvider.listVaultRecordsByStudent(profile.student_id) || [];
-    // We might need a direct getTreatmentRecord function, let's assume it exists or use raw fetch if needed.
-    // The existing code has SupabaseProvider.getTreatmentRecord. Let's assume it exists or fallback to finding in vault.
-    var record = records.find(function (r) {
+    var owned = records.find(function (r) {
       return r.record_id === recordId;
     });
-    if (!record) {
-      record = SupabaseProvider.getTreatmentRecord
-        ? SupabaseProvider.getTreatmentRecord(recordId)
-        : null;
-    }
-
-    if (!record) {
+    if (!owned) {
       throw new Error("Record not found or not authorized to access.");
     }
+    // Then fetch the full record with joins (treatment_catalog, treatment_steps, patient) for email details.
+    var record = SupabaseProvider.getTreatmentRecord(recordId);
+    if (!record) {
+      throw new Error("Record not found.");
+    }
 
-    if (record.status !== "completed") {
+    if (
+      record.status !== "completed" &&
+      record.status !== "pending verification" &&
+      record.status !== "rejected"
+    ) {
       throw new Error(
-        "Record must be in 'completed' status to request verification.",
+        "Record must be in 'completed', 'pending verification', or 'rejected' status to request verification.",
       );
     }
 
@@ -432,12 +432,12 @@ function studentRequestEmailVerification(recordId, instructorId) {
       "</table>" +
       "<p style='margin-bottom: 30px;'>Please review the work and click one of the actions below:</p>" +
       "<div style='text-align: center;'>" +
-      "<a href='" +
+      "<p style='margin: 0 0 12px 0;'><a href='" +
       verifyUrl +
-      "' style='background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; margin-right: 15px; display: inline-block;'>Verify Treatment</a>" +
-      "<a href='" +
+      "' style='background-color: #10b981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Verify Treatment</a></p>" +
+      "<p style='margin: 0;'><a href='" +
       rejectUrl +
-      "' style='background-color: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Reject Treatment</a>" +
+      "' style='background-color: #ef4444; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Reject Treatment</a></p>" +
       "</div>" +
       "<p style='margin-top: 30px; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px;'>Note: Clicking these links will securely process the action based on your active Google Workspace login.</p>" +
       "</div>";
@@ -447,6 +447,12 @@ function studentRequestEmailVerification(recordId, instructorId) {
       subject:
         "Verification Request: " + treatmentName + " for HN " + patientHn,
       htmlBody: htmlBody,
+    });
+
+    // Update record status to 'pending verification' after successful email send
+    SupabaseProvider.updateTreatmentRecord(recordId, {
+      status: "pending verification",
+      updated_at: new Date().toISOString(),
     });
 
     return { success: true, message: "Email sent successfully to advisor." };
@@ -739,28 +745,335 @@ function doGet(e) {
 //   }
 //
 var DIVISION_PROCESSORS = {
-  // Populated when a division requires logic beyond aggregation_config
+  /**
+   * Operative (OPER) — cross-requirement overflow / substitution rules.
+   *
+   * Prerequisite aggregation_config on requirement_list rows:
+   *   Class I–VI, PRR  → { "type": "count" }
+   *   Class IV         → { "type": "sum_union", "also_sum": ["<DIASTEMA_CLOSURE_REQ_ID>"] }
+   *   Diastema Closure → null  (minimum_rsu=0, minimum_cda=0; absorbed by Class IV above)
+   *   Recall (any)     → { "type": "count_met", "source_ids": ["<I>","<II>","<III>","<IV>","<V>","<VI>"] }
+   *                      is_selectable=false
+   *
+   * This processor runs AFTER both passes. Recall has already been computed in pass-2
+   * using raw counts — do NOT overwrite it here.
+   *
+   * All overflow rules use TRANSFER semantics: the source requirement's count
+   * decreases by the amount given, so records are never double-counted.
+   *
+   * RSU rules (in order):
+   *   1. Class II excess → Class I  (transfer: Class II count decreases)
+   *   2. Class IV excess → Class III (transfer: Class IV count decreases)
+   *   3. If Class I still short → PRR bonus, max 1 (transfer: PRR count decreases)
+   *
+   * CDA rules:
+   *   4. Class II excess → Class I CDA first (fill deficit), remainder → Class III or IV CDA
+   *      (transfer: Class II CDA decreases by total given away)
+   */
+  OPER: function (divReqs, divRecords, progressMap) {
+    // Build lookup maps keyed by requirement_type and cda_requirement_type (case-insensitive)
+    var byType = {};
+    var byCdaType = {};
+    divReqs.forEach(function (req) {
+      if (req.requirement_type) {
+        byType[req.requirement_type.toLowerCase().trim()] = req;
+      }
+      if (req.cda_requirement_type) {
+        byCdaType[req.cda_requirement_type.toLowerCase().trim()] = req;
+      }
+    });
+
+    function getByType(label) {
+      return byType[label.toLowerCase().trim()] || null;
+    }
+    // For CDA lookups: prefer cda_requirement_type match, fall back to requirement_type
+    function getForCda(label) {
+      var key = label.toLowerCase().trim();
+      return byCdaType[key] || byType[key] || null;
+    }
+    function prog(req) {
+      if (!req) return { rsu: 0, cda: 0, p_rsu: 0, p_cda: 0 };
+      return (
+        progressMap[req.requirement_id] || {
+          rsu: 0,
+          cda: 0,
+          p_rsu: 0,
+          p_cda: 0,
+        }
+      );
+    }
+
+    // ── Record-level transfer helpers ─────────────────────────────────────
+    // Build a detail record shape matching recordsDetailMap entries, with
+    // an extra `transferred_from` label identifying the source requirement.
+    function buildDetailRec(rec, fromLabel) {
+      return {
+        record_id: rec.record_id,
+        hn: rec.hn || (rec.patient && rec.patient.hn) || "-",
+        patient_name:
+          rec.patient_name || (rec.patient && rec.patient.name) || "-",
+        area: rec.area || "-",
+        rsu_units: parseFloat(rec.rsu_units) || 0,
+        cda_units: parseFloat(rec.cda_units) || 0,
+        status: rec.status,
+        is_exam: rec.is_exam === true,
+        transferred_from: fromLabel,
+      };
+    }
+    // Ensure transfer arrays exist on a progressMap entry.
+    function ensureTransfer(reqId) {
+      var p = progressMap[reqId];
+      if (!p.transferred_in_rsu) p.transferred_in_rsu = [];
+      if (!p.transferred_in_cda) p.transferred_in_cda = [];
+      if (!p.transferred_out_ids_rsu) p.transferred_out_ids_rsu = [];
+      if (!p.transferred_out_ids_cda) p.transferred_out_ids_cda = [];
+    }
+    // Return verified divRecords whose requirement_id is in reqIds[].
+    function verifiedFor(reqIds) {
+      return divRecords.filter(function (r) {
+        return (
+          reqIds.indexOf(r.requirement_id) !== -1 && r.status === "verified"
+        );
+      });
+    }
+
+    var r1 = getByType("class i");
+    var r2 = getByType("class ii");
+    var r3 = getByType("class iii");
+    var r4 = getByType("class iv");
+    var rPrr = getByType("prr");
+    // CDA: "Class III or IV" may be the cda_requirement_type on the Class III row, or its own row
+    var r3or4Cda = getForCda("class iii or iv") || r3;
+
+    // ── Helper: greedy transfer selection ──────────────────────────────────
+    // Given an array of verified records, a unit field ('rsu_units' or 'cda_units'),
+    // and a minimum the source must keep, return the records that can be
+    // transferred.  Sorts ascending by unit value so that the smallest-value
+    // records leave first (maximises transfer count).
+    function greedyTransfer(records, unitField, minKeep) {
+      var total = 0;
+      records.forEach(function (r) {
+        total += parseFloat(r[unitField]) || 0;
+      });
+      if (total <= minKeep) return [];
+      var sorted = records.slice().sort(function (a, b) {
+        return (
+          (parseFloat(a[unitField]) || 0) - (parseFloat(b[unitField]) || 0)
+        );
+      });
+      var remaining = total;
+      var out = [];
+      for (var i = 0; i < sorted.length; i++) {
+        var u = parseFloat(sorted[i][unitField]) || 0;
+        if (remaining - u >= minKeep) {
+          out.push(sorted[i]);
+          remaining -= u;
+        }
+      }
+      return out;
+    }
+
+    // ── RSU Rule 1: Class II excess → Class I (transfer) ──────────────────
+    // Source progress = SUM(rsu_units). Each transferred record = 1 at target.
+    if (r2 && r1) {
+      var c2MinRsu = parseFloat(r2.minimum_rsu) || 0;
+      var c2VerRecs = verifiedFor([r2.requirement_id]);
+      var toR1 = greedyTransfer(c2VerRecs, "rsu_units", c2MinRsu);
+      if (toR1.length > 0) {
+        // Target gains 1 per record
+        progressMap[r1.requirement_id].rsu += toR1.length;
+        // Source keeps remaining sum (override pass-1 value)
+        var c2Removed = 0;
+        toR1.forEach(function (r) {
+          c2Removed += parseFloat(r.rsu_units) || 0;
+        });
+        progressMap[r2.requirement_id].rsu -= c2Removed;
+        // Record tracking
+        ensureTransfer(r1.requirement_id);
+        ensureTransfer(r2.requirement_id);
+        toR1.forEach(function (rec) {
+          progressMap[r1.requirement_id].transferred_in_rsu.push(
+            buildDetailRec(rec, r2.requirement_type),
+          );
+          progressMap[r2.requirement_id].transferred_out_ids_rsu.push({
+            record_id: rec.record_id,
+            to_label: r1.requirement_type,
+          });
+        });
+      }
+    }
+
+    // ── RSU Rule 2: Class IV excess → Class III (transfer) ────────────────
+    // Class IV effective pool includes Diastema Closure (via sum_union).
+    if (r4 && r3) {
+      var c4MinRsu = parseFloat(r4.minimum_rsu) || 0;
+      // Safe parse aggregation_config (may be string or object from Supabase)
+      var r4AggCfg =
+        typeof r4.aggregation_config === "string"
+          ? (function () {
+              try {
+                return JSON.parse(r4.aggregation_config);
+              } catch (e) {
+                return {};
+              }
+            })()
+          : r4.aggregation_config || {};
+      var r4AllIds = [r4.requirement_id].concat(r4AggCfg.also_sum || []);
+      var c4VerRecs = verifiedFor(r4AllIds);
+      var toR3 = greedyTransfer(c4VerRecs, "rsu_units", c4MinRsu);
+      if (toR3.length > 0) {
+        progressMap[r3.requirement_id].rsu += toR3.length;
+        var c4Removed = 0;
+        toR3.forEach(function (r) {
+          c4Removed += parseFloat(r.rsu_units) || 0;
+        });
+        progressMap[r4.requirement_id].rsu -= c4Removed;
+        ensureTransfer(r3.requirement_id);
+        ensureTransfer(r4.requirement_id);
+        toR3.forEach(function (rec) {
+          var fromLabel =
+            rec.requirement_id === r4.requirement_id
+              ? r4.requirement_type
+              : "Diastema Closure";
+          progressMap[r3.requirement_id].transferred_in_rsu.push(
+            buildDetailRec(rec, fromLabel),
+          );
+          if (rec.requirement_id === r4.requirement_id) {
+            progressMap[r4.requirement_id].transferred_out_ids_rsu.push({
+              record_id: rec.record_id,
+              to_label: r3.requirement_type,
+            });
+          }
+        });
+      }
+    }
+
+    // ── RSU Rule 3: PRR bonus to Class I, max 1 (transfer) ────────────────
+    if (r1 && rPrr) {
+      var c1MinRsu = parseFloat(r1.minimum_rsu) || 0;
+      var c1RsuNow = progressMap[r1.requirement_id].rsu;
+      if (c1RsuNow < c1MinRsu) {
+        var prrVerRecs = verifiedFor([rPrr.requirement_id]);
+        if (prrVerRecs.length > 0) {
+          // Transfer exactly 1 PRR record (the last one)
+          var prrRec = prrVerRecs[prrVerRecs.length - 1];
+          progressMap[r1.requirement_id].rsu += 1;
+          progressMap[rPrr.requirement_id].rsu -=
+            parseFloat(prrRec.rsu_units) || 0;
+          ensureTransfer(r1.requirement_id);
+          ensureTransfer(rPrr.requirement_id);
+          progressMap[r1.requirement_id].transferred_in_rsu.push(
+            buildDetailRec(prrRec, rPrr.requirement_type),
+          );
+          progressMap[rPrr.requirement_id].transferred_out_ids_rsu.push({
+            record_id: prrRec.record_id,
+            to_label: r1.requirement_type,
+          });
+        }
+      }
+    }
+
+    // ── CDA Rule 4: Class II excess → Class I (priority), remainder → Class III/IV ──
+    // Same principle: SUM(cda_units) for source, 1 per record at target.
+    if (r2) {
+      var c2MinCda = parseFloat(r2.minimum_cda) || 0;
+      var c2CdaVerRecs = verifiedFor([r2.requirement_id]);
+      var toCda = greedyTransfer(c2CdaVerRecs, "cda_units", c2MinCda);
+      if (toCda.length > 0) {
+        // Determine how many go to Class I (fill deficit) vs Class III/IV (remainder)
+        var cdaGoToI = 0;
+        if (r1) {
+          var c1MinCda = parseFloat(r1.minimum_cda) || 0;
+          var c1CdaNow = progressMap[r1.requirement_id].cda;
+          var c1Deficit = Math.max(0, c1MinCda - c1CdaNow);
+          cdaGoToI = Math.min(toCda.length, c1Deficit);
+        }
+        var cdaGoToIII = toCda.length - cdaGoToI;
+
+        // Update target progress (1 per record)
+        if (cdaGoToI > 0 && r1) {
+          progressMap[r1.requirement_id].cda += cdaGoToI;
+        }
+        if (cdaGoToIII > 0 && r3or4Cda) {
+          progressMap[r3or4Cda.requirement_id].cda += cdaGoToIII;
+        }
+
+        // Source loses actual cda_units sum
+        var c2CdaRemoved = 0;
+        toCda.forEach(function (r) {
+          c2CdaRemoved += parseFloat(r.cda_units) || 0;
+        });
+        progressMap[r2.requirement_id].cda -= c2CdaRemoved;
+
+        // Record tracking
+        ensureTransfer(r2.requirement_id);
+        toCda.forEach(function (rec, idx) {
+          var destLabel =
+            idx < cdaGoToI
+              ? r1
+                ? r1.requirement_type
+                : "Class I"
+              : r3or4Cda
+                ? r3or4Cda.cda_requirement_type || r3or4Cda.requirement_type
+                : "Class III or IV";
+          progressMap[r2.requirement_id].transferred_out_ids_cda.push({
+            record_id: rec.record_id,
+            to_label: destLabel,
+          });
+        });
+        if (cdaGoToI > 0 && r1) {
+          ensureTransfer(r1.requirement_id);
+          toCda.slice(0, cdaGoToI).forEach(function (rec) {
+            progressMap[r1.requirement_id].transferred_in_cda.push(
+              buildDetailRec(rec, r2.requirement_type),
+            );
+          });
+        }
+        if (cdaGoToIII > 0 && r3or4Cda) {
+          ensureTransfer(r3or4Cda.requirement_id);
+          toCda.slice(cdaGoToI).forEach(function (rec) {
+            progressMap[r3or4Cda.requirement_id].transferred_in_cda.push(
+              buildDetailRec(rec, r2.requirement_type),
+            );
+          });
+        }
+      }
+    }
+  },
 };
 
 /**
  * Apply aggregation for one requirement based on its aggregation_config.
- * Called twice per division: pass 1 (isPass2=false) handles sum/count/count_exam;
- * pass 2 (isPass2=true) handles 'derived' which reads from pass-1 results.
+ * Called twice per division: pass 1 (isPass2=false) and pass 2 (isPass2=true).
  *
  * aggregation_config types:
- *   null / "sum"        — sum rsu_units / cda_units from records linked to this req (default)
- *   "count"             — count records linked to this req (not sum units)
- *   "count_exam"        — count is_exam=true records in this division
- *                         optional: { "source_ids": [...] } to scope to specific reqs
- *   "derived"           — read progressMap values from source_ids and aggregate
- *                         { "source_ids": [...], "operation": "sum_both|sum_rsu|sum_cda" }
+ *   null / "sum"         — sum rsu_units / cda_units from records linked to this req (default)
+ *   "count"              — count records linked directly to this req (not sum units)
+ *   "count_union"        — count records linked to this req + also_count req IDs (pass 1)
+ *                          { "also_count": ["<req_id>", ...] }
+ *   "sum_union"          — sum rsu_units/cda_units from this req + also_sum req IDs (pass 1)
+ *                          { "also_sum": ["<req_id>", ...] }
+ *   "count_exam"         — count is_exam=true records in this division (pass 1)
+ *                          optional: { "source_ids": [...] } to scope to specific reqs
+ *   "derived"            — sum progressMap values from source_ids (pass 2)
+ *                          { "source_ids": [...], "operation": "sum_both|sum_rsu|sum_cda" }
+ *   "count_met"          — count sources whose pass-1 progress >= their minimum (pass 2)
+ *                          { "source_ids": [...] }
+ *                          requires divReqs (5th param) to look up each source's minimum
  *
- * @param {Object} req          — requirement_list row
- * @param {Array}  divRecords   — all verified/completed records in this division for this student
- * @param {Object} progressMap  — { [req_id]: { rsu, cda, p_rsu, p_cda } }
- * @param {boolean} isPass2     — true = only process 'derived'; false = skip 'derived'
+ * @param {Object}  req          — requirement_list row
+ * @param {Array}   divRecords   — all verified/completed records in this division for this student
+ * @param {Object}  progressMap  — { [req_id]: { rsu, cda, p_rsu, p_cda } }
+ * @param {boolean} isPass2      — true = only process pass-2 types; false = skip pass-2 types
+ * @param {Array}   [divReqs]    — optional; all requirement rows for this division (needed for count_met)
  */
-function _applyRequirementAggregation(req, divRecords, progressMap, isPass2) {
+function _applyRequirementAggregation(
+  req,
+  divRecords,
+  progressMap,
+  isPass2,
+  divReqs,
+) {
   var config = null;
   try {
     config =
@@ -774,8 +1087,10 @@ function _applyRequirementAggregation(req, divRecords, progressMap, isPass2) {
   // Determine effective type: config > is_exam fallback > default sum
   var type = config ? config.type : req.is_exam === true ? "count_exam" : "sum";
 
-  if (isPass2 && type !== "derived") return; // pass 2: derived only
-  if (!isPass2 && type === "derived") return; // pass 1: skip derived
+  // Pass-2 types: derived, count_met
+  var isPass2Type = type === "derived" || type === "count_met";
+  if (isPass2 && !isPass2Type) return; // pass 2: skip pass-1 types
+  if (!isPass2 && isPass2Type) return; // pass 1: skip pass-2 types
 
   var reqId = req.requirement_id;
   if (!progressMap[reqId]) {
@@ -790,7 +1105,11 @@ function _applyRequirementAggregation(req, divRecords, progressMap, isPass2) {
       if (rec.status === "verified") {
         progressMap[reqId].rsu += rsu;
         progressMap[reqId].cda += cda;
-      } else if (rec.status === "completed") {
+      } else if (
+        rec.status === "completed" ||
+        rec.status === "pending verification" ||
+        rec.status === "rejected"
+      ) {
         progressMap[reqId].p_rsu += rsu;
         progressMap[reqId].p_cda += cda;
       }
@@ -802,9 +1121,51 @@ function _applyRequirementAggregation(req, divRecords, progressMap, isPass2) {
       if (rec.status === "verified") {
         progressMap[reqId].rsu += 1;
         progressMap[reqId].cda += 1;
-      } else if (rec.status === "completed") {
+      } else if (
+        rec.status === "completed" ||
+        rec.status === "pending verification" ||
+        rec.status === "rejected"
+      ) {
         progressMap[reqId].p_rsu += 1;
         progressMap[reqId].p_cda += 1;
+      }
+    });
+  } else if (type === "count_union") {
+    // Count records linked to this req + also_count requirement IDs
+    var alsoCount = config.also_count || [];
+    var unionIds = [reqId].concat(alsoCount);
+    divRecords.forEach(function (rec) {
+      if (unionIds.indexOf(rec.requirement_id) === -1) return;
+      if (rec.status === "verified") {
+        progressMap[reqId].rsu += 1;
+        progressMap[reqId].cda += 1;
+      } else if (
+        rec.status === "completed" ||
+        rec.status === "pending verification" ||
+        rec.status === "rejected"
+      ) {
+        progressMap[reqId].p_rsu += 1;
+        progressMap[reqId].p_cda += 1;
+      }
+    });
+  } else if (type === "sum_union") {
+    // Sum rsu_units/cda_units from records linked to this req + also_sum requirement IDs
+    var alsoSum = config.also_sum || [];
+    var unionIds = [reqId].concat(alsoSum);
+    divRecords.forEach(function (rec) {
+      if (unionIds.indexOf(rec.requirement_id) === -1) return;
+      var rsu = parseFloat(rec.rsu_units) || 0;
+      var cda = parseFloat(rec.cda_units) || 0;
+      if (rec.status === "verified") {
+        progressMap[reqId].rsu += rsu;
+        progressMap[reqId].cda += cda;
+      } else if (
+        rec.status === "completed" ||
+        rec.status === "pending verification" ||
+        rec.status === "rejected"
+      ) {
+        progressMap[reqId].p_rsu += rsu;
+        progressMap[reqId].p_cda += cda;
       }
     });
   } else if (type === "count_exam") {
@@ -816,7 +1177,11 @@ function _applyRequirementAggregation(req, divRecords, progressMap, isPass2) {
       if (rec.status === "verified") {
         progressMap[reqId].rsu += 1;
         progressMap[reqId].cda += 1;
-      } else if (rec.status === "completed") {
+      } else if (
+        rec.status === "completed" ||
+        rec.status === "pending verification" ||
+        rec.status === "rejected"
+      ) {
         progressMap[reqId].p_rsu += 1;
         progressMap[reqId].p_cda += 1;
       }
@@ -842,6 +1207,30 @@ function _applyRequirementAggregation(req, divRecords, progressMap, isPass2) {
       p_rsu: op === "sum_cda" ? pCda : pRsu,
       p_cda: op === "sum_rsu" ? pRsu : pCda,
     };
+  } else if (type === "count_met") {
+    // Count how many source requirements have pass-1 verified progress >= their minimum.
+    // Each qualifying source contributes 1. Requires divReqs for minimum lookups.
+    var sourceIds = config.source_ids || [];
+    var reqMinMap = {};
+    if (divReqs) {
+      divReqs.forEach(function (r) {
+        reqMinMap[r.requirement_id] = {
+          min_rsu: parseFloat(r.minimum_rsu) || 0,
+          min_cda: parseFloat(r.minimum_cda) || 0,
+        };
+      });
+    }
+    var metRsu = 0,
+      metCda = 0;
+    sourceIds.forEach(function (sid) {
+      var p = progressMap[sid] || { rsu: 0, cda: 0 };
+      var mins = reqMinMap[sid] || { min_rsu: 0, min_cda: 0 };
+      if (mins.min_rsu > 0 && p.rsu >= mins.min_rsu) metRsu += 1;
+      if (mins.min_cda > 0 && p.cda >= mins.min_cda) metCda += 1;
+    });
+    progressMap[reqId].rsu = metRsu;
+    progressMap[reqId].cda = metCda;
+    // p_rsu / p_cda intentionally left 0: Recall is a verified-only metric
   }
 }
 
@@ -862,7 +1251,7 @@ function getStudentVaultData(targetStudentId) {
   var finalStudentId = targetStudentId || profile.student_id;
   if (profile.role === "student") {
     finalStudentId = profile.student_id;
-  } else if (!finalStudentId) {
+  } else if (!finalStudentId || finalStudentId === "-") {
     throw new Error("No student specified.");
   }
 
@@ -903,6 +1292,7 @@ function getStudentVaultData(targetStudentId) {
     var recHn = rec.hn || (rec.patient && rec.patient.hn) || "-";
     var recName = rec.patient_name || (rec.patient && rec.patient.name) || "-";
     recordsDetailMap[rec.requirement_id].push({
+      record_id: rec.record_id,
       hn: recHn,
       patient_name: recName,
       area: rec.area || "-",
@@ -925,14 +1315,20 @@ function getStudentVaultData(targetStudentId) {
       progressMap[req.requirement_id] = { rsu: 0, cda: 0, p_rsu: 0, p_cda: 0 };
     });
 
-    // Pass 1: sum / count / count_exam (non-derived)
+    // Pass 1: sum / count / count_union / count_exam (non-pass-2 types)
     divReqs.forEach(function (req) {
-      _applyRequirementAggregation(req, divRecords, progressMap, false);
+      _applyRequirementAggregation(
+        req,
+        divRecords,
+        progressMap,
+        false,
+        divReqs,
+      );
     });
 
-    // Pass 2: derived (reads from progressMap values built in pass 1)
+    // Pass 2: derived / count_met (reads from pass-1 progressMap; needs divReqs for minimums)
     divReqs.forEach(function (req) {
-      _applyRequirementAggregation(req, divRecords, progressMap, true);
+      _applyRequirementAggregation(req, divRecords, progressMap, true, divReqs);
     });
 
     // Optional division-specific processor (override / extend progressMap)
@@ -970,15 +1366,17 @@ function getStudentVaultData(targetStudentId) {
         divisionMeta[divName].code === "ENDO" &&
         req.requirement_type === "Exam RCT");
 
-    // Detail records: for exam-type show all division exam records; otherwise per-requirement
-    var detailRecords;
+    // Detail records: separate rsu_records / cda_records to reflect transfer semantics.
+    // Transferred records are added to the target and excluded from the source.
+    var rsuRecords, cdaRecords;
     if (isExam) {
-      detailRecords = (recordsByDiv[divName] || [])
+      var examRecs = (recordsByDiv[divName] || [])
         .filter(function (r) {
           return r.is_exam === true;
         })
         .map(function (r) {
           return {
+            record_id: r.record_id,
             hn: r.hn || (r.patient && r.patient.hn) || "-",
             patient_name:
               r.patient_name || (r.patient && r.patient.name) || "-",
@@ -989,8 +1387,216 @@ function getStudentVaultData(targetStudentId) {
             is_exam: true,
           };
         });
+      rsuRecords = examRecs;
+      cdaRecords = examRecs;
     } else {
-      detailRecords = recordsDetailMap[req.requirement_id] || [];
+      var ownRecs = recordsDetailMap[req.requirement_id] || [];
+      var outIdsRsu = prog.transferred_out_ids_rsu || []; // [{ record_id, to_label }]
+      var outIdsCda = prog.transferred_out_ids_cda || []; // [{ record_id, to_label }]
+      // Keep transferred-out records but stamp them with transferred_to label
+      var markedRsu = ownRecs.map(function (r) {
+        for (var oi = 0; oi < outIdsRsu.length; oi++) {
+          if (outIdsRsu[oi].record_id === r.record_id) {
+            var copy = {};
+            for (var k in r) {
+              if (r.hasOwnProperty(k)) copy[k] = r[k];
+            }
+            copy.transferred_to = outIdsRsu[oi].to_label;
+            return copy;
+          }
+        }
+        return r;
+      });
+      var markedCda = ownRecs.map(function (r) {
+        for (var oi = 0; oi < outIdsCda.length; oi++) {
+          if (outIdsCda[oi].record_id === r.record_id) {
+            var copy = {};
+            for (var k in r) {
+              if (r.hasOwnProperty(k)) copy[k] = r[k];
+            }
+            copy.transferred_to = outIdsCda[oi].to_label;
+            return copy;
+          }
+        }
+        return r;
+      });
+      rsuRecords = markedRsu.concat(prog.transferred_in_rsu || []);
+      cdaRecords = markedCda.concat(prog.transferred_in_cda || []);
+    }
+
+    // Compute human-readable calculation method label from aggregation_config
+    var aggCfgRaw = req.aggregation_config;
+    var aggCfgParsed = null;
+    try {
+      aggCfgParsed =
+        typeof aggCfgRaw === "string"
+          ? JSON.parse(aggCfgRaw)
+          : aggCfgRaw || null;
+    } catch (e) {}
+    var calcMethod = "Sum";
+    if (isExam || (aggCfgParsed && aggCfgParsed.type === "count_exam")) {
+      calcMethod = "Exam";
+    } else if (
+      aggCfgParsed &&
+      (aggCfgParsed.type === "count" || aggCfgParsed.type === "count_union")
+    ) {
+      calcMethod = "Count";
+    } else if (aggCfgParsed && aggCfgParsed.type === "derived") {
+      calcMethod = "Derived";
+    } else if (aggCfgParsed && aggCfgParsed.type === "count_met") {
+      calcMethod = "Met";
+    }
+
+    // Compute per-requirement calc hints showing exact numbers (for non-trivial aggregations)
+    var rsuCalcHint = null;
+    var cdaCalcHint = null;
+    var _divProgMap = progressMaps[divName] || {};
+    var _divReqsList =
+      (divisionMeta[divName] && divisionMeta[divName].reqs) || [];
+    var _divRecordsList = recordsByDiv[divName] || [];
+
+    if (calcMethod === "Derived" && aggCfgParsed && aggCfgParsed.source_ids) {
+      var _srcIds = aggCfgParsed.source_ids;
+      var _op = aggCfgParsed.operation || "sum_both";
+      var _nameMap = {};
+      _divReqsList.forEach(function (r) {
+        _nameMap[r.requirement_id] = r.requirement_type;
+      });
+      var _rParts = [],
+        _cParts = [],
+        _rTotal = 0,
+        _cTotal = 0;
+      _srcIds.forEach(function (sid) {
+        var sp = _divProgMap[sid] || { rsu: 0, cda: 0 };
+        var nm = _nameMap[sid] || "Unknown";
+        var rv = Math.round((_op === "sum_cda" ? sp.cda : sp.rsu) * 100) / 100;
+        var cv = Math.round((_op === "sum_rsu" ? sp.rsu : sp.cda) * 100) / 100;
+        _rParts.push(nm + " (" + rv + ")");
+        _cParts.push(nm + " (" + cv + ")");
+        _rTotal += rv;
+        _cTotal += cv;
+      });
+      if (_rParts.length > 0) {
+        rsuCalcHint =
+          _rParts.join(" + ") + " = " + Math.round(_rTotal * 100) / 100;
+        cdaCalcHint =
+          _cParts.join(" + ") + " = " + Math.round(_cTotal * 100) / 100;
+      }
+    } else if (
+      calcMethod === "Met" &&
+      aggCfgParsed &&
+      aggCfgParsed.source_ids
+    ) {
+      var _srcIds = aggCfgParsed.source_ids;
+      var _reqMap = {};
+      _divReqsList.forEach(function (r) {
+        _reqMap[r.requirement_id] = r;
+      });
+      var _rLines = [],
+        _cLines = [],
+        _rMet = 0,
+        _cMet = 0,
+        _rTotal = 0,
+        _cTotal = 0;
+      _srcIds.forEach(function (sid) {
+        var sp = _divProgMap[sid] || { rsu: 0, cda: 0 };
+        var sr = _reqMap[sid];
+        var nm = sr ? sr.requirement_type : "Unknown";
+        var minR = sr ? parseFloat(sr.minimum_rsu) || 0 : 0;
+        var minC = sr ? parseFloat(sr.minimum_cda) || 0 : 0;
+        if (minR > 0) {
+          var ok = sp.rsu >= minR;
+          if (ok) _rMet++;
+          _rTotal++;
+          _rLines.push(nm + (ok ? " \u2713" : " \u2717"));
+        }
+        if (minC > 0) {
+          var ok = sp.cda >= minC;
+          if (ok) _cMet++;
+          _cTotal++;
+          _cLines.push(nm + (ok ? " \u2713" : " \u2717"));
+        }
+      });
+      if (_rTotal > 0)
+        rsuCalcHint =
+          _rLines.join("\n") + "\n\u2192  " + _rMet + " / " + _rTotal;
+      if (_cTotal > 0)
+        cdaCalcHint =
+          _cLines.join("\n") + "\n\u2192  " + _cMet + " / " + _cTotal;
+    } else if (aggCfgParsed && aggCfgParsed.type === "sum_union") {
+      var _alsoIds = aggCfgParsed.also_sum || [];
+      var _nameMap = {};
+      _divReqsList.forEach(function (r) {
+        _nameMap[r.requirement_id] = r.requirement_type;
+      });
+      var _ownRsuSum = 0,
+        _ownCdaSum = 0;
+      _divRecordsList
+        .filter(function (r) {
+          return (
+            r.requirement_id === req.requirement_id && r.status === "verified"
+          );
+        })
+        .forEach(function (r) {
+          _ownRsuSum += parseFloat(r.rsu_units) || 0;
+          _ownCdaSum += parseFloat(r.cda_units) || 0;
+        });
+      var _rParts = ["Own (" + Math.round(_ownRsuSum * 100) / 100 + ")"];
+      var _cParts = ["Own (" + Math.round(_ownCdaSum * 100) / 100 + ")"];
+      _alsoIds.forEach(function (sid) {
+        var rsuSum = 0,
+          cdaSum = 0;
+        _divRecordsList
+          .filter(function (r) {
+            return r.requirement_id === sid && r.status === "verified";
+          })
+          .forEach(function (r) {
+            rsuSum += parseFloat(r.rsu_units) || 0;
+            cdaSum += parseFloat(r.cda_units) || 0;
+          });
+        var nm = _nameMap[sid] || "Other";
+        _rParts.push(nm + " (" + Math.round(rsuSum * 100) / 100 + ")");
+        _cParts.push(nm + " (" + Math.round(cdaSum * 100) / 100 + ")");
+      });
+      rsuCalcHint =
+        _rParts.join(" + ") + " = " + Math.round(prog.rsu * 100) / 100;
+      cdaCalcHint =
+        _cParts.join(" + ") + " = " + Math.round(prog.cda * 100) / 100;
+    } else if (aggCfgParsed && aggCfgParsed.type === "count_union") {
+      var _alsoIds = aggCfgParsed.also_count || [];
+      var _nameMap = {};
+      _divReqsList.forEach(function (r) {
+        _nameMap[r.requirement_id] = r.requirement_type;
+      });
+      var _ownCnt = _divRecordsList.filter(function (r) {
+        return (
+          r.requirement_id === req.requirement_id && r.status === "verified"
+        );
+      }).length;
+      var _parts = ["Own (" + _ownCnt + ")"];
+      _alsoIds.forEach(function (sid) {
+        var cnt = _divRecordsList.filter(function (r) {
+          return r.requirement_id === sid && r.status === "verified";
+        }).length;
+        _parts.push((_nameMap[sid] || "Other") + " (" + cnt + ")");
+      });
+      var _hint = _parts.join(" + ") + " = " + Math.round(prog.rsu);
+      rsuCalcHint = _hint;
+      cdaCalcHint = _hint;
+    } else if (calcMethod === "Exam") {
+      var _filterReqs =
+        aggCfgParsed && aggCfgParsed.source_ids
+          ? aggCfgParsed.source_ids
+          : null;
+      var _examCnt = _divRecordsList.filter(function (r) {
+        if (!r.is_exam) return false;
+        if (_filterReqs && _filterReqs.indexOf(r.requirement_id) === -1)
+          return false;
+        return r.status === "verified";
+      }).length;
+      var _hint = _examCnt + " exam record" + (_examCnt !== 1 ? "s" : "");
+      rsuCalcHint = _hint;
+      cdaCalcHint = _hint;
     }
 
     divisions[divName].requirements.push({
@@ -1007,7 +1613,11 @@ function getStudentVaultData(targetStudentId) {
       cda_unit: req.cda_unit || "Case",
       is_exam: isExam,
       is_selectable: req.is_selectable !== false, // default true if column not yet migrated
-      records: detailRecords,
+      calc_method: calcMethod,
+      rsu_calc_hint: rsuCalcHint,
+      cda_calc_hint: cdaCalcHint,
+      rsu_records: rsuRecords,
+      cda_records: cdaRecords,
     });
   });
 
@@ -1724,6 +2334,15 @@ function adminGetUserDetail(email) {
       user.unit_id = s.unit_id;
       user.team_leader_1_id = s.team_leader_1_id;
       user.team_leader_2_id = s.team_leader_2_id;
+      user.oper_instructor_id = s.oper_instructor_id;
+      user.endo_instructor_id = s.endo_instructor_id;
+      user.perio_instructor_id = s.perio_instructor_id;
+      user.prosth_instructor_id = s.prosth_instructor_id;
+      user.diag_instructor_id = s.diag_instructor_id;
+      user.radio_instructor_id = s.radio_instructor_id;
+      user.sur_instructor_id = s.sur_instructor_id;
+      user.ortho_instructor_id = s.ortho_instructor_id;
+      user.pedo_instructor_id = s.pedo_instructor_id;
     }
   } else if (user.role === "instructor" || user.role === "admin") {
     var i = SupabaseProvider.getInstructorByUserId(user.user_id);
@@ -2496,17 +3115,31 @@ function adminListRequirements() {
   return SupabaseProvider.listRequirements() || [];
 }
 
+/**
+ * Parse an aggregation_config string entered by an admin.
+ * Strips invisible Unicode characters (BOM, non-breaking spaces, zero-width chars)
+ * that browsers sometimes inject during copy-paste, causing JSON.parse to fail with
+ * "Unexpected non-whitespace character after JSON".
+ * @param {string} raw
+ * @returns {Object|null}
+ */
+function _parseAggConfig(raw) {
+  if (!raw || !raw.trim()) return null;
+  // Strip BOM and invisible/non-standard Unicode whitespace before parsing
+  var cleaned = raw
+    .replace(/[\uFEFF\u00A0\u200B\u200C\u200D\u2028\u2029]/g, "")
+    .trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    throw new Error("Invalid aggregation_config JSON: " + e.message);
+  }
+}
+
 function adminCreateRequirement(form) {
   _assertAdmin();
   try {
-    var aggConfig = null;
-    if (form.aggregation_config && form.aggregation_config.trim()) {
-      try {
-        aggConfig = JSON.parse(form.aggregation_config);
-      } catch (e) {
-        throw new Error("Invalid aggregation_config JSON: " + e.message);
-      }
-    }
+    var aggConfig = _parseAggConfig(form.aggregation_config);
     SupabaseProvider.createRequirement({
       division_id: form.division_id,
       requirement_type: form.requirement_type,
@@ -2534,14 +3167,7 @@ function adminCreateRequirement(form) {
 function adminUpdateRequirement(id, form) {
   _assertAdmin();
   try {
-    var aggConfigUpd = null;
-    if (form.aggregation_config && form.aggregation_config.trim()) {
-      try {
-        aggConfigUpd = JSON.parse(form.aggregation_config);
-      } catch (e) {
-        throw new Error("Invalid aggregation_config JSON: " + e.message);
-      }
-    }
+    var aggConfigUpd = _parseAggConfig(form.aggregation_config);
     SupabaseProvider.updateRequirement(id, {
       division_id: form.division_id,
       requirement_type: form.requirement_type,
