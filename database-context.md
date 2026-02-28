@@ -164,8 +164,31 @@ create table public.requirement_list (
 --       → used for "Recall (any)" style requirements (is_selectable=false)
 --       → p_rsu/p_cda intentionally left 0 (verified-only metric)
 --
---   NOTE: complex cross-requirement overflow (e.g. OPER) is handled by
---   DIVISION_PROCESSORS['OPER'] in Code.gs, which runs after both passes.
+--   DIVISION-PROCESSOR-ONLY types (handled entirely in DIVISION_PROCESSORS, not aggregation engine):
+--
+--   {"type":"source_only"}
+--       → row stays selectable in treatment_plan.html dropdown (minimum kept > 0 for badge)
+--       → hidden from vault RSU/CDA display via vault HTML filter
+--       → excluded from radar chart completion % calculation
+--       → used for: PERIO Case G (418523ff-0fa6-430c-b9d1-1693ef74fa44),
+--                   PROSTH MRPD, ARPD, CD (Upper), CD (Lower)
+--   {"type":"perio_total_cases"}
+--       → PERIO processor: count Case G + Case P records where rsu_units > 0 (proxy step >= 7)
+--       → injects sub_counts:{case_g:{verified,pending}, case_p:{verified,pending}} into progressMap
+--       → populates transferred_in_rsu for expanded panel
+--   {"type":"perio_severity_casep"}
+--       → PERIO processor: sum of severity for qualifying Case P (severity = rsu_units × 0.5)
+--       → sets display_field="severity" and display_value per record on progressMap
+--       → vault HTML renders column header as "Severity" and shows display_value
+--   {"type":"perio_exam_flag","flag_key":"ohi_1st|ohi_2nd|srp_1st|srp_2nd"}
+--       → PERIO processor: count Case G + Case P records where perio_exams[flag_key] === true
+--       → is_selectable=false (requirement removed from treatment plan dropdown)
+--       → populates rsu/cda counts and transferred_in_rsu/cda for expanded panel
+--       → perio_exams column on treatment_records stores the flags as jsonb
+--
+--   NOTE: complex cross-requirement logic (OPER overflow, PERIO derived aggregation) is handled
+--   by DIVISION_PROCESSORS['OPER'] and DIVISION_PROCESSORS['PERIO'] in Code.gs,
+--   which run after both aggregation passes.
 
 -- 3.6 Patients
 -- create table public.patients (
@@ -206,6 +229,7 @@ create table public.treatment_records (
   requirement_id uuid references public.requirement_list(requirement_id), -- Linked requirement
   verified_by uuid references public.users(user_id), -- The Instructor's user_id
   is_exam boolean default false,                  -- Flag for Exam cases
+  perio_exams jsonb default null,                 -- PERIO exam flags: {"ohi_1st":bool,"ohi_2nd":bool,"srp_1st":bool,"srp_2nd":bool}; null for non-PERIO Case G/P records
   -- Validation: Step MUST belong to the Treatment
   constraint fk_treatment_step_validation
     foreign key (treatment_id, step_id)
@@ -236,8 +260,12 @@ create table public.treatment_records (
 2. **In Progress:** Student begins clinical work on a specific step.
 3. **Completed:** Student finishes the work. The status changes to "Completed".
 4. **Pending Verification:** Student requests email verification. The status changes to "Pending Verification". This still counts toward "Estimated" progress in the Requirement Vault.
-5. **Verified:** Instructor reviews work and "signs off". The status changes to "Verified" in the Requirement Vault, contributing to the final graduation progress.
+5. **Verified:** Instructor reviews work and "signs off". The status changes to "Verified" in the Requirement Vault, contributing to the final graduation progress. A **Verification Proof** (SHA-256 hash of `verified_at|record_id|VERIFICATION_SECRET`) is included in the student notification email.
 6. **Rejected:** Instructor rejects the work. Student can edit and re-request verification. Also counts toward "Estimated" progress.
+
+#### Verification Hash
+
+When a record is verified, a one-way SHA-256 hash is computed from `verified_at + "|" + record_id + "|" + VERIFICATION_SECRET` (Script Properties). The hash, timestamp, and record ID are included in the student's confirmation email as tamper-proof proof. Admins and instructors can re-verify the hash via the **Verify Hash** UI (admin console tab / instructor portal section).
 
 ### D. Auto-Calculation Logic (PERIO)
 
@@ -306,17 +334,18 @@ OPER uses cross-requirement overflow and substitution logic that cannot be expre
 
 **Required `aggregation_config` on OPER `requirement_list` rows:**
 
-| requirement_type | aggregation_config                                                             | Notes                                                         |
-| ---------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| Class I          | `null` (sum)                                                                   | Receives transfer from Class II and PRR bonus                 |
-| Class II         | `null` (sum)                                                                   | Source for transfer to Class I (RSU) and Class I/III-IV (CDA) |
-| Class III        | `null` (sum)                                                                   | Receives transfer from Class IV                               |
-| Class IV         | `{"type":"sum_union","also_sum":["<DIASTEMA_UUID>"]}`                          | Sums rsu_units from Class IV + Diastema Closure records       |
-| Class V          | `null` (sum)                                                                   | Standard                                                      |
-| Class VI         | `null` (sum)                                                                   | Standard                                                      |
-| PRR              | `null` (sum)                                                                   | Bonus source for Class I RSU (max 1 record)                   |
-| Diastema Closure | `null` + `minimum_rsu=0`, `minimum_cda=0`                                      | Selectable but has no vault row; absorbed by Class IV         |
-| Recall (any)     | `{"type":"count_met","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>"]}` | `is_selectable=false`; computed in pass-2 from raw counts     |
+| requirement_type | aggregation_config                                                                                              | Notes                                                                          |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Class I          | `null` (sum)                                                                                                    | Receives transfer from Class II and PRR bonus                                  |
+| Class II         | `null` (sum)                                                                                                    | Source for transfer to Class I (RSU) and Class I/III-IV (CDA)                  |
+| Class III        | `null` (sum)                                                                                                    | Receives transfer from Class IV                                                |
+| Class IV         | `{"type":"sum_union","also_sum":["<DIASTEMA_UUID>"]}`                                                           | Sums rsu_units from Class IV + Diastema Closure records                        |
+| Class V          | `null` (sum)                                                                                                    | Standard                                                                       |
+| Class VI         | `null` (sum)                                                                                                    | Standard                                                                       |
+| PRR              | `null` (sum)                                                                                                    | Bonus source for Class I RSU (max 1 record)                                    |
+| Minimum Total R  | `{"type":"derived","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>","<Diastema>"],"operation":"sum_rsu"}` | `is_selectable=false`; pass-2 sums RSU from all class types (minimum_rsu = 60) |
+| Diastema Closure | `null` + `minimum_rsu=0`, `minimum_cda=0`                                                                       | Selectable but has no vault row; absorbed by Class IV                          |
+| Recall (any)     | `{"type":"count_met","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>"]}`                                  | `is_selectable=false`; computed in pass-2 from raw counts                      |
 
 **Transfer algorithm (`greedyTransfer` helper):**
 
@@ -351,6 +380,71 @@ Example: Class II records [2,2,3,3] = 10 total, minimum = 6 →
 
 - `transferred_in_rsu` / `transferred_in_cda` — array of detail-record objects (with `transferred_from` label) appended to target's record list
 - `transferred_out_ids_rsu` / `transferred_out_ids_cda` — array of `{ record_id, to_label }` objects; source records are kept in the list but stamped with `transferred_to` for display
+
+---
+
+### H. Periodontics (PERIO) Division — Vault Aggregation Rules
+
+PERIO uses derived aggregation requirements that cannot be expressed by standard `aggregation_config` types alone. Logic is split between pass-1 (for standard types) and `DIVISION_PROCESSORS['PERIO']` in `Code.gs`.
+
+**Source requirements (students link records to these; selectable in treatment_plan.html):**
+
+| requirement_type             | UUID                                   | aggregation_config       | Notes                                                                         |
+| ---------------------------- | -------------------------------------- | ------------------------ | ----------------------------------------------------------------------------- |
+| Case G                       | `418523ff-0fa6-430c-b9d1-1693ef74fa44` | `{"type":"source_only"}` | Keeps `minimum_rsu > 0` for dropdown badge; hidden from vault RSU display     |
+| Case P                       | `1ee6edcc-aba0-4b5a-876d-af81fc5c978c` | `null` (sum)             | `minimum_rsu = 0` hides from RSU vault; `minimum_cda > 0` keeps CDA vault row |
+| Only Recall or Miscellaneous | `854f959d-6919-4e82-b093-91aa0a729415` | `null` (sum)             | Contributes to CDA Cases count                                                |
+
+**Derived requirements (`is_selectable=false`; set minimums via Admin Console):**
+
+| requirement_type      | section | aggregation_config                                                         | processor role                                                            |
+| --------------------- | ------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Total Cases           | RSU     | `{"type":"perio_total_cases"}`                                             | Count qualG + qualP; inject sub_counts + rsu_records                      |
+| Total Severity Case P | RSU     | `{"type":"perio_severity_casep"}`                                          | Sum severity (rsu_units×0.5) for qualP; set display_field + display_value |
+| Complexities          | RSU     | `{"type":"sum_union","also_sum":["<CaseG>","<CaseP>"]}`                    | Pass-1 sums rsu_units; processor populates rsu_records                    |
+| CDA Cases             | CDA     | `{"type":"count_union","also_count":["<CaseG>","<CaseP>","<OnlyRecall>"]}` | Pass-1 counts all three; processor populates cda_records                  |
+| OHI 1st Exam          | RSU     | `{"type":"perio_exam_flag","flag_key":"ohi_1st"}`                          | Count Case G+P records where perio_exams.ohi_1st === true                 |
+| OHI 2nd Exam          | RSU     | `{"type":"perio_exam_flag","flag_key":"ohi_2nd"}`                          | Count Case G+P records where perio_exams.ohi_2nd === true                 |
+| SRP 1st Exam          | RSU     | `{"type":"perio_exam_flag","flag_key":"srp_1st"}`                          | Count Case G+P records where perio_exams.srp_1st === true                 |
+| SRP 2nd Exam          | CDA     | `{"type":"perio_exam_flag","flag_key":"srp_2nd"}`                          | Count Case G+P records where perio_exams.srp_2nd === true                 |
+
+**Key logic in PERIO processor:**
+
+- **Qualifying records**: Case G or Case P where `rsu_units > 0` (proxy for step order >= 7, since `calculatePerioUnits()` sets `rsu_units = 0` for step < 7)
+- **Severity reverse-compute**: `severity = rsu_units × 0.5` (Case P formula: `rsu_units = severity / 0.5`)
+- **sub_counts**: injected into progressMap for Total Cases → `{ case_g: {verified, pending}, case_p: {verified, pending} }`
+- **display_field / display_value**: set on progressMap for Total Severity Case P; vault HTML renders column header as "Severity" and cell as `rec.display_value`
+- **Record population**: `transferred_in_rsu` / `transferred_in_cda` populated without `transferred_from` (no badge); Complexities and CDA Cases use this pattern since no records link directly to them
+
+---
+
+### I. Prosthodontics (PROSTH) Division — Vault Aggregation Rules
+
+PROSTH uses derived parent requirements that aggregate two selectable source requirements each. Logic is handled by `DIVISION_PROCESSORS['PROSTH']` in `Code.gs` via a generic `applySubcounts` helper.
+
+**Source requirements (`source_only` — selectable in treatment plan, hidden from vault display):**
+
+| requirement_type | aggregation_config       | Notes                                                 |
+| ---------------- | ------------------------ | ----------------------------------------------------- |
+| MRPD             | `{"type":"source_only"}` | Sub-source of RPD; visible in treatment plan dropdown |
+| ARPD             | `{"type":"source_only"}` | Sub-source of RPD                                     |
+| CD (Upper)       | `{"type":"source_only"}` | Sub-source of CD                                      |
+| CD (Lower)       | `{"type":"source_only"}` | Sub-source of CD                                      |
+
+**Parent requirements (`is_selectable=false`; derived from source pairs):**
+
+| requirement_type | aggregation_config                                                                         | processor role                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| RPD              | `{"type":"derived","source_ids":["<MRPD_id>","<ARPD_id>"],"operation":"sum_both"}`         | Sums RSU+CDA from MRPD + ARPD; injects sub_counts + record lists             |
+| CD               | `{"type":"derived","source_ids":["<CD_Upper_id>","<CD_Lower_id>"],"operation":"sum_both"}` | Sums RSU+CDA from CD (Upper) + CD (Lower); injects sub_counts + record lists |
+
+**Key logic in PROSTH processor (`applySubcounts` helper):**
+
+- Iterates source reqs, collects their records from `divRecords`
+- Builds `sub_counts: { <key>: {verified, pending} }` and `sub_counts_labels: { <key>: "<label>" }`
+- Populates `transferred_in_rsu` (and `transferred_in_cda` if `minimum_cda > 0`) on parent progressMap
+- No `transferred_from` badge — records are displayed as sub-items without transfer styling
+- Pass-2 `derived` already sums RSU/CDA values; processor only adds record lists and sub_counts
 
 ---
 

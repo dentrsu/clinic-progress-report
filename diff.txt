@@ -1,0 +1,972 @@
+diff --git a/database-context.md b/database-context.md
+index 6f32de3..2445ddb 100644
+--- a/database-context.md
++++ b/database-context.md
+@@ -164,8 +164,30 @@ create table public.requirement_list (
+ --       → used for "Recall (any)" style requirements (is_selectable=false)
+ --       → p_rsu/p_cda intentionally left 0 (verified-only metric)
+ --
+---   NOTE: complex cross-requirement overflow (e.g. OPER) is handled by
+---   DIVISION_PROCESSORS['OPER'] in Code.gs, which runs after both passes.
++--   DIVISION-PROCESSOR-ONLY types (handled entirely in DIVISION_PROCESSORS, not aggregation engine):
++--
++--   {"type":"source_only"}
++--       → row stays selectable in treatment_plan.html dropdown (minimum kept > 0 for badge)
++--       → hidden from vault RSU/CDA display via vault HTML filter
++--       → excluded from radar chart completion % calculation
++--       → used for PERIO Case G (418523ff-0fa6-430c-b9d1-1693ef74fa44)
++--   {"type":"perio_total_cases"}
++--       → PERIO processor: count Case G + Case P records where rsu_units > 0 (proxy step >= 7)
++--       → injects sub_counts:{case_g:{verified,pending}, case_p:{verified,pending}} into progressMap
++--       → populates transferred_in_rsu for expanded panel
++--   {"type":"perio_severity_casep"}
++--       → PERIO processor: sum of severity for qualifying Case P (severity = rsu_units × 0.5)
++--       → sets display_field="severity" and display_value per record on progressMap
++--       → vault HTML renders column header as "Severity" and shows display_value
++--   {"type":"perio_exam_flag","flag_key":"ohi_1st|ohi_2nd|srp_1st|srp_2nd"}
++--       → PERIO processor: count Case G + Case P records where perio_exams[flag_key] === true
++--       → is_selectable=false (requirement removed from treatment plan dropdown)
++--       → populates rsu/cda counts and transferred_in_rsu/cda for expanded panel
++--       → perio_exams column on treatment_records stores the flags as jsonb
++--
++--   NOTE: complex cross-requirement logic (OPER overflow, PERIO derived aggregation) is handled
++--   by DIVISION_PROCESSORS['OPER'] and DIVISION_PROCESSORS['PERIO'] in Code.gs,
++--   which run after both aggregation passes.
+ 
+ -- 3.6 Patients
+ -- create table public.patients (
+@@ -206,6 +228,7 @@ create table public.treatment_records (
+   requirement_id uuid references public.requirement_list(requirement_id), -- Linked requirement
+   verified_by uuid references public.users(user_id), -- The Instructor's user_id
+   is_exam boolean default false,                  -- Flag for Exam cases
++  perio_exams jsonb default null,                 -- PERIO exam flags: {"ohi_1st":bool,"ohi_2nd":bool,"srp_1st":bool,"srp_2nd":bool}; null for non-PERIO Case G/P records
+   -- Validation: Step MUST belong to the Treatment
+   constraint fk_treatment_step_validation
+     foreign key (treatment_id, step_id)
+@@ -354,6 +377,41 @@ Example: Class II records [2,2,3,3] = 10 total, minimum = 6 →
+ 
+ ---
+ 
++### H. Periodontics (PERIO) Division — Vault Aggregation Rules
++
++PERIO uses derived aggregation requirements that cannot be expressed by standard `aggregation_config` types alone. Logic is split between pass-1 (for standard types) and `DIVISION_PROCESSORS['PERIO']` in `Code.gs`.
++
++**Source requirements (students link records to these; selectable in treatment_plan.html):**
++
++| requirement_type | UUID | aggregation_config | Notes |
++| --- | --- | --- | --- |
++| Case G | `418523ff-0fa6-430c-b9d1-1693ef74fa44` | `{"type":"source_only"}` | Keeps `minimum_rsu > 0` for dropdown badge; hidden from vault RSU display |
++| Case P | `1ee6edcc-aba0-4b5a-876d-af81fc5c978c` | `null` (sum) | `minimum_rsu = 0` hides from RSU vault; `minimum_cda > 0` keeps CDA vault row |
++| Only Recall or Miscellaneous | `854f959d-6919-4e82-b093-91aa0a729415` | `null` (sum) | Contributes to CDA Cases count |
++
++**Derived requirements (`is_selectable=false`; set minimums via Admin Console):**
++
++| requirement_type | section | aggregation_config | processor role |
++| --- | --- | --- | --- |
++| Total Cases | RSU | `{"type":"perio_total_cases"}` | Count qualG + qualP; inject sub_counts + rsu_records |
++| Total Severity Case P | RSU | `{"type":"perio_severity_casep"}` | Sum severity (rsu_units×0.5) for qualP; set display_field + display_value |
++| Complexities | RSU | `{"type":"sum_union","also_sum":["<CaseG>","<CaseP>"]}` | Pass-1 sums rsu_units; processor populates rsu_records |
++| CDA Cases | CDA | `{"type":"count_union","also_count":["<CaseG>","<CaseP>","<OnlyRecall>"]}` | Pass-1 counts all three; processor populates cda_records |
++| OHI 1st Exam | RSU | `{"type":"perio_exam_flag","flag_key":"ohi_1st"}` | Count Case G+P records where perio_exams.ohi_1st === true |
++| OHI 2nd Exam | RSU | `{"type":"perio_exam_flag","flag_key":"ohi_2nd"}` | Count Case G+P records where perio_exams.ohi_2nd === true |
++| SRP 1st Exam | RSU | `{"type":"perio_exam_flag","flag_key":"srp_1st"}` | Count Case G+P records where perio_exams.srp_1st === true |
++| SRP 2nd Exam | CDA | `{"type":"perio_exam_flag","flag_key":"srp_2nd"}` | Count Case G+P records where perio_exams.srp_2nd === true |
++
++**Key logic in PERIO processor:**
++
++- **Qualifying records**: Case G or Case P where `rsu_units > 0` (proxy for step order >= 7, since `calculatePerioUnits()` sets `rsu_units = 0` for step < 7)
++- **Severity reverse-compute**: `severity = rsu_units × 0.5` (Case P formula: `rsu_units = severity / 0.5`)
++- **sub_counts**: injected into progressMap for Total Cases → `{ case_g: {verified, pending}, case_p: {verified, pending} }`
++- **display_field / display_value**: set on progressMap for Total Severity Case P; vault HTML renders column header as "Severity" and cell as `rec.display_value`
++- **Record population**: `transferred_in_rsu` / `transferred_in_cda` populated without `transferred_from` (no badge); Complexities and CDA Cases use this pattern since no records link directly to them
++
++---
++
+ ## 4. Key Developer Queries (Reference)
+ 
+ ### Fetching a Student's Progress
+diff --git a/gas/Code.gs b/gas/Code.gs
+index 185864b..3d9a902 100644
+--- a/gas/Code.gs
++++ b/gas/Code.gs
+@@ -394,6 +394,8 @@ function studentRequestEmailVerification(recordId, instructorId) {
+       ? record.treatment_steps.step_name
+       : "Step";
+     var studentName = profile.name;
++    var divCode = record.division ? record.division.code : "";
++    var reqType = record.requirement ? record.requirement.requirement_type : "";
+ 
+     var appUrl = ScriptApp.getService().getUrl();
+     var verifyUrl =
+@@ -407,6 +409,79 @@ function studentRequestEmailVerification(recordId, instructorId) {
+       recordId +
+       "&status=rejected";
+ 
++    // Build division-specific detail rows
++    var td = "padding: 8px; border-bottom: 1px solid #edf2f7;";
++    var divRows = "";
++
++    // Requirement type (if available)
++    if (reqType) {
++      divRows +=
++        "<tr><td style='" + td + "'><strong>Requirement:</strong></td>" +
++        "<td style='" + td + "'>" + reqType + "</td></tr>";
++    }
++
++    // RSU units — label as "Complexities" for PERIO Case G/P
++    if (record.rsu_units != null && record.rsu_units !== "") {
++      var rsuLabel =
++        divCode === "PERIO" &&
++        (reqType === "Case G" || reqType === "Case P")
++          ? "Complexities"
++          : "RSU Units";
++      divRows +=
++        "<tr><td style='" + td + "'><strong>" + rsuLabel + ":</strong></td>" +
++        "<td style='" + td + "'>" + record.rsu_units + "</td></tr>";
++    }
++
++    // CDA units
++    if (record.cda_units != null && record.cda_units !== "") {
++      divRows +=
++        "<tr><td style='" + td + "'><strong>CDA Units:</strong></td>" +
++        "<td style='" + td + "'>" + record.cda_units + "</td></tr>";
++    }
++
++    // OPER: book number, page number
++    if (divCode === "OPER") {
++      if (record.book_number != null && record.book_number !== "") {
++        divRows +=
++          "<tr><td style='" + td + "'><strong>Book No.:</strong></td>" +
++          "<td style='" + td + "'>" + record.book_number + "</td></tr>";
++      }
++      if (record.page_number != null && record.page_number !== "") {
++        divRows +=
++          "<tr><td style='" + td + "'><strong>Page No.:</strong></td>" +
++          "<td style='" + td + "'>" + record.page_number + "</td></tr>";
++      }
++    }
++
++    // PERIO: severity, perio_exams flags
++    if (divCode === "PERIO") {
++      if (record.severity != null && record.severity !== "") {
++        divRows +=
++          "<tr><td style='" + td + "'><strong>Severity:</strong></td>" +
++          "<td style='" + td + "'>" + record.severity + "</td></tr>";
++      }
++      var pe = record.perio_exams;
++      if (pe && typeof pe === "object") {
++        var examParts = [];
++        if (pe.ohi_1st) examParts.push("OHI 1st Exam");
++        if (pe.ohi_2nd) examParts.push("OHI 2nd Exam");
++        if (pe.srp_1st) examParts.push("SRP 1st Exam");
++        if (pe.srp_2nd) examParts.push("SRP 2nd Exam");
++        if (examParts.length > 0) {
++          divRows +=
++            "<tr><td style='" + td + "'><strong>Exams Performed:</strong></td>" +
++            "<td style='" + td + "'>" + examParts.join(", ") + "</td></tr>";
++        }
++      }
++    }
++
++    // ENDO: exam case flag
++    if (divCode === "ENDO" && record.is_exam) {
++      divRows +=
++        "<tr><td style='" + td + "'><strong>Exam Case:</strong></td>" +
++        "<td style='" + td + "'>Yes</td></tr>";
++    }
++
+     var htmlBody =
+       "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>" +
+       "<h2 style='color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>Verification Request</h2>" +
+@@ -414,21 +489,22 @@ function studentRequestEmailVerification(recordId, instructorId) {
+       studentName +
+       " has requested verification for a completed treatment step.</p>" +
+       "<table style='width: 100%; border-collapse: collapse; margin: 20px 0;'>" +
+-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Patient HN:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
++      "<tr><td style='" + td + "'><strong>Patient HN:</strong></td><td style='" + td + "'>" +
+       patientHn +
+       "</td></tr>" +
+-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Patient Name:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
++      "<tr><td style='" + td + "'><strong>Patient Name:</strong></td><td style='" + td + "'>" +
+       patientName +
+       "</td></tr>" +
+-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Treatment:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
++      "<tr><td style='" + td + "'><strong>Treatment:</strong></td><td style='" + td + "'>" +
+       treatmentName +
+       "</td></tr>" +
+-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Step:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
++      "<tr><td style='" + td + "'><strong>Step:</strong></td><td style='" + td + "'>" +
+       stepName +
+       "</td></tr>" +
+-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Area:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
++      "<tr><td style='" + td + "'><strong>Area:</strong></td><td style='" + td + "'>" +
+       (record.area || "-") +
+       "</td></tr>" +
++      divRows +
+       "</table>" +
+       "<p style='margin-bottom: 30px;'>Please review the work and click one of the actions below:</p>" +
+       "<div style='text-align: center;'>" +
+@@ -1062,6 +1138,200 @@ var DIVISION_PROCESSORS = {
+       }
+     }
+   },
++
++  /**
++   * Periodontics (PERIO) — vault aggregation for derived RSU/CDA requirements.
++   *
++   * Source requirements (students link records to these):
++   *   Case G — 418523ff-0fa6-430c-b9d1-1693ef74fa44
++   *   Case P — 1ee6edcc-aba0-4b5a-876d-af81fc5c978c
++   *
++   * Derived requirements handled here (is_selectable=false):
++   *   RSU: "Total Cases"          aggregation_config type = "perio_total_cases"
++   *        "Total Severity Case P" aggregation_config type = "perio_severity_casep"
++   *        "Complexities"          aggregation handled by sum_union pass-1;
++   *                                this processor only populates rsu_records.
++   *   CDA: "CDA Cases"            aggregation handled by count_union pass-1;
++   *                                this processor only populates cda_records.
++   *
++   * Qualifying records = Case G or Case P with rsu_units > 0.
++   *   calculatePerioUnits() in treatment_plan.html sets rsu_units = 0 when
++   *   step_order < 7, so rsu_units > 0 is a reliable proxy for step >= 7.
++   *
++   * Severity is reverse-computed: severity = rsu_units × 0.5  (Case P formula:
++   *   rsu_units = severity / 0.5, so severity = rsu_units × 0.5).
++   */
++  PERIO: function (divReqs, divRecords, progressMap) {
++    var CASE_G_ID = "418523ff-0fa6-430c-b9d1-1693ef74fa44";
++    var CASE_P_ID = "1ee6edcc-aba0-4b5a-876d-af81fc5c978c";
++    var ONLY_RECALL_ID = "854f959d-6919-4e82-b093-91aa0a729415";
++
++    // Build requirement lookups by type label (lowercase)
++    var byType = {};
++    var byCdaType = {};
++    divReqs.forEach(function (req) {
++      if (req.requirement_type)
++        byType[req.requirement_type.toLowerCase().trim()] = req;
++      if (req.cda_requirement_type)
++        byCdaType[req.cda_requirement_type.toLowerCase().trim()] = req;
++    });
++    function getByType(label) {
++      return byType[label.toLowerCase().trim()] || null;
++    }
++    function getByCdaType(label) {
++      return byCdaType[label.toLowerCase().trim()] || null;
++    }
++
++    // Build a plain detail record for the expanded panel (no transfer badge).
++    function mkRec(r, extra) {
++      var base = {
++        record_id: r.record_id,
++        hn: r.hn || (r.patient && r.patient.hn) || "-",
++        patient_name: r.patient_name || (r.patient && r.patient.name) || "-",
++        area: r.area || "-",
++        rsu_units: parseFloat(r.rsu_units) || 0,
++        cda_units: parseFloat(r.cda_units) || 0,
++        status: r.status,
++        is_exam: false,
++      };
++      if (extra) {
++        for (var k in extra) {
++          if (extra.hasOwnProperty(k)) base[k] = extra[k];
++        }
++      }
++      return base;
++    }
++
++    // Separate raw Case G, Case P, and Only Recall or Miscellaneous records
++    var caseGRecs = divRecords.filter(function (r) {
++      return r.requirement_id === CASE_G_ID;
++    });
++    var casePRecs = divRecords.filter(function (r) {
++      return r.requirement_id === CASE_P_ID;
++    });
++    var onlyRecallRecs = divRecords.filter(function (r) {
++      return r.requirement_id === ONLY_RECALL_ID;
++    });
++
++    // Qualifying records: rsu_units > 0 (proxy for step order >= 7)
++    var qualG = caseGRecs.filter(function (r) {
++      return (parseFloat(r.rsu_units) || 0) > 0;
++    });
++    var qualP = casePRecs.filter(function (r) {
++      return (parseFloat(r.rsu_units) || 0) > 0;
++    });
++
++    function countVerPen(recs) {
++      var v = 0,
++        p = 0;
++      recs.forEach(function (r) {
++        if (r.status === "verified") v++;
++        else p++;
++      });
++      return { verified: v, pending: p };
++    }
++
++    // ── Total Cases ───────────────────────────────────────────────────────────
++    var tcReq = getByType("total cases");
++    if (tcReq) {
++      var tcId = tcReq.requirement_id;
++      var gStats = countVerPen(qualG);
++      var pStats = countVerPen(qualP);
++      var vAll = gStats.verified + pStats.verified;
++      var penAll = gStats.pending + pStats.pending;
++      progressMap[tcId].rsu = vAll;
++      progressMap[tcId].p_rsu = penAll;
++      progressMap[tcId].cda = 0;
++      progressMap[tcId].p_cda = 0;
++      progressMap[tcId].sub_counts = { case_g: gStats, case_p: pStats };
++      // Populate rsu_records for expanded panel
++      progressMap[tcId].transferred_in_rsu = qualG.concat(qualP).map(
++        function (r) {
++          return mkRec(r);
++        },
++      );
++    }
++
++    // ── Total Severity Case P ─────────────────────────────────────────────────
++    // severity = rsu_units × 0.5  (Case P: rsu = sev / 0.5 → sev = rsu × 0.5)
++    var sevReq = getByType("total severity case p");
++    if (sevReq) {
++      var sevId = sevReq.requirement_id;
++      var vSev = 0,
++        pSev = 0;
++      qualP.forEach(function (r) {
++        var sev = Math.round(parseFloat(r.rsu_units) * 0.5 * 100) / 100;
++        if (r.status === "verified") vSev += sev;
++        else pSev += sev;
++      });
++      progressMap[sevId].rsu = Math.round(vSev * 100) / 100;
++      progressMap[sevId].p_rsu = Math.round(pSev * 100) / 100;
++      progressMap[sevId].cda = 0;
++      progressMap[sevId].p_cda = 0;
++      // Signal vault HTML to label and render this column as "Severity"
++      progressMap[sevId].display_field = "severity";
++      // Each record carries display_value = severity (not rsu_units)
++      progressMap[sevId].transferred_in_rsu = qualP.map(function (r) {
++        var sev = Math.round(parseFloat(r.rsu_units) * 0.5 * 100) / 100;
++        return mkRec(r, { display_value: sev });
++      });
++    }
++
++    // ── Complexities: populate rsu_records for expanded panel ─────────────────
++    // The sum_union aggregation already ran in pass 1 and set the total correctly.
++    // This processor only adds the qualifying records so the expanded panel shows them.
++    var cxReq = getByType("complexities");
++    if (cxReq) {
++      var cxId = cxReq.requirement_id;
++      progressMap[cxId].transferred_in_rsu = qualG.concat(qualP).map(
++        function (r) {
++          return mkRec(r);
++        },
++      );
++    }
++
++    // ── CDA Cases: populate cda_records for expanded panel ────────────────────
++    // The count_union aggregation already ran in pass 1.
++    // This processor adds all Case G + Case P records to the panel.
++    var cdaCasesReq = getByCdaType("cda cases");
++    if (cdaCasesReq) {
++      var cdaId = cdaCasesReq.requirement_id;
++      progressMap[cdaId].transferred_in_cda = caseGRecs
++        .concat(casePRecs)
++        .concat(onlyRecallRecs)
++        .map(function (r) {
++          return mkRec(r);
++        });
++    }
++
++    // ── Exam Flags ────────────────────────────────────────────────────────────
++    // For each perio_exam_flag requirement, count Case G+P records where
++    // perio_exams[flagKey] === true; populate rsu/cda and rsu_records/cda_records.
++    var allCasesForExam = caseGRecs.concat(casePRecs);
++    divReqs.forEach(function (req) {
++      var cfg = _parseAggConfig(req.aggregation_config);
++      if (!cfg || cfg.type !== "perio_exam_flag") return;
++      var flagKey = cfg.flag_key;
++      if (!flagKey) return;
++      var reqId = req.requirement_id;
++      var v = 0,
++        p = 0;
++      var recList = [];
++      allCasesForExam.forEach(function (r) {
++        var exams = r.perio_exams || {};
++        if (exams[flagKey] !== true) return;
++        if (r.status === "verified") v++;
++        else p++;
++        recList.push(mkRec(r));
++      });
++      progressMap[reqId].rsu = req.minimum_rsu > 0 ? v : 0;
++      progressMap[reqId].p_rsu = req.minimum_rsu > 0 ? p : 0;
++      progressMap[reqId].cda = req.minimum_cda > 0 ? v : 0;
++      progressMap[reqId].p_cda = req.minimum_cda > 0 ? p : 0;
++      if (req.minimum_rsu > 0) progressMap[reqId].transferred_in_rsu = recList;
++      if (req.minimum_cda > 0) progressMap[reqId].transferred_in_cda = recList;
++    });
++  },
+ };
+ 
+ /**
+@@ -1460,7 +1730,8 @@ function getStudentVaultData(targetStudentId) {
+       calcMethod = "Exam";
+     } else if (
+       aggCfgParsed &&
+-      (aggCfgParsed.type === "count" || aggCfgParsed.type === "count_union")
++      (aggCfgParsed.type === "count" || aggCfgParsed.type === "count_union" ||
++       aggCfgParsed.type === "perio_total_cases" || aggCfgParsed.type === "perio_exam_flag")
+     ) {
+       calcMethod = "Count";
+     } else if (aggCfgParsed && aggCfgParsed.type === "derived") {
+@@ -1640,16 +1911,34 @@ function getStudentVaultData(targetStudentId) {
+       cda_calc_hint: cdaCalcHint,
+       rsu_records: rsuRecords,
+       cda_records: cdaRecords,
++      aggregation_config: (function () {
++        try {
++          return typeof req.aggregation_config === "string"
++            ? JSON.parse(req.aggregation_config)
++            : req.aggregation_config || null;
++        } catch (e) {
++          return null;
++        }
++      })(),
++      sub_counts: prog.sub_counts || null,
++      display_field: prog.display_field || null,
+     });
+   });
+ 
+   // 6. Compute per-division completion percentages for radar chart
+   Object.values(divisions).forEach(function (div) {
++    // Exclude source-only rows (e.g. PERIO Case G) from completion calculation
+     var rsuReqs = div.requirements.filter(function (r) {
+-      return r.minimum_rsu > 0 || r.is_exam;
++      return (
++        (r.minimum_rsu > 0 || r.is_exam) &&
++        !(r.aggregation_config && r.aggregation_config.type === "source_only")
++      );
+     });
+     var cdaReqs = div.requirements.filter(function (r) {
+-      return r.minimum_cda > 0 || r.is_exam;
++      return (
++        (r.minimum_cda > 0 || r.is_exam) &&
++        !(r.aggregation_config && r.aggregation_config.type === "source_only")
++      );
+     });
+ 
+     div.rsu_completion_pct =
+@@ -2103,10 +2392,19 @@ function instructorGetPendingVerifications() {
+       area: rec.area || "-",
+       rsu_units: rec.rsu_units != null ? rec.rsu_units : "-",
+       cda_units: rec.cda_units != null ? rec.cda_units : "-",
++      severity: rec.severity != null ? rec.severity : null,
++      book_number: rec.book_number != null ? rec.book_number : null,
++      page_number: rec.page_number != null ? rec.page_number : null,
++      is_exam: !!rec.is_exam,
++      perio_exams: rec.perio_exams || null,
+       treatment_name: rec.treatment_catalog
+         ? rec.treatment_catalog.treatment_name
+         : "-",
+       step_name: rec.treatment_steps ? rec.treatment_steps.step_name : "-",
++      division_code:
++        rec.treatment_catalog && rec.treatment_catalog.divisions
++          ? rec.treatment_catalog.divisions.code
++          : "",
+       division_name:
+         rec.treatment_catalog && rec.treatment_catalog.divisions
+           ? rec.treatment_catalog.divisions.name
+@@ -3542,6 +3840,7 @@ function adminCreateRequirement(form) {
+       is_selectable:
+         form.is_selectable !== false && form.is_selectable !== "false",
+       aggregation_config: aggConfig,
++      display_order: parseInt(form.display_order) || 0,
+     });
+     return { success: true };
+   } catch (e) {
+@@ -3570,6 +3869,7 @@ function adminUpdateRequirement(id, form) {
+       is_selectable:
+         form.is_selectable !== false && form.is_selectable !== "false",
+       aggregation_config: aggConfigUpd,
++      display_order: parseInt(form.display_order) || 0,
+     });
+     return { success: true };
+   } catch (e) {
+@@ -3755,6 +4055,10 @@ function studentCreateTreatmentRecord(hn, form) {
+       start_date: form.start_date || null,
+       complete_date: form.complete_date || null,
+       is_exam: !!form.is_exam,
++      perio_exams:
++        form.perio_exams && typeof form.perio_exams === "object"
++          ? form.perio_exams
++          : null,
+       // treatment_order: set below
+     };
+ 
+@@ -3829,6 +4133,10 @@ function studentUpdateTreatmentRecord(recordId, form) {
+       start_date: form.start_date || null,
+       complete_date: form.complete_date || null,
+       is_exam: !!form.is_exam,
++      perio_exams:
++        form.perio_exams && typeof form.perio_exams === "object"
++          ? form.perio_exams
++          : null,
+       updated_at: new Date().toISOString(),
+     };
+ 
+diff --git a/gas/SupabaseProvider.gs b/gas/SupabaseProvider.gs
+index 24d08c4..65bc3ad 100644
+--- a/gas/SupabaseProvider.gs
++++ b/gas/SupabaseProvider.gs
+@@ -700,7 +700,7 @@ var SupabaseProvider = (function () {
+      */
+     listRequirements: function () {
+       return _getCached(
+-        "/rest/v1/requirement_list?select=*,divisions(name,code)&order=requirement_type.asc",
++        "/rest/v1/requirement_list?select=*,divisions(name,code)&order=display_order.asc,requirement_type.asc",
+         1200,
+       );
+     },
+@@ -800,7 +800,7 @@ var SupabaseProvider = (function () {
+         "/rest/v1/treatment_records?student_id=eq." +
+           studentId +
+           "&status=in.(verified,completed,pending verification,rejected)" +
+-          "&select=record_id,requirement_id,rsu_units,cda_units,status,is_exam,hn,patient_name,area,patient:patients(hn,name)",
++          "&select=record_id,requirement_id,rsu_units,cda_units,status,is_exam,perio_exams,hn,patient_name,area,patient:patients(hn,name)",
+       );
+     },
+ 
+@@ -811,7 +811,7 @@ var SupabaseProvider = (function () {
+       return _get(
+         "/rest/v1/requirement_list?division_id=eq." +
+           divisionId +
+-          "&select=*&order=requirement_type.asc",
++          "&select=*&order=display_order.asc,requirement_type.asc",
+       );
+     },
+ 
+@@ -869,7 +869,7 @@ var SupabaseProvider = (function () {
+     getTreatmentRecord: function (recordId) {
+       if (!recordId) return null;
+       var select =
+-        "*,treatment_catalog(treatment_name,division_id),treatment_steps(step_name,step_order),patient:patients(hn,name),student:students(user:users(name))";
++        "*,treatment_catalog(treatment_name,division_id),treatment_steps(step_name,step_order),patient:patients(hn,name),student:students(user:users(name)),division:divisions(code,name),requirement:requirement_list(requirement_type)";
+       var rows = _get(
+         "/rest/v1/treatment_records?record_id=eq." +
+           recordId +
+@@ -1003,8 +1003,12 @@ var SupabaseProvider = (function () {
+         "area",
+         "rsu_units",
+         "cda_units",
+-        "status",
++        "severity",
++        "book_number",
++        "page_number",
+         "is_exam",
++        "perio_exams",
++        "status",
+         "updated_at",
+         "treatment_catalog(treatment_name,divisions(name,code))",
+         "treatment_steps(step_name)",
+diff --git a/gas/admin.html b/gas/admin.html
+index 0729e67..26e926d 100644
+--- a/gas/admin.html
++++ b/gas/admin.html
+@@ -755,6 +755,7 @@
+               <th class="px-6 py-4 text-center">Selectable</th>
+               <th class="px-6 py-4 text-center">Exam</th>
+               <th class="px-6 py-4 text-center">Aggregation</th>
++              <th class="px-6 py-4 text-center">Order</th>
+               <th class="px-6 py-4 text-right">Actions</th>
+            </tr>
+          </thead>
+@@ -811,6 +812,10 @@
+                         class="inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-100"
+                         x-text="req.aggregation_config ? (req.aggregation_config.type || 'sum') : 'sum'"></span>
+                 </td>
++                <!-- display_order -->
++                <td class="px-6 py-4 whitespace-nowrap text-center">
++                  <span class="text-sm text-gray-500" x-text="req.display_order || 0"></span>
++                </td>
+                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button @click="openModal('edit', req)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                  <button @click="deleteRequirement(req, $event)" 
+@@ -822,7 +827,7 @@
+              </tr>
+            </template>
+            <tr x-show="filteredRequirements.length === 0">
+-             <td colspan="7" class="px-6 py-8 text-center text-gray-500">No requirements found.</td>
++             <td colspan="8" class="px-6 py-8 text-center text-gray-500">No requirements found.</td>
+            </tr>
+          </tbody>
+        </table>
+@@ -1251,6 +1256,16 @@
+               <span class="text-sm text-gray-700">Exam-type requirement <span class="text-gray-400 text-xs">(counts exam records, not sum of units)</span></span>
+             </label>
+           </div>
++          <!-- Display Order -->
++          <div>
++            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
++              Display Order
++              <span class="normal-case text-gray-400 font-normal ml-1">(lower = shown first; ties sorted A–Z)</span>
++            </label>
++            <input type="number" x-model="reqForm.display_order" min="0" step="1"
++                   placeholder="0"
++                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
++          </div>
+           <!-- Aggregation Config -->
+           <div class="col-span-2">
+             <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
+@@ -2011,11 +2026,13 @@
+         loadRequirements() {
+           google.script.run
+             .withSuccessHandler(data => {
+-              // Sort by Division, then Requirement Type
++              // Sort by Division, then display_order, then Requirement Type
+               this.requirements = data.sort((a, b) => {
+                 const divA = (a.divisions ? a.divisions.name : '').toLowerCase();
+                 const divB = (b.divisions ? b.divisions.name : '').toLowerCase();
+                 if (divA !== divB) return divA.localeCompare(divB);
++                const orderDiff = (a.display_order || 0) - (b.display_order || 0);
++                if (orderDiff !== 0) return orderDiff;
+                 return (a.requirement_type || '').toLowerCase().localeCompare((b.requirement_type || '').toLowerCase());
+               });
+             })
+@@ -2137,7 +2154,7 @@
+           } else if (this.activeTab === 'requirements') {
+             // Requirements
+             if (mode === 'create') {
+-              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '' };
++              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '', display_order: 0 };
+             } else {
+               this.reqForm = { ...item, cda_requirement_type: item.cda_requirement_type || '', is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false, is_selectable: item.is_selectable !== false, is_exam: item.is_exam === true, aggregation_config: item.aggregation_config ? JSON.stringify(item.aggregation_config, null, 2) : '' };
+             }
+diff --git a/gas/requirement_vault.html b/gas/requirement_vault.html
+index ba65029..10094c5 100644
+--- a/gas/requirement_vault.html
++++ b/gas/requirement_vault.html
+@@ -270,7 +270,7 @@
+                                     </tr>
+                                 </thead>
+                                     <template x-for="req in division.requirements" :key="'rsu_'+req.requirement_id">
+-                                        <tbody x-show="req.minimum_rsu > 0 || req.is_exam" class="divide-y divide-gray-50">
++                                        <tbody x-show="(req.minimum_rsu > 0 || req.is_exam) && !(req.aggregation_config && req.aggregation_config.type === 'source_only')" class="divide-y divide-gray-50">
+                                             <!-- Requirement Row (clickable) -->
+                                             <tr @click="toggleReq('rsu_'+req.requirement_id)"
+                                                 class="hover:bg-blue-50/60 transition-colors group cursor-pointer select-none border-b border-gray-50">
+@@ -366,14 +366,33 @@
+                                             <!-- Expanded Records Row -->
+                                             <tr x-show="expandedReqs.has('rsu_'+req.requirement_id)" class="records-row bg-blue-50/30">
+                                                 <td colspan="3" class="px-2 sm:px-6 pb-4 pt-1">
+-                                                    <template x-if="req.rsu_records && req.rsu_records.length > 0">
++                                                    <!-- Sub-counts breakdown (e.g. PERIO "Total Cases" → Case G / Case P) -->
++                                    <template x-if="req.sub_counts">
++                                        <div class="mb-3 flex flex-wrap gap-4 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2 text-xs">
++                                            <div class="flex items-center gap-1.5">
++                                                <span class="font-medium text-gray-500">Case G:</span>
++                                                <span class="font-bold text-navy" x-text="req.sub_counts.case_g.verified"></span>
++                                                <template x-if="req.sub_counts.case_g.pending > 0">
++                                                    <span class="text-amber-500 text-[10px]" x-text="'(+' + req.sub_counts.case_g.pending + ' pending)'"></span>
++                                                </template>
++                                            </div>
++                                            <div class="flex items-center gap-1.5">
++                                                <span class="font-medium text-gray-500">Case P:</span>
++                                                <span class="font-bold text-navy" x-text="req.sub_counts.case_p.verified"></span>
++                                                <template x-if="req.sub_counts.case_p.pending > 0">
++                                                    <span class="text-amber-500 text-[10px]" x-text="'(+' + req.sub_counts.case_p.pending + ' pending)'"></span>
++                                                </template>
++                                            </div>
++                                        </div>
++                                    </template>
++                                    <template x-if="req.rsu_records && req.rsu_records.length > 0">
+                                                         <div class="rounded-xl overflow-hidden border border-blue-100">
+                                                             <table class="w-full text-left">
+                                                                 <thead>
+                                                                     <tr class="bg-navy/5 text-[9px] font-bold text-navy uppercase tracking-widest">
+                                                                         <th class="px-3 sm:px-4 py-2">Patient</th>
+                                                                         <th class="hidden sm:table-cell px-4 py-2">Area</th>
+-                                                                        <th class="px-3 sm:px-4 py-2 text-center">RSU</th>
++                                                                        <th class="px-3 sm:px-4 py-2 text-center" x-text="req.display_field === 'severity' ? 'Severity' : 'RSU'"></th>
+                                                                         <th class="px-3 sm:px-4 py-2 text-right">Status</th>
+                                                                     </tr>
+                                                                 </thead>
+@@ -397,7 +416,7 @@
+                                                                                 <div class="sm:hidden text-gray-400 text-[10px]" x-text="rec.area"></div>
+                                                                             </td>
+                                                                             <td class="hidden sm:table-cell px-4 py-2 text-gray-500" x-text="rec.area"></td>
+-                                                                            <td class="px-3 sm:px-4 py-2 text-center font-semibold text-navy" x-text="rec.rsu_units"></td>
++                                                                            <td class="px-3 sm:px-4 py-2 text-center font-semibold text-navy" x-text="req.display_field === 'severity' ? rec.display_value : rec.rsu_units"></td>
+                                                                             <td class="px-3 sm:px-4 py-2 text-right">
+                                                                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase"
+                                                                                       :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+diff --git a/gas/treatment_plan.html b/gas/treatment_plan.html
+index d3ea581..0dfcdab 100644
+--- a/gas/treatment_plan.html
++++ b/gas/treatment_plan.html
+@@ -231,6 +231,7 @@
+ 
+         <!-- Modal Body -->
+         <div class="px-6 py-5 space-y-4">
++
+           <!-- Row 1: Phase & Division -->
+           <div class="grid grid-cols-2 gap-4">
+             <div>
+@@ -348,7 +349,44 @@
+             <label class="block text-xs font-medium text-indigo-600 mb-1 uppercase tracking-wide">Severity (PERIO)</label>
+             <input type="number" x-model="form.severity" @input="calculatePerioUnits()" step="0.01" min="0" max="99.99" placeholder="0.00" class="w-full" />
+           </div>
+-          
++
++          <!-- PERIO: Exam Toggles (Case G / Case P only) -->
++          <template x-if="selectedDivisionCode === 'PERIO' && (selectedRequirementType === 'Case G' || selectedRequirementType === 'Case P') && form.perio_exams">
++            <div class="bg-indigo-50/50 rounded-lg p-4 border border-indigo-100 mb-6">
++              <label class="block text-xs font-medium text-indigo-600 mb-3 uppercase tracking-wide">Exams Performed</label>
++              <div class="grid grid-cols-2 gap-3">
++                <label class="flex items-center gap-3 cursor-pointer">
++                  <div class="relative inline-flex items-center">
++                    <input type="checkbox" x-model="form.perio_exams.ohi_1st" class="sr-only peer">
++                    <div class="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
++                  </div>
++                  <span class="text-sm text-gray-700">OHI 1st Exam</span>
++                </label>
++                <label class="flex items-center gap-3 cursor-pointer">
++                  <div class="relative inline-flex items-center">
++                    <input type="checkbox" x-model="form.perio_exams.ohi_2nd" class="sr-only peer">
++                    <div class="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
++                  </div>
++                  <span class="text-sm text-gray-700">OHI 2nd Exam</span>
++                </label>
++                <label class="flex items-center gap-3 cursor-pointer">
++                  <div class="relative inline-flex items-center">
++                    <input type="checkbox" x-model="form.perio_exams.srp_1st" class="sr-only peer">
++                    <div class="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
++                  </div>
++                  <span class="text-sm text-gray-700">SRP 1st Exam</span>
++                </label>
++                <label class="flex items-center gap-3 cursor-pointer">
++                  <div class="relative inline-flex items-center">
++                    <input type="checkbox" x-model="form.perio_exams.srp_2nd" class="sr-only peer">
++                    <div class="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
++                  </div>
++                  <span class="text-sm text-gray-700">SRP 2nd Exam <span class="text-xs text-gray-400">(CDA)</span></span>
++                </label>
++              </div>
++            </div>
++          </template>
++
+           <!-- Requirement Summary Group -->
+           <fieldset class="border border-indigo-100 rounded-xl p-5 mb-6 bg-slate-50 relative mt-6">
+             <legend class="text-xs font-bold text-white px-3 py-1 bg-navy rounded-full uppercase tracking-wide absolute -top-3 left-4 shadow-sm">
+@@ -448,27 +486,35 @@
+             <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Auto Status</span>
+             <span class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide"
+                   :class="{
+-                    'bg-gray-200 text-gray-600': form.status === 'planned',
+-                    'bg-blue-100 text-blue-700': form.status === 'in_progress',
+-                    'bg-emerald-100 text-emerald-700': form.status === 'completed',
+-                    'bg-amber-100 text-amber-700': form.status === 'pending verification'
++                    'bg-gray-200 text-gray-600': !verifiedRecordChanged && form.status === 'planned',
++                    'bg-blue-100 text-blue-700': !verifiedRecordChanged && form.status === 'in_progress',
++                    'bg-emerald-100 text-emerald-700': !verifiedRecordChanged && form.status === 'completed',
++                    'bg-amber-100 text-amber-700': verifiedRecordChanged || form.status === 'pending verification'
+                   }"
+-                  x-text="form.status"></span>
++                  x-text="verifiedRecordChanged ? 'pending verification' : form.status"></span>
++          </div>
++
++          <!-- Verified-record change warning -->
++          <div x-show="editingRecord && verifiedRecordChanged" x-transition
++               class="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
++            <svg class="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
++              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
++            </svg>
++            <span>This record was <strong>verified</strong>. Saving your changes will reset the status to <strong>Pending Verification</strong> and require re-approval from your advisor.</span>
+           </div>
+         </div>
+ 
+         <!-- Modal Footer -->
+         <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
+           <button @click="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition">Cancel</button>
+-          
+-          <button x-show="canRequestVerification" @click="requestEmailVerification()" :disabled="requestingVerification || saving" class="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition shadow-sm disabled:opacity-50 flex items-center gap-2">
+-            <div x-show="requestingVerification" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+-            <span x-text="requestingVerification ? 'Sending...' : 'Request Email Verification'"></span>
+-          </button>
+ 
+-          <button x-show="!currentUser || currentUser.role === 'student'" @click="saveRecord()" :disabled="saving || requestingVerification" class="px-5 py-2 bg-navy text-white text-sm font-semibold rounded-lg hover:bg-navy-light transition shadow-sm disabled:opacity-50 flex items-center gap-2">
+-            <div x-show="saving" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+-            <span x-text="saving ? 'Saving...' : (editingRecord ? 'Update' : 'Save')"></span>
++          <button x-show="!currentUser || currentUser.role === 'student'"
++                  @click="(canRequestVerification || verifiedRecordChanged) ? requestEmailVerification() : saveRecord()"
++                  :disabled="saving || requestingVerification"
++                  :class="(canRequestVerification || verifiedRecordChanged) ? 'bg-blue-600 hover:bg-blue-700' : 'bg-navy hover:bg-navy-light'"
++                  class="px-5 py-2 text-white text-sm font-semibold rounded-lg transition shadow-sm disabled:opacity-50 flex items-center gap-2">
++            <div x-show="saving || requestingVerification" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
++            <span x-text="requestingVerification ? 'Sending...' : saving ? 'Saving...' : (canRequestVerification || verifiedRecordChanged) ? 'Save & Request Verification' : (editingRecord ? 'Update' : 'Save')"></span>
+           </button>
+         </div>
+       </div>
+@@ -540,6 +586,8 @@
+         saving: false,
+         requestingVerification: false,
+         form: {},
++        originalWasVerified: false,
++        originalFormSnapshot: null,
+ 
+         // Delete state
+         showDeleteConfirm: false,
+@@ -564,6 +612,34 @@
+          phaseLocked: false,
+ 
+          // Computed-like getters
++        get verifiedRecordChanged() {
++          if (!this.originalWasVerified || !this.originalFormSnapshot) return false;
++          return this._snapshotForm() !== this.originalFormSnapshot;
++        },
++
++        _snapshotForm: function() {
++          var f = this.form;
++          return JSON.stringify({
++            phase_id: f.phase_id,
++            division_id: f.division_id,
++            treatment_id: f.treatment_id,
++            step_id: f.step_id,
++            student_id: f.student_id,
++            instructor_id: f.instructor_id,
++            requirement_id: f.requirement_id,
++            area: f.area,
++            start_date: f.start_date,
++            complete_date: f.complete_date,
++            rsu_units: f.rsu_units,
++            cda_units: f.cda_units,
++            severity: f.severity,
++            book_number: f.book_number,
++            page_number: f.page_number,
++            is_exam: f.is_exam,
++            perio_exams: f.perio_exams,
++          });
++        },
++
+         get canRequestVerification() {
+           if (!this.editingRecord) return false;
+           if (this.currentUser && this.currentUser.role !== 'student') return false;
+@@ -696,6 +772,8 @@
+         },
+ 
+         resetForm: function() {
++          this.originalWasVerified = false;
++          this.originalFormSnapshot = null;
+           this.form = {
+             phase_id: '',
+             division_id: '',
+@@ -715,6 +793,7 @@
+             book_number: '',
+             page_number: '',
+             is_exam: false,
++            perio_exams: null,
+             status: 'planned',
+             treatment_order: this.records.length + 1
+           };
+@@ -749,6 +828,9 @@
+             this.form.book_number = record.book_number != null ? record.book_number : '';
+             this.form.page_number = record.page_number != null ? record.page_number : '';
+             this.form.is_exam = !!record.is_exam;
++            this.form.perio_exams = record.perio_exams
++              ? JSON.parse(JSON.stringify(record.perio_exams))
++              : { ohi_1st: false, ohi_2nd: false, srp_1st: false, srp_2nd: false };
+             this.form.status = record.status || 'planned';
+ 
+             // 3. Delay setting dependent fields (Catalog, Instructor, Requirement) to allow filters to update
+@@ -760,6 +842,8 @@
+                // 4. Delay setting Step ID (depends on treatment_id) and showing modal
+                setTimeout(function() {
+                   self.form.step_id = record.step_id || '';
++                  self.originalWasVerified = record.status === 'verified';
++                  self.originalFormSnapshot = self.originalWasVerified ? self._snapshotForm() : null;
+                   self.showModal = true;
+                }, 50);
+             }, 50);
+@@ -788,9 +872,9 @@
+         onDivisionChange: function() {
+           this.form.treatment_id = '';
+           this.form.step_id = '';
+-
+           this.form.instructor_id = '';
+           this.form.requirement_id = '';
++          this.form.perio_exams = null;
+           this.updateStatus();
+         },
+ 
+@@ -839,7 +923,7 @@
+ 
+           var req = this.requirements.find(function(r) { return r.requirement_id === reqId; });
+           var step = this.allSteps.find(function(s) { return s.step_id === stepId; });
+-          
++
+           if (!req) return;
+ 
+           var reqType = req.requirement_type || '';
+@@ -847,20 +931,26 @@
+           var rsu = 0;
+           var cda = 0;
+ 
++          // Ensure perio_exams is initialised when user selects Case G/P
++          // (x-model bindings on the toggle block require a plain object, never null)
++          if (reqType === 'Case G' || reqType === 'Case P') {
++            if (!this.form.perio_exams || typeof this.form.perio_exams !== 'object') {
++              this.form.perio_exams = { ohi_1st: false, ohi_2nd: false, srp_1st: false, srp_2nd: false };
++            }
++          }
++
+           // RSU Units
+           if (reqType === 'Case G' && stepOrder >= 7) {
+             rsu = severity / 0.8;
+           } else if (reqType === 'Case P' && stepOrder >= 7) {
+             rsu = severity / 0.5;
+-          } else if (['SRP 1st Exam', 'OHI 1st Exam', 'OHI 2nd Exam'].indexOf(reqType) !== -1) {
+-            rsu = 1;
+           }
+ 
+           // CDA Units
+-          if (['Case G', 'Case P', 'SRP 2nd Exam'].indexOf(reqType) !== -1) {
+-             cda = 1;
++          if (reqType === 'Case G' || reqType === 'Case P') {
++            cda = 1;
+           }
+-          
++
+           this.form.rsu_units = rsu.toFixed(2);
+           this.form.cda_units = cda.toFixed(2);
+         },
+@@ -870,6 +960,10 @@
+           self.saving = true;
+ 
+           if (self.editingRecord) {
++            // If the record was verified and the user changed something, downgrade to pending
++            if (self.originalWasVerified && self.verifiedRecordChanged) {
++              self.form.status = 'pending verification';
++            }
+             // Update
+             google.script.run
+               .withSuccessHandler(function(res) {
+@@ -911,8 +1005,20 @@
+         requestEmailVerification: function() {
+           var self = this;
+           self.requestingVerification = true;
+-          
+-          // Step 1: Save the record first to ensure the backend sees the 'completed' status
++
++          // Normalise status before saving so the backend check always passes.
++          // • verified→changed records always become 'pending verification' (needs re-approval)
++          // • any other non-qualifying status (in_progress, planned) → 'pending verification'
++          // • completed / pending verification / rejected → left as-is
++          if (self.originalWasVerified && self.verifiedRecordChanged) {
++            self.form.status = 'pending verification';
++          } else if (self.form.status !== 'completed' &&
++                     self.form.status !== 'pending verification' &&
++                     self.form.status !== 'rejected') {
++            self.form.status = 'pending verification';
++          }
++
++          // Step 1: Save the record first so the backend sees the correct status
+           google.script.run
+             .withSuccessHandler(function(saveRes) {
+               if (saveRes.success) {

@@ -394,6 +394,8 @@ function studentRequestEmailVerification(recordId, instructorId) {
       ? record.treatment_steps.step_name
       : "Step";
     var studentName = profile.name;
+    var divCode = record.division ? record.division.code : "";
+    var reqType = record.requirement ? record.requirement.requirement_type : "";
 
     var appUrl = ScriptApp.getService().getUrl();
     var verifyUrl =
@@ -407,6 +409,126 @@ function studentRequestEmailVerification(recordId, instructorId) {
       recordId +
       "&status=rejected";
 
+    // Build division-specific detail rows
+    var td = "padding: 8px; border-bottom: 1px solid #edf2f7;";
+    var divRows = "";
+
+    // Requirement type (if available)
+    if (reqType) {
+      divRows +=
+        "<tr><td style='" +
+        td +
+        "'><strong>Requirement:</strong></td>" +
+        "<td style='" +
+        td +
+        "'>" +
+        reqType +
+        "</td></tr>";
+    }
+
+    // RSU units — label as "Complexities" for PERIO Case G/P
+    if (record.rsu_units != null && record.rsu_units !== "") {
+      var rsuLabel =
+        divCode === "PERIO" && (reqType === "Case G" || reqType === "Case P")
+          ? "Complexities"
+          : "RSU Units";
+      divRows +=
+        "<tr><td style='" +
+        td +
+        "'><strong>" +
+        rsuLabel +
+        ":</strong></td>" +
+        "<td style='" +
+        td +
+        "'>" +
+        record.rsu_units +
+        "</td></tr>";
+    }
+
+    // CDA units
+    if (record.cda_units != null && record.cda_units !== "") {
+      divRows +=
+        "<tr><td style='" +
+        td +
+        "'><strong>CDA Units:</strong></td>" +
+        "<td style='" +
+        td +
+        "'>" +
+        record.cda_units +
+        "</td></tr>";
+    }
+
+    // OPER: book number, page number
+    if (divCode === "OPER") {
+      if (record.book_number != null && record.book_number !== "") {
+        divRows +=
+          "<tr><td style='" +
+          td +
+          "'><strong>Book No.:</strong></td>" +
+          "<td style='" +
+          td +
+          "'>" +
+          record.book_number +
+          "</td></tr>";
+      }
+      if (record.page_number != null && record.page_number !== "") {
+        divRows +=
+          "<tr><td style='" +
+          td +
+          "'><strong>Page No.:</strong></td>" +
+          "<td style='" +
+          td +
+          "'>" +
+          record.page_number +
+          "</td></tr>";
+      }
+    }
+
+    // PERIO: severity, perio_exams flags
+    if (divCode === "PERIO") {
+      if (record.severity != null && record.severity !== "") {
+        divRows +=
+          "<tr><td style='" +
+          td +
+          "'><strong>Severity:</strong></td>" +
+          "<td style='" +
+          td +
+          "'>" +
+          record.severity +
+          "</td></tr>";
+      }
+      var pe = record.perio_exams;
+      if (pe && typeof pe === "object") {
+        var examParts = [];
+        if (pe.ohi_1st) examParts.push("OHI 1st Exam");
+        if (pe.ohi_2nd) examParts.push("OHI 2nd Exam");
+        if (pe.srp_1st) examParts.push("SRP 1st Exam");
+        if (pe.srp_2nd) examParts.push("SRP 2nd Exam");
+        if (examParts.length > 0) {
+          divRows +=
+            "<tr><td style='" +
+            td +
+            "'><strong>Exams Performed:</strong></td>" +
+            "<td style='" +
+            td +
+            "'>" +
+            examParts.join(", ") +
+            "</td></tr>";
+        }
+      }
+    }
+
+    // ENDO: exam case flag
+    if (divCode === "ENDO" && record.is_exam) {
+      divRows +=
+        "<tr><td style='" +
+        td +
+        "'><strong>Exam Case:</strong></td>" +
+        "<td style='" +
+        td +
+        "'>Yes</td></tr>";
+    }
+
     var htmlBody =
       "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>" +
       "<h2 style='color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>Verification Request</h2>" +
@@ -414,21 +536,42 @@ function studentRequestEmailVerification(recordId, instructorId) {
       studentName +
       " has requested verification for a completed treatment step.</p>" +
       "<table style='width: 100%; border-collapse: collapse; margin: 20px 0;'>" +
-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Patient HN:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Patient HN:</strong></td><td style='" +
+      td +
+      "'>" +
       patientHn +
       "</td></tr>" +
-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Patient Name:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Patient Name:</strong></td><td style='" +
+      td +
+      "'>" +
       patientName +
       "</td></tr>" +
-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Treatment:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Treatment:</strong></td><td style='" +
+      td +
+      "'>" +
       treatmentName +
       "</td></tr>" +
-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Step:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Step:</strong></td><td style='" +
+      td +
+      "'>" +
       stepName +
       "</td></tr>" +
-      "<tr><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'><strong>Area:</strong></td><td style='padding: 8px; border-bottom: 1px solid #edf2f7;'>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Area:</strong></td><td style='" +
+      td +
+      "'>" +
       (record.area || "-") +
       "</td></tr>" +
+      divRows +
       "</table>" +
       "<p style='margin-bottom: 30px;'>Please review the work and click one of the actions below:</p>" +
       "<div style='text-align: center;'>" +
@@ -460,6 +603,57 @@ function studentRequestEmailVerification(recordId, instructorId) {
     Logger.log("studentRequestEmailVerification error: " + e.message);
     return { success: false, error: e.message };
   }
+}
+
+/**
+ * Compute a one-way verification hash for a treatment record.
+ * Input: SHA-256( verifiedAt | recordId | VERIFICATION_SECRET )
+ * @param {string} verifiedAt  ISO-8601 timestamp of verification
+ * @param {string} recordId    UUID of the treatment record
+ * @returns {string} Hex-encoded SHA-256 hash
+ */
+function _computeVerificationHash(verifiedAt, recordId) {
+  var secret =
+    PropertiesService.getScriptProperties().getProperty(
+      "VERIFICATION_SECRET",
+    ) || "";
+  var raw = verifiedAt + "|" + recordId + "|" + secret;
+  var digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    raw,
+    Utilities.Charset.UTF_8,
+  );
+  // Convert byte array to hex string
+  return digest
+    .map(function (b) {
+      return ("0" + ((b + 256) % 256).toString(16)).slice(-2);
+    })
+    .join("");
+}
+
+/**
+ * Admin function: recompute verification hash and compare.
+ * @param {string} verifiedAt  ISO-8601 timestamp
+ * @param {string} recordId    UUID
+ * @param {string} hash        Hash string provided by the student
+ * @returns {{ valid: boolean, computed: string }}
+ */
+function adminVerifyHash(verifiedAt, recordId, hash) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (
+    !profile.found ||
+    !profile.active ||
+    (profile.role !== "admin" && profile.role !== "instructor")
+  ) {
+    throw new Error("Access Denied: Admin or instructor only.");
+  }
+  var computed = _computeVerificationHash(verifiedAt, recordId);
+  return {
+    valid: computed === (hash || "").trim().toLowerCase(),
+    computed: computed,
+  };
 }
 
 /**
@@ -533,6 +727,57 @@ function processEmailVerification(e) {
           var areaTeeth = record.area || "-";
           var rsuUnits = record.rsu_units != null ? record.rsu_units : "-";
           var cdaUnits = record.cda_units != null ? record.cda_units : "-";
+          var reqType = record.requirement
+            ? record.requirement.requirement_type
+            : "-";
+          var divName = record.division ? record.division.name : "-";
+          var severity = record.severity;
+          var bookNum = record.book_number;
+          var pageNum = record.page_number;
+
+          // Build verification proof section (only for verified)
+          var hashSection = "";
+          if (actionStatus === "verified") {
+            var vAt = updates.verified_at;
+            var vHash = _computeVerificationHash(vAt, recordId);
+            hashSection =
+              "<div style='margin-top:20px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'>" +
+              "<p style='margin:0 0 8px;font-size:12px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;'>Verification Proof</p>" +
+              "<table style='width:100%;border-collapse:collapse;font-size:13px;'>" +
+              "<tr><td style='padding:4px 0;color:#374151;font-weight:600;width:100px;'>Verified At</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;'>" +
+              vAt +
+              "</td></tr>" +
+              "<tr><td style='padding:4px 0;color:#374151;font-weight:600;'>Record ID</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;word-break:break-all;'>" +
+              recordId +
+              "</td></tr>" +
+              "<tr><td style='padding:4px 0;color:#374151;font-weight:600;'>Hash</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;word-break:break-all;font-size:11px;'>" +
+              vHash +
+              "</td></tr>" +
+              "</table>" +
+              "<p style='margin:8px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof of verification. The hash can be validated by your program administrator.</p>" +
+              "</div>";
+          }
+
+          // Build optional detail rows
+          var optionalRows = "";
+          if (severity != null) {
+            optionalRows +=
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Severity:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              severity +
+              "</td></tr>";
+          }
+          if (bookNum != null) {
+            optionalRows +=
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Book Number:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              bookNum +
+              "</td></tr>";
+          }
+          if (pageNum != null) {
+            optionalRows +=
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Page Number:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              pageNum +
+              "</td></tr>";
+          }
 
           MailApp.sendEmail({
             to: student.user.email,
@@ -561,6 +806,12 @@ function processEmailVerification(e) {
               "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Patient Name:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
               pName +
               "</td></tr>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Division:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              divName +
+              "</td></tr>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Requirement:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              reqType +
+              "</td></tr>" +
               "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Treatment:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
               treatName +
               "</td></tr>" +
@@ -578,7 +829,11 @@ function processEmailVerification(e) {
               "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>CDA Units:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
               cdaUnits +
               "</td></tr>" +
-              "</table></div>",
+              optionalRows +
+              "</table>" +
+              "<p style='font-size:11px;color:#6b7280;margin:0 0 4px;'>📌 Please archive or label this email as part of your RSU requirements record.</p>" +
+              hashSection +
+              "</div>",
           });
         }
       }
@@ -617,6 +872,7 @@ function doGet(e) {
     return processEmailVerification(e);
   }
 
+  var favicon = "https://img2.pic.in.th/image2aa7d890b471f6fa.th.png";
   var page = e.parameter.page;
   var url = ScriptApp.getService().getUrl(); // Always returns /exec URL
   var scriptId = ScriptApp.getScriptId();
@@ -678,6 +934,7 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Requirement Vault — Clinic Progress Report")
+      .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -689,6 +946,7 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Student Portal — Clinic Progress Report")
+      .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -700,6 +958,7 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Instructor Portal — Clinic Progress Report")
+      .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -711,6 +970,7 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Advisor Portal — Clinic Progress Report")
+      .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -722,6 +982,7 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Verification Queue — Clinic Progress Report")
+      .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -733,6 +994,7 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Division Dashboard — Clinic Progress Report")
+      .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -743,6 +1005,7 @@ function doGet(e) {
   return t
     .evaluate()
     .setTitle("Clinic Progress Report — RSU")
+    .setFaviconUrl(favicon)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag("viewport", "width=device-width, initial-scale=1");
 }
@@ -1061,6 +1324,284 @@ var DIVISION_PROCESSORS = {
         }
       }
     }
+  },
+
+  /**
+   * Periodontics (PERIO) — vault aggregation for derived RSU/CDA requirements.
+   *
+   * Source requirements (students link records to these):
+   *   Case G — 418523ff-0fa6-430c-b9d1-1693ef74fa44
+   *   Case P — 1ee6edcc-aba0-4b5a-876d-af81fc5c978c
+   *
+   * Derived requirements handled here (is_selectable=false):
+   *   RSU: "Total Cases"          aggregation_config type = "perio_total_cases"
+   *        "Total Severity Case P" aggregation_config type = "perio_severity_casep"
+   *        "Complexities"          aggregation handled by sum_union pass-1;
+   *                                this processor only populates rsu_records.
+   *   CDA: "CDA Cases"            aggregation handled by count_union pass-1;
+   *                                this processor only populates cda_records.
+   *
+   * Qualifying records = Case G or Case P with rsu_units > 0.
+   *   calculatePerioUnits() in treatment_plan.html sets rsu_units = 0 when
+   *   step_order < 7, so rsu_units > 0 is a reliable proxy for step >= 7.
+   *
+   * Severity is reverse-computed: severity = rsu_units × 0.5  (Case P formula:
+   *   rsu_units = severity / 0.5, so severity = rsu_units × 0.5).
+   */
+  PERIO: function (divReqs, divRecords, progressMap) {
+    var CASE_G_ID = "418523ff-0fa6-430c-b9d1-1693ef74fa44";
+    var CASE_P_ID = "1ee6edcc-aba0-4b5a-876d-af81fc5c978c";
+    var ONLY_RECALL_ID = "854f959d-6919-4e82-b093-91aa0a729415";
+
+    // Build requirement lookups by type label (lowercase)
+    var byType = {};
+    var byCdaType = {};
+    divReqs.forEach(function (req) {
+      if (req.requirement_type)
+        byType[req.requirement_type.toLowerCase().trim()] = req;
+      if (req.cda_requirement_type)
+        byCdaType[req.cda_requirement_type.toLowerCase().trim()] = req;
+    });
+    function getByType(label) {
+      return byType[label.toLowerCase().trim()] || null;
+    }
+    function getByCdaType(label) {
+      return byCdaType[label.toLowerCase().trim()] || null;
+    }
+
+    // Build a plain detail record for the expanded panel (no transfer badge).
+    function mkRec(r, extra) {
+      var base = {
+        record_id: r.record_id,
+        hn: r.hn || (r.patient && r.patient.hn) || "-",
+        patient_name: r.patient_name || (r.patient && r.patient.name) || "-",
+        area: r.area || "-",
+        rsu_units: parseFloat(r.rsu_units) || 0,
+        cda_units: parseFloat(r.cda_units) || 0,
+        status: r.status,
+        is_exam: false,
+      };
+      if (extra) {
+        for (var k in extra) {
+          if (extra.hasOwnProperty(k)) base[k] = extra[k];
+        }
+      }
+      return base;
+    }
+
+    // Separate raw Case G, Case P, and Only Recall or Miscellaneous records
+    var caseGRecs = divRecords.filter(function (r) {
+      return r.requirement_id === CASE_G_ID;
+    });
+    var casePRecs = divRecords.filter(function (r) {
+      return r.requirement_id === CASE_P_ID;
+    });
+    var onlyRecallRecs = divRecords.filter(function (r) {
+      return r.requirement_id === ONLY_RECALL_ID;
+    });
+
+    // Qualifying records: rsu_units > 0 (proxy for step order >= 7)
+    var qualG = caseGRecs.filter(function (r) {
+      return (parseFloat(r.rsu_units) || 0) > 0;
+    });
+    var qualP = casePRecs.filter(function (r) {
+      return (parseFloat(r.rsu_units) || 0) > 0;
+    });
+
+    function countVerPen(recs) {
+      var v = 0,
+        p = 0;
+      recs.forEach(function (r) {
+        if (r.status === "verified") v++;
+        else p++;
+      });
+      return { verified: v, pending: p };
+    }
+
+    // ── Total Cases ───────────────────────────────────────────────────────────
+    var tcReq = getByType("total cases");
+    if (tcReq) {
+      var tcId = tcReq.requirement_id;
+      var gStats = countVerPen(qualG);
+      var pStats = countVerPen(qualP);
+      var vAll = gStats.verified + pStats.verified;
+      var penAll = gStats.pending + pStats.pending;
+      progressMap[tcId].rsu = vAll;
+      progressMap[tcId].p_rsu = penAll;
+      progressMap[tcId].cda = 0;
+      progressMap[tcId].p_cda = 0;
+      progressMap[tcId].sub_counts = { case_g: gStats, case_p: pStats };
+      progressMap[tcId].sub_counts_labels = {
+        case_g: "Case G",
+        case_p: "Case P",
+      };
+      // Populate rsu_records for expanded panel
+      progressMap[tcId].transferred_in_rsu = qualG
+        .concat(qualP)
+        .map(function (r) {
+          return mkRec(r);
+        });
+    }
+
+    // ── Total Severity Case P ─────────────────────────────────────────────────
+    // severity = rsu_units × 0.5  (Case P: rsu = sev / 0.5 → sev = rsu × 0.5)
+    var sevReq = getByType("total severity case p");
+    if (sevReq) {
+      var sevId = sevReq.requirement_id;
+      var vSev = 0,
+        pSev = 0;
+      qualP.forEach(function (r) {
+        var sev = Math.round(parseFloat(r.rsu_units) * 0.5 * 100) / 100;
+        if (r.status === "verified") vSev += sev;
+        else pSev += sev;
+      });
+      progressMap[sevId].rsu = Math.round(vSev * 100) / 100;
+      progressMap[sevId].p_rsu = Math.round(pSev * 100) / 100;
+      progressMap[sevId].cda = 0;
+      progressMap[sevId].p_cda = 0;
+      // Signal vault HTML to label and render this column as "Severity"
+      progressMap[sevId].display_field = "severity";
+      // Each record carries display_value = severity (not rsu_units)
+      progressMap[sevId].transferred_in_rsu = qualP.map(function (r) {
+        var sev = Math.round(parseFloat(r.rsu_units) * 0.5 * 100) / 100;
+        return mkRec(r, { display_value: sev });
+      });
+    }
+
+    // ── Complexities: populate rsu_records for expanded panel ─────────────────
+    // The sum_union aggregation already ran in pass 1 and set the total correctly.
+    // This processor only adds the qualifying records so the expanded panel shows them.
+    var cxReq = getByType("complexities");
+    if (cxReq) {
+      var cxId = cxReq.requirement_id;
+      progressMap[cxId].transferred_in_rsu = qualG
+        .concat(qualP)
+        .map(function (r) {
+          return mkRec(r);
+        });
+    }
+
+    // ── CDA Cases: populate cda_records for expanded panel ────────────────────
+    // The count_union aggregation already ran in pass 1.
+    // This processor adds all Case G + Case P records to the panel.
+    var cdaCasesReq = getByCdaType("cda cases");
+    if (cdaCasesReq) {
+      var cdaId = cdaCasesReq.requirement_id;
+      progressMap[cdaId].transferred_in_cda = caseGRecs
+        .concat(casePRecs)
+        .concat(onlyRecallRecs)
+        .map(function (r) {
+          return mkRec(r);
+        });
+    }
+
+    // ── Exam Flags ────────────────────────────────────────────────────────────
+    // For each perio_exam_flag requirement, count Case G+P records where
+    // perio_exams[flagKey] === true; populate rsu/cda and rsu_records/cda_records.
+    var allCasesForExam = caseGRecs.concat(casePRecs);
+    divReqs.forEach(function (req) {
+      var cfg = _parseAggConfig(req.aggregation_config);
+      if (!cfg || cfg.type !== "perio_exam_flag") return;
+      var flagKey = cfg.flag_key;
+      if (!flagKey) return;
+      var reqId = req.requirement_id;
+      var v = 0,
+        p = 0;
+      var recList = [];
+      allCasesForExam.forEach(function (r) {
+        var exams = r.perio_exams || {};
+        if (exams[flagKey] !== true) return;
+        if (r.status === "verified") v++;
+        else p++;
+        recList.push(mkRec(r));
+      });
+      progressMap[reqId].rsu = req.minimum_rsu > 0 ? v : 0;
+      progressMap[reqId].p_rsu = req.minimum_rsu > 0 ? p : 0;
+      progressMap[reqId].cda = req.minimum_cda > 0 ? v : 0;
+      progressMap[reqId].p_cda = req.minimum_cda > 0 ? p : 0;
+      if (req.minimum_rsu > 0) progressMap[reqId].transferred_in_rsu = recList;
+      if (req.minimum_cda > 0) progressMap[reqId].transferred_in_cda = recList;
+    });
+  },
+
+  /**
+   * Prosthodontics (PROSTH) — sub-count breakdown for derived requirements.
+   *
+   * Handles any requirement whose RSU/CDA is derived from two source requirements.
+   * Pass-2 "derived" already fills progressMap[parentId].rsu / .cda.
+   * This processor adds sub_counts + record lists for the expanded vault panel.
+   *
+   * Derived pairs (see migrations):
+   *   RPD  ← MRPD  + ARPD
+   *   CD   ← CD (Upper) + CD (Lower)
+   */
+  PROSTH: function (divReqs, divRecords, progressMap) {
+    function getByType(t) {
+      var lower = t.toLowerCase();
+      return (
+        divReqs.find(function (r) {
+          return r.requirement_type.toLowerCase() === lower;
+        }) || null
+      );
+    }
+
+    function countVerPen(recs) {
+      var v = 0,
+        p = 0;
+      recs.forEach(function (r) {
+        if (r.status === "verified") v++;
+        else p++;
+      });
+      return { verified: v, pending: p };
+    }
+
+    function mkRec(r) {
+      return {
+        record_id: r.record_id,
+        hn: r.hn || (r.patient ? r.patient.hn : ""),
+        patient_name: r.patient_name || (r.patient ? r.patient.name : ""),
+        area: r.area || "",
+        rsu_units: r.rsu_units,
+        cda_units: r.cda_units,
+        status: r.status,
+      };
+    }
+
+    // Generic helper: inject sub_counts + record lists into a derived parent requirement.
+    // sources = [{ key, label, req }, ...]
+    function applySubcounts(parentReq, sources) {
+      if (!parentReq) return;
+      var subCounts = {};
+      var subLabels = {};
+      var allRecs = [];
+      sources.forEach(function (s) {
+        if (!s.req) return;
+        var recs = divRecords.filter(function (r) {
+          return r.requirement_id === s.req.requirement_id;
+        });
+        subCounts[s.key] = countVerPen(recs);
+        subLabels[s.key] = s.label;
+        allRecs = allRecs.concat(recs.map(mkRec));
+      });
+      progressMap[parentReq.requirement_id].sub_counts = subCounts;
+      progressMap[parentReq.requirement_id].sub_counts_labels = subLabels;
+      progressMap[parentReq.requirement_id].transferred_in_rsu = allRecs;
+      if (parentReq.minimum_cda > 0) {
+        progressMap[parentReq.requirement_id].transferred_in_cda = allRecs;
+      }
+    }
+
+    // ── RPD ← MRPD + ARPD ────────────────────────────────────────────────
+    applySubcounts(getByType("rpd"), [
+      { key: "mrpd", label: "MRPD", req: getByType("mrpd") },
+      { key: "arpd", label: "ARPD", req: getByType("arpd") },
+    ]);
+
+    // ── CD ← CD (Upper) + CD (Lower) ─────────────────────────────────────
+    applySubcounts(getByType("cd"), [
+      { key: "cd_upper", label: "CD (Upper)", req: getByType("cd (upper)") },
+      { key: "cd_lower", label: "CD (Lower)", req: getByType("cd (lower)") },
+    ]);
   },
 };
 
@@ -1412,38 +1953,80 @@ function getStudentVaultData(targetStudentId) {
       rsuRecords = examRecs;
       cdaRecords = examRecs;
     } else {
-      var ownRecs = recordsDetailMap[req.requirement_id] || [];
-      var outIdsRsu = prog.transferred_out_ids_rsu || []; // [{ record_id, to_label }]
-      var outIdsCda = prog.transferred_out_ids_cda || []; // [{ record_id, to_label }]
-      // Keep transferred-out records but stamp them with transferred_to label
-      var markedRsu = ownRecs.map(function (r) {
-        for (var oi = 0; oi < outIdsRsu.length; oi++) {
-          if (outIdsRsu[oi].record_id === r.record_id) {
+      // Check if this is a derived requirement → collect records from source requirements
+      var _derivedCfg = null;
+      try {
+        _derivedCfg =
+          typeof req.aggregation_config === "string"
+            ? JSON.parse(req.aggregation_config)
+            : req.aggregation_config || null;
+      } catch (e) {}
+
+      if (
+        _derivedCfg &&
+        _derivedCfg.type === "derived" &&
+        _derivedCfg.source_ids &&
+        _derivedCfg.source_ids.length > 0
+      ) {
+        // Build a name map: requirement_id → requirement_type label
+        var _srcNameMap = {};
+        (divisionMeta[divName] ? divisionMeta[divName].reqs : []).forEach(
+          function (r) {
+            _srcNameMap[r.requirement_id] = r.requirement_type;
+          },
+        );
+        // Collect records from each source and stamp with transferred_from
+        var derivedRsuRecs = [];
+        var derivedCdaRecs = [];
+        _derivedCfg.source_ids.forEach(function (sid) {
+          var srcLabel = _srcNameMap[sid] || "Other";
+          var srcRecs = recordsDetailMap[sid] || [];
+          srcRecs.forEach(function (r) {
             var copy = {};
             for (var k in r) {
               if (r.hasOwnProperty(k)) copy[k] = r[k];
             }
-            copy.transferred_to = outIdsRsu[oi].to_label;
-            return copy;
-          }
-        }
-        return r;
-      });
-      var markedCda = ownRecs.map(function (r) {
-        for (var oi = 0; oi < outIdsCda.length; oi++) {
-          if (outIdsCda[oi].record_id === r.record_id) {
-            var copy = {};
-            for (var k in r) {
-              if (r.hasOwnProperty(k)) copy[k] = r[k];
+            copy.transferred_from = srcLabel;
+            derivedRsuRecs.push(copy);
+            derivedCdaRecs.push(copy);
+          });
+        });
+        rsuRecords = derivedRsuRecs;
+        cdaRecords = derivedCdaRecs;
+      } else {
+        var ownRecs = recordsDetailMap[req.requirement_id] || [];
+        var outIdsRsu = prog.transferred_out_ids_rsu || []; // [{ record_id, to_label }]
+        var outIdsCda = prog.transferred_out_ids_cda || []; // [{ record_id, to_label }]
+        // Keep transferred-out records but stamp them with transferred_to label
+        var markedRsu = ownRecs.map(function (r) {
+          for (var oi = 0; oi < outIdsRsu.length; oi++) {
+            if (outIdsRsu[oi].record_id === r.record_id) {
+              var copy = {};
+              for (var k in r) {
+                if (r.hasOwnProperty(k)) copy[k] = r[k];
+              }
+              copy.transferred_to = outIdsRsu[oi].to_label;
+              return copy;
             }
-            copy.transferred_to = outIdsCda[oi].to_label;
-            return copy;
           }
-        }
-        return r;
-      });
-      rsuRecords = markedRsu.concat(prog.transferred_in_rsu || []);
-      cdaRecords = markedCda.concat(prog.transferred_in_cda || []);
+          return r;
+        });
+        var markedCda = ownRecs.map(function (r) {
+          for (var oi = 0; oi < outIdsCda.length; oi++) {
+            if (outIdsCda[oi].record_id === r.record_id) {
+              var copy = {};
+              for (var k in r) {
+                if (r.hasOwnProperty(k)) copy[k] = r[k];
+              }
+              copy.transferred_to = outIdsCda[oi].to_label;
+              return copy;
+            }
+          }
+          return r;
+        });
+        rsuRecords = markedRsu.concat(prog.transferred_in_rsu || []);
+        cdaRecords = markedCda.concat(prog.transferred_in_cda || []);
+      }
     }
 
     // Compute human-readable calculation method label from aggregation_config
@@ -1460,7 +2043,10 @@ function getStudentVaultData(targetStudentId) {
       calcMethod = "Exam";
     } else if (
       aggCfgParsed &&
-      (aggCfgParsed.type === "count" || aggCfgParsed.type === "count_union")
+      (aggCfgParsed.type === "count" ||
+        aggCfgParsed.type === "count_union" ||
+        aggCfgParsed.type === "perio_total_cases" ||
+        aggCfgParsed.type === "perio_exam_flag")
     ) {
       calcMethod = "Count";
     } else if (aggCfgParsed && aggCfgParsed.type === "derived") {
@@ -1640,16 +2226,35 @@ function getStudentVaultData(targetStudentId) {
       cda_calc_hint: cdaCalcHint,
       rsu_records: rsuRecords,
       cda_records: cdaRecords,
+      aggregation_config: (function () {
+        try {
+          return typeof req.aggregation_config === "string"
+            ? JSON.parse(req.aggregation_config)
+            : req.aggregation_config || null;
+        } catch (e) {
+          return null;
+        }
+      })(),
+      sub_counts: prog.sub_counts || null,
+      sub_counts_labels: prog.sub_counts_labels || null,
+      display_field: prog.display_field || null,
     });
   });
 
   // 6. Compute per-division completion percentages for radar chart
   Object.values(divisions).forEach(function (div) {
+    // Exclude source-only rows (e.g. PERIO Case G) from completion calculation
     var rsuReqs = div.requirements.filter(function (r) {
-      return r.minimum_rsu > 0 || r.is_exam;
+      return (
+        (r.minimum_rsu > 0 || r.is_exam) &&
+        !(r.aggregation_config && r.aggregation_config.type === "source_only")
+      );
     });
     var cdaReqs = div.requirements.filter(function (r) {
-      return r.minimum_cda > 0 || r.is_exam;
+      return (
+        (r.minimum_cda > 0 || r.is_exam) &&
+        !(r.aggregation_config && r.aggregation_config.type === "source_only")
+      );
     });
 
     div.rsu_completion_pct =
@@ -1881,8 +2486,12 @@ function advisorGetStudentDivisionVault(studentId, divisionName) {
   if (!user.allowed) throw new Error("Access Denied");
 
   var profile = getUserProfile(user.email);
-  if (!profile.found || !profile.active || profile.role !== "instructor") {
-    throw new Error("User is not an active instructor.");
+  if (
+    !profile.found ||
+    !profile.active ||
+    (profile.role !== "instructor" && profile.role !== "admin")
+  ) {
+    throw new Error("Access Denied.");
   }
 
   // Reuse the full vault generation, then pick only the requested division
@@ -1906,24 +2515,79 @@ function advisorGetStudentDivisionVault(studentId, divisionName) {
  * @param {string} viewMode  'advisor' (my advisees only) | 'division' (all division students)
  * @returns {{ profile, students, requirements, records, floors }}
  */
-function advisorGetDashboardData(viewMode) {
+/**
+ * Returns the caller's role and available divisions for the dashboard.
+ * Called once on dashboard init to decide whether to show a division picker (admin)
+ * or load directly (instructor).
+ * @returns {{ role: string, name: string, divisions: Array }}
+ */
+function dashboardGetMeta() {
   var user = getCurrentUser();
   if (!user.allowed) throw new Error("Access Denied");
 
   var profile = getUserProfile(user.email);
-  if (!profile.found || !profile.active || profile.role !== "instructor") {
-    throw new Error("User is not an active instructor.");
-  }
-  if (!profile.division || !profile.division.code) {
-    throw new Error("Instructor is not assigned to a division.");
+  if (!profile.found || !profile.active)
+    throw new Error("User not found or inactive.");
+
+  if (profile.role === "admin") {
+    var divs = (SupabaseProvider.listDivisions() || [])
+      .map(function (d) {
+        return { division_id: d.division_id, code: d.code, name: d.name };
+      })
+      .sort(function (a, b) {
+        return a.name.localeCompare(b.name);
+      });
+    return { role: "admin", name: profile.name, divisions: divs };
   }
 
-  var divCode = profile.division.code.toLowerCase();
+  if (profile.role === "instructor") {
+    return {
+      role: "instructor",
+      name: profile.name,
+      divisions: profile.division
+        ? [{ code: profile.division.code, name: profile.division.name }]
+        : [],
+    };
+  }
+
+  throw new Error("Access Denied.");
+}
+
+function advisorGetDashboardData(viewMode, divisionCode) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active)
+    throw new Error("User not found or inactive.");
+
+  var isAdmin = profile.role === "admin";
+  var isInstructor = profile.role === "instructor";
+  if (!isAdmin && !isInstructor) throw new Error("Access Denied.");
+
+  var divCode, divisionObj;
+  if (isAdmin) {
+    if (!divisionCode)
+      throw new Error("Division code is required for admin access.");
+    var allDivs = SupabaseProvider.listDivisions() || [];
+    divisionObj = allDivs.find(function (d) {
+      return d.code && d.code.toLowerCase() === divisionCode.toLowerCase();
+    });
+    if (!divisionObj) throw new Error("Division not found: " + divisionCode);
+    divCode = divisionObj.code.toLowerCase();
+  } else {
+    if (!profile.division || !profile.division.code) {
+      throw new Error("Instructor is not assigned to a division.");
+    }
+    divCode = profile.division.code.toLowerCase();
+    divisionObj = profile.division;
+  }
+
   var columnName = divCode + "_instructor_id";
 
-  // 1. Students by view mode
+  // 1. Students by view mode (admin always uses whole-division view)
   var rawStudents;
-  if (viewMode === "advisor") {
+  if (!isAdmin && viewMode === "advisor") {
     rawStudents =
       SupabaseProvider.listStudentsByDivisionInstructor(
         columnName,
@@ -1939,8 +2603,7 @@ function advisorGetDashboardData(viewMode) {
   var today = new Date();
   var yr = today.getFullYear();
   var isNewAY =
-    today.getMonth() > 7 ||
-    (today.getMonth() === 7 && today.getDate() >= 20);
+    today.getMonth() > 7 || (today.getMonth() === 7 && today.getDate() >= 20);
 
   var students = rawStudents.map(function (s) {
     var calcYear = "-";
@@ -1990,6 +2653,14 @@ function advisorGetDashboardData(viewMode) {
         minimum_cda: r.minimum_cda || 0,
         is_exam: r.is_exam || false,
         is_selectable: r.is_selectable !== false,
+        aggregation_config: (function () {
+          try {
+            var raw = r.aggregation_config;
+            return typeof raw === "string" ? JSON.parse(raw) : raw || null;
+          } catch (e) {
+            return null;
+          }
+        })(),
       };
     });
 
@@ -2029,9 +2700,10 @@ function advisorGetDashboardData(viewMode) {
 
   return {
     profile: {
-      instructor_id: profile.instructor_id,
+      instructor_id: profile.instructor_id || null,
       name: profile.name,
-      division: profile.division,
+      role: profile.role,
+      division: { code: divisionObj.code, name: divisionObj.name },
     },
     students: students,
     requirements: divReqs,
@@ -2053,16 +2725,14 @@ function instructorGetPendingVerifications() {
   if (!instructorId) throw new Error("Instructor record not found.");
 
   // 1. Get team students
-  var students =
-    SupabaseProvider.listStudentsByTeamLeader(instructorId) || [];
+  var students = SupabaseProvider.listStudentsByTeamLeader(instructorId) || [];
   if (students.length === 0) return [];
 
   // 2. Compute year and build student map (same filter logic as instructorGetTeamStudents)
   var today = new Date();
   var currentYear = today.getFullYear();
   var isNewAY =
-    today.getMonth() > 7 ||
-    (today.getMonth() === 7 && today.getDate() >= 20);
+    today.getMonth() > 7 || (today.getMonth() === 7 && today.getDate() >= 20);
 
   var studentMap = {};
   students.forEach(function (s) {
@@ -2103,10 +2773,19 @@ function instructorGetPendingVerifications() {
       area: rec.area || "-",
       rsu_units: rec.rsu_units != null ? rec.rsu_units : "-",
       cda_units: rec.cda_units != null ? rec.cda_units : "-",
+      severity: rec.severity != null ? rec.severity : null,
+      book_number: rec.book_number != null ? rec.book_number : null,
+      page_number: rec.page_number != null ? rec.page_number : null,
+      is_exam: !!rec.is_exam,
+      perio_exams: rec.perio_exams || null,
       treatment_name: rec.treatment_catalog
         ? rec.treatment_catalog.treatment_name
         : "-",
       step_name: rec.treatment_steps ? rec.treatment_steps.step_name : "-",
+      division_code:
+        rec.treatment_catalog && rec.treatment_catalog.divisions
+          ? rec.treatment_catalog.divisions.code
+          : "",
       division_name:
         rec.treatment_catalog && rec.treatment_catalog.divisions
           ? rec.treatment_catalog.divisions.name
@@ -2166,6 +2845,7 @@ function instructorBulkUpdateRecordStatus(payload) {
       if (action === "verified") {
         updates.verified_by = profile.user_id;
         updates.verified_at = new Date().toISOString();
+        rec._verified_at = updates.verified_at; // store for hash proof
       }
       SupabaseProvider.updateTreatmentRecord(rec.record_id, updates);
       successCount++;
@@ -2207,10 +2887,79 @@ function instructorBulkUpdateRecordStatus(payload) {
             "<td style='padding:6px 8px;border-bottom:1px solid #edf2f7;'>" +
             (r.requirement_type || "-") +
             "</td>" +
+            "<td style='padding:6px 8px;border-bottom:1px solid #edf2f7;text-align:center;font-family:monospace;'>" +
+            (r.rsu_units != null ? r.rsu_units : "-") +
+            "</td>" +
+            "<td style='padding:6px 8px;border-bottom:1px solid #edf2f7;text-align:center;font-family:monospace;'>" +
+            (r.cda_units != null ? r.cda_units : "-") +
+            "</td>" +
             "</tr>"
           );
         })
         .join("");
+
+      // Build hash proof section for verified records
+      var hashProofSection = "";
+      if (action === "verified") {
+        var proofRows = sum.items
+          .map(function (r) {
+            var vHash = _computeVerificationHash(r._verified_at, r.record_id);
+            // Build optional detail chips
+            var details = "";
+            if (r.area && r.area !== "-")
+              details +=
+                "<span style='display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:4px;font-size:10px;color:#4338ca;'>Area: " +
+                r.area +
+                "</span>";
+            if (r.severity != null)
+              details +=
+                "<span style='display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:4px;font-size:10px;color:#047857;'>Severity: " +
+                r.severity +
+                "</span>";
+            if (r.book_number != null)
+              details +=
+                "<span style='display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:10px;color:#1d4ed8;'>Book: " +
+                r.book_number +
+                "</span>";
+            if (r.page_number != null)
+              details +=
+                "<span style='display:inline-block;margin:2px 4px 2px 0;padding:2px 6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;font-size:10px;color:#1d4ed8;'>Page: " +
+                r.page_number +
+                "</span>";
+            return (
+              "<div style='padding:10px;border-bottom:1px solid #d1fae5;'>" +
+              "<div style='font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;'>" +
+              (r.treatment_name || "Treatment") +
+              " — HN " +
+              (r.hn || r.patient_hn || "-") +
+              " — " +
+              (r.requirement_type || "-") +
+              "</div>" +
+              (details
+                ? "<div style='margin-bottom:4px;'>" + details + "</div>"
+                : "") +
+              "<table style='width:100%;border-collapse:collapse;font-size:11px;'>" +
+              "<tr><td style='padding:2px 0;color:#6b7280;width:80px;'>Verified At</td><td style='font-family:monospace;color:#1f2937;'>" +
+              r._verified_at +
+              "</td></tr>" +
+              "<tr><td style='padding:2px 0;color:#6b7280;'>Record ID</td><td style='font-family:monospace;color:#1f2937;word-break:break-all;'>" +
+              r.record_id +
+              "</td></tr>" +
+              "<tr><td style='padding:2px 0;color:#6b7280;'>Hash</td><td style='font-family:monospace;color:#1f2937;word-break:break-all;font-size:10px;'>" +
+              vHash +
+              "</td></tr>" +
+              "</table></div>"
+            );
+          })
+          .join("");
+        hashProofSection =
+          "<div style='margin-top:20px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'>" +
+          "<p style='margin:0 0 8px;font-size:12px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;'>Verification Proof</p>" +
+          proofRows +
+          "<p style='margin:8px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof. The hash can be validated by your program administrator.</p>" +
+          "</div>";
+      }
+
       MailApp.sendEmail({
         to: email,
         subject:
@@ -2236,9 +2985,14 @@ function instructorBulkUpdateRecordStatus(payload) {
           "<th style='padding:6px 8px;text-align:left;font-size:12px;color:#718096;'>Patient HN</th>" +
           "<th style='padding:6px 8px;text-align:left;font-size:12px;color:#718096;'>Treatment</th>" +
           "<th style='padding:6px 8px;text-align:left;font-size:12px;color:#718096;'>Requirement</th>" +
+          "<th style='padding:6px 8px;text-align:center;font-size:12px;color:#718096;'>RSU</th>" +
+          "<th style='padding:6px 8px;text-align:center;font-size:12px;color:#718096;'>CDA</th>" +
           "</tr></thead><tbody>" +
           rows +
-          "</tbody></table></div>",
+          "</tbody></table>" +
+          "<p style='font-size:11px;color:#6b7280;margin:0 0 4px;'>📌 Please archive or label this email as part of your RSU requirements record.</p>" +
+          hashProofSection +
+          "</div>",
       });
     } catch (mailErr) {
       Logger.log(
@@ -3542,6 +4296,7 @@ function adminCreateRequirement(form) {
       is_selectable:
         form.is_selectable !== false && form.is_selectable !== "false",
       aggregation_config: aggConfig,
+      display_order: parseInt(form.display_order) || 0,
     });
     return { success: true };
   } catch (e) {
@@ -3570,6 +4325,7 @@ function adminUpdateRequirement(id, form) {
       is_selectable:
         form.is_selectable !== false && form.is_selectable !== "false",
       aggregation_config: aggConfigUpd,
+      display_order: parseInt(form.display_order) || 0,
     });
     return { success: true };
   } catch (e) {
@@ -3690,13 +4446,133 @@ function instructorVerifyTreatmentRecord(recordId) {
 
   try {
     var verifierId = profile.user_id;
+    var verifiedAt = new Date().toISOString();
 
     SupabaseProvider.updateTreatmentRecord(recordId, {
       status: "verified",
       verified_by: verifierId,
-      verified_at: new Date().toISOString(),
+      verified_at: verifiedAt,
       updated_at: new Date().toISOString(),
     });
+
+    // Notify student with verification proof
+    try {
+      var record = SupabaseProvider.getTreatmentRecord(recordId);
+      if (record && record.student_id) {
+        var student = SupabaseProvider.getStudentById(record.student_id);
+        if (student && student.user && student.user.email) {
+          var treatName = record.treatment_catalog
+            ? record.treatment_catalog.treatment_name
+            : "Treatment";
+          var stepLabel = record.treatment_steps
+            ? record.treatment_steps.step_name
+            : "";
+          var pHn = record.hn || (record.patient ? record.patient.hn : "-");
+          var pName =
+            record.patient_name || (record.patient ? record.patient.name : "-");
+          var areaTeeth = record.area || "-";
+          var rsuUnits = record.rsu_units != null ? record.rsu_units : "-";
+          var cdaUnits = record.cda_units != null ? record.cda_units : "-";
+          var reqType = record.requirement
+            ? record.requirement.requirement_type
+            : "-";
+          var divName = record.division ? record.division.name : "-";
+          var severity = record.severity;
+          var bookNum = record.book_number;
+          var pageNum = record.page_number;
+
+          var vHash = _computeVerificationHash(verifiedAt, recordId);
+          var hashSection =
+            "<div style='margin-top:20px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'>" +
+            "<p style='margin:0 0 8px;font-size:12px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;'>Verification Proof</p>" +
+            "<table style='width:100%;border-collapse:collapse;font-size:13px;'>" +
+            "<tr><td style='padding:4px 0;color:#374151;font-weight:600;width:100px;'>Verified At</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;'>" +
+            verifiedAt +
+            "</td></tr>" +
+            "<tr><td style='padding:4px 0;color:#374151;font-weight:600;'>Record ID</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;word-break:break-all;'>" +
+            recordId +
+            "</td></tr>" +
+            "<tr><td style='padding:4px 0;color:#374151;font-weight:600;'>Hash</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;word-break:break-all;font-size:11px;'>" +
+            vHash +
+            "</td></tr>" +
+            "</table>" +
+            "<p style='margin:8px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof of verification. The hash can be validated by your program administrator.</p>" +
+            "</div>";
+
+          // Build optional detail rows
+          var optionalRows = "";
+          if (severity != null) {
+            optionalRows +=
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Severity:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              severity +
+              "</td></tr>";
+          }
+          if (bookNum != null) {
+            optionalRows +=
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Book Number:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              bookNum +
+              "</td></tr>";
+          }
+          if (pageNum != null) {
+            optionalRows +=
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Page Number:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              pageNum +
+              "</td></tr>";
+          }
+
+          MailApp.sendEmail({
+            to: student.user.email,
+            subject: "Treatment Verified: " + treatName + " (HN " + pHn + ")",
+            htmlBody:
+              "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px;'>" +
+              "<h2 style='color:#1a365d;border-bottom:2px solid #e2e8f0;padding-bottom:10px;'>Treatment Verified ✅</h2>" +
+              "<p>Your treatment record has been <b>verified</b> by " +
+              (profile.name || "an instructor") +
+              ".</p>" +
+              "<table style='width:100%;border-collapse:collapse;margin:20px 0;'>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Patient HN:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              pHn +
+              "</td></tr>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Patient Name:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              pName +
+              "</td></tr>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Division:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              divName +
+              "</td></tr>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Requirement:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              reqType +
+              "</td></tr>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Treatment:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              treatName +
+              "</td></tr>" +
+              (stepLabel
+                ? "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Step:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+                  stepLabel +
+                  "</td></tr>"
+                : "") +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>Area / Teeth:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              areaTeeth +
+              "</td></tr>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>RSU Units:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              rsuUnits +
+              "</td></tr>" +
+              "<tr><td style='padding:8px;border-bottom:1px solid #edf2f7;'><strong>CDA Units:</strong></td><td style='padding:8px;border-bottom:1px solid #edf2f7;'>" +
+              cdaUnits +
+              "</td></tr>" +
+              optionalRows +
+              "</table>" +
+              "<p style='font-size:11px;color:#6b7280;margin:0 0 4px;'>📌 Please archive or label this email as part of your RSU requirements record.</p>" +
+              hashSection +
+              "</div>",
+          });
+        }
+      }
+    } catch (emailErr) {
+      Logger.log(
+        "instructorVerifyTreatmentRecord email error: " + emailErr.message,
+      );
+    }
+
     return { success: true };
   } catch (e) {
     Logger.log("instructorVerifyTreatmentRecord error: " + e.message);
@@ -3755,6 +4631,10 @@ function studentCreateTreatmentRecord(hn, form) {
       start_date: form.start_date || null,
       complete_date: form.complete_date || null,
       is_exam: !!form.is_exam,
+      perio_exams:
+        form.perio_exams && typeof form.perio_exams === "object"
+          ? form.perio_exams
+          : null,
       // treatment_order: set below
     };
 
@@ -3829,6 +4709,10 @@ function studentUpdateTreatmentRecord(recordId, form) {
       start_date: form.start_date || null,
       complete_date: form.complete_date || null,
       is_exam: !!form.is_exam,
+      perio_exams:
+        form.perio_exams && typeof form.perio_exams === "object"
+          ? form.perio_exams
+          : null,
       updated_at: new Date().toISOString(),
     };
 

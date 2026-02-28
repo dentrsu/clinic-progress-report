@@ -63,6 +63,37 @@
     </div>
   </div>
 
+  <!-- ── Division Picker (Admin only) ─────────────────────────── -->
+  <div x-show="state === 'pick_division'" style="display:none" class="min-h-screen bg-surface flex flex-col animate-fade-in">
+    <header class="bg-navy text-white px-4 md:px-6 py-4 flex items-center gap-3 shadow-lg">
+      <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base md:text-lg font-bold leading-tight">Division Dashboard</h1>
+        <p class="text-white/60 text-xs">Admin — Select a division to view</p>
+      </div>
+      <a href="<?= appUrl ?>?page=admin" class="ml-auto flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        <span class="hidden sm:inline">Admin Console</span>
+      </a>
+    </header>
+    <div class="flex-1 px-4 md:px-6 py-8 max-w-4xl mx-auto w-full">
+      <p class="text-sm text-gray-500 mb-5">Select a division to open its dashboard in whole-division view.</p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <template x-for="div in allDivisions" :key="div.code">
+          <button @click="load('division', div.code)"
+                  class="group bg-white rounded-xl border border-gray-200 shadow-sm hover:border-navy hover:shadow-md transition-all p-4 text-left">
+            <div class="text-xs font-bold text-navy/60 group-hover:text-navy mb-1 uppercase tracking-widest" x-text="div.code"></div>
+            <div class="text-sm font-semibold text-gray-800 leading-tight" x-text="div.name"></div>
+          </button>
+        </template>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Main ─────────────────────────────────────────────────── -->
   <div x-show="state === 'loaded'" style="display:none" class="animate-fade-in">
 
@@ -86,8 +117,8 @@
         </div>
       </div>
       <div class="flex items-center gap-2 print:hidden">
-        <!-- Desktop view toggle -->
-        <div class="hidden sm:flex bg-white/10 rounded-lg p-0.5 border border-white/20 text-xs font-medium">
+        <!-- Desktop view toggle (instructor only) -->
+        <div x-show="!isAdmin" class="hidden sm:flex bg-white/10 rounded-lg p-0.5 border border-white/20 text-xs font-medium">
           <button @click="switchView('advisor')"
                   :class="viewMode === 'advisor' ? 'bg-white text-navy' : 'text-white/70 hover:text-white'"
                   class="px-3 py-1.5 rounded-md transition whitespace-nowrap">My Advisees</button>
@@ -95,6 +126,12 @@
                   :class="viewMode === 'division' ? 'bg-white text-navy' : 'text-white/70 hover:text-white'"
                   class="px-3 py-1.5 rounded-md transition whitespace-nowrap">Whole Division</button>
         </div>
+        <!-- Change Division (admin only) -->
+        <button x-show="isAdmin" @click="changeDivision()"
+                class="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+          Change Division
+        </button>
         <!-- Print -->
         <button @click="printDashboard()"
                 class="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
@@ -102,16 +139,16 @@
           Print
         </button>
         <!-- Back -->
-        <a href="<?= appUrl ?>?page=advisor"
+        <a :href="isAdmin ? '<?= appUrl ?>?page=admin' : '<?= appUrl ?>?page=advisor'"
            class="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-          <span class="hidden sm:inline">Advisor Portal</span>
+          <span class="hidden sm:inline" x-text="isAdmin ? 'Admin Console' : 'Advisor Portal'"></span>
         </a>
       </div>
     </header>
 
     <!-- Mobile view toggle -->
-    <div class="sm:hidden flex bg-navy/90 px-4 pb-3 gap-1 print:hidden">
+    <div x-show="!isAdmin" class="sm:hidden flex bg-navy/90 px-4 pb-3 gap-1 print:hidden">
       <button @click="switchView('advisor')"
               :class="viewMode === 'advisor' ? 'bg-white text-navy font-semibold' : 'bg-white/10 text-white/70'"
               class="flex-1 py-2 rounded-lg text-xs transition">My Advisees</button>
@@ -192,7 +229,7 @@
           <p class="text-sm text-gray-400">No requirements found for this division.</p>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <template x-for="req in requirements" :key="req.requirement_id">
+          <template x-for="req in requirements.filter(r => !isSourceOnly(r))" :key="req.requirement_id">
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
               <!-- Card header -->
               <div class="px-4 pt-4 pb-3 border-b border-gray-100 flex items-start justify-between gap-2">
@@ -215,11 +252,11 @@
                   <template x-if="reqTotal(req) > 0">
                     <div class="flex w-full">
                       <div class="bg-slate-400 transition-all h-full"
-                           :style="'width:' + (progressMap()[req.requirement_id].planned   / reqTotal(req) * 100) + '%'"></div>
+                           :style="'width:' + (effectiveProgress(req).planned   / reqTotal(req) * 100) + '%'"></div>
                       <div class="bg-amber-400 transition-all h-full"
-                           :style="'width:' + (progressMap()[req.requirement_id].inProgress / reqTotal(req) * 100) + '%'"></div>
+                           :style="'width:' + (effectiveProgress(req).inProgress / reqTotal(req) * 100) + '%'"></div>
                       <div class="bg-emerald-500 transition-all h-full"
-                           :style="'width:' + (progressMap()[req.requirement_id].completed  / reqTotal(req) * 100) + '%'"></div>
+                           :style="'width:' + (effectiveProgress(req).completed  / reqTotal(req) * 100) + '%'"></div>
                     </div>
                   </template>
                 </div>
@@ -227,17 +264,34 @@
                 <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px]">
                   <span class="flex items-center gap-1 text-gray-500">
                     <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
-                    Planned <span class="font-bold text-gray-700 ml-0.5" x-text="progressMap()[req.requirement_id].planned"></span>
+                    Planned <span class="font-bold text-gray-700 ml-0.5" x-text="effectiveProgress(req).planned"></span>
                   </span>
                   <span class="flex items-center gap-1 text-gray-500">
                     <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
-                    In Progress <span class="font-bold text-gray-700 ml-0.5" x-text="progressMap()[req.requirement_id].inProgress"></span>
+                    In Progress <span class="font-bold text-gray-700 ml-0.5" x-text="effectiveProgress(req).inProgress"></span>
                   </span>
                   <span class="flex items-center gap-1 text-gray-500">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                    Completed <span class="font-bold text-gray-700 ml-0.5" x-text="progressMap()[req.requirement_id].completed"></span>
+                    Completed <span class="font-bold text-gray-700 ml-0.5" x-text="effectiveProgress(req).completed"></span>
                   </span>
                 </div>
+                <!-- Sub-counts strip for derived reqs (e.g. RPD → MRPD/ARPD, CD → CD Upper/Lower) -->
+                <template x-if="reqSubCounts(req).length > 0">
+                  <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 pt-2 border-t border-gray-100">
+                    <template x-for="sc in reqSubCounts(req)" :key="sc.label">
+                      <div class="flex items-center gap-1 text-[10px]">
+                        <span class="font-medium text-gray-500" x-text="sc.label + ':'"></span>
+                        <span class="font-bold text-emerald-700" x-text="sc.progress.completed"></span>
+                        <template x-if="sc.progress.inProgress > 0">
+                          <span class="text-amber-500 font-semibold" x-text="'+' + sc.progress.inProgress"></span>
+                        </template>
+                        <template x-if="sc.progress.planned > 0">
+                          <span class="text-slate-400" x-text="'(' + sc.progress.planned + ' planned)'"></span>
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </template>
               </div>
               <!-- Students meeting minimum bar -->
               <template x-if="req.minimum_rsu > 0 || req.is_exam">
@@ -349,14 +403,14 @@
                       <p class="text-xs text-gray-400">No requirements in this division.</p>
                     </div>
                     <!-- RSU section -->
-                    <div x-show="inlineVaultData.requirements.some(r => r.minimum_rsu > 0 || r.is_exam)"
+                    <div x-show="inlineVaultData.requirements.some(r => (r.minimum_rsu > 0 || r.is_exam) && !(r.aggregation_config && r.aggregation_config.type === 'source_only'))"
                          class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                       <div class="px-3 py-2 bg-navy/5 border-b border-gray-100">
                         <span class="text-[10px] font-bold text-navy uppercase tracking-widest">RSU</span>
                       </div>
                       <div class="divide-y divide-gray-50">
                         <template x-for="req in inlineVaultData.requirements" :key="'irsu_' + req.requirement_id">
-                          <div x-show="req.minimum_rsu > 0 || req.is_exam">
+                          <div x-show="(req.minimum_rsu > 0 || req.is_exam) && !(req.aggregation_config && req.aggregation_config.type === 'source_only')">
                             <div @click="toggleInlineReq('irsu_' + req.requirement_id)"
                                  class="px-3 py-3 hover:bg-indigo-50/50 cursor-pointer select-none">
                               <div class="flex items-start gap-2">
@@ -400,6 +454,20 @@
                             <!-- Expanded records -->
                             <div x-show="inlineExpandedReqs.has('irsu_' + req.requirement_id)"
                                  class="px-3 pb-3 pt-1 bg-indigo-50/30 border-t border-indigo-50">
+                              <!-- Sub-counts bar (PERIO Total Cases, PROSTHO RPD/CD, etc.) -->
+                              <template x-if="req.sub_counts">
+                                <div class="mt-2 mb-2 flex flex-wrap gap-3 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 text-[10px]">
+                                  <template x-for="sc in subCountsEntries(req)" :key="sc.key">
+                                    <div class="flex items-center gap-1">
+                                      <span class="font-medium text-gray-500" x-text="sc.label + ':'"></span>
+                                      <span class="font-bold text-navy" x-text="sc.counts.verified"></span>
+                                      <template x-if="sc.counts.pending > 0">
+                                        <span class="text-amber-500 font-semibold" x-text="'(+' + sc.counts.pending + ')'"></span>
+                                      </template>
+                                    </div>
+                                  </template>
+                                </div>
+                              </template>
                               <template x-if="req.rsu_records && req.rsu_records.length > 0">
                                 <div class="mt-2 rounded-xl overflow-hidden border border-blue-100">
                                   <table class="w-full text-left text-xs">
@@ -407,7 +475,7 @@
                                       <tr class="bg-navy/5 text-[9px] font-bold text-navy uppercase tracking-widest">
                                         <th class="px-3 py-2">Patient</th>
                                         <th class="px-3 py-2">Area</th>
-                                        <th class="px-3 py-2 text-center">RSU</th>
+                                        <th class="px-3 py-2 text-center" x-text="req.display_field === 'severity' ? 'Sev' : 'RSU'"></th>
                                         <th class="px-3 py-2 text-right">Status</th>
                                       </tr>
                                     </thead>
@@ -424,7 +492,8 @@
                                             <div class="text-gray-500 text-[10px]" x-text="rec.patient_name"></div>
                                           </td>
                                           <td class="px-3 py-2 text-gray-500 text-[11px]" x-text="rec.area"></td>
-                                          <td class="px-3 py-2 text-center font-semibold text-navy" x-text="rec.rsu_units"></td>
+                                          <td class="px-3 py-2 text-center font-semibold text-navy"
+                                              x-text="req.display_field === 'severity' ? rec.display_value : rec.rsu_units"></td>
                                           <td class="px-3 py-2 text-right">
                                             <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
                                                   :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
@@ -446,14 +515,14 @@
                     </div>
 
                     <!-- CDA section -->
-                    <div x-show="inlineVaultData.requirements.some(r => r.minimum_cda > 0 || r.is_exam)"
+                    <div x-show="inlineVaultData.requirements.some(r => (r.minimum_cda > 0 || r.is_exam) && !(r.aggregation_config && r.aggregation_config.type === 'source_only'))"
                          class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                       <div class="px-3 py-2 bg-amber-50 border-b border-gray-100">
                         <span class="text-[10px] font-bold text-amber-700 uppercase tracking-widest">CDA</span>
                       </div>
                       <div class="divide-y divide-gray-50">
                         <template x-for="req in inlineVaultData.requirements" :key="'icda_' + req.requirement_id">
-                          <div x-show="req.minimum_cda > 0 || req.is_exam">
+                          <div x-show="(req.minimum_cda > 0 || req.is_exam) && !(req.aggregation_config && req.aggregation_config.type === 'source_only')">
                             <div @click="toggleInlineReq('icda_' + req.requirement_id)"
                                  class="px-3 py-3 hover:bg-amber-50/50 cursor-pointer select-none">
                               <div class="flex items-start gap-2">
@@ -552,7 +621,7 @@
       <div x-show="activeTab === 'requirement'" style="display:none">
         <!-- Pill selector -->
         <div class="flex gap-2 overflow-x-auto pb-3 mb-4">
-          <template x-for="req in requirements" :key="req.requirement_id">
+          <template x-for="req in requirements.filter(r => !isSourceOnly(r))" :key="req.requirement_id">
             <button @click="selectedReqId = (selectedReqId === req.requirement_id ? null : req.requirement_id)"
                     :class="selectedReqId === req.requirement_id
                       ? 'bg-navy text-white border-navy'
@@ -661,6 +730,8 @@
         state: 'loading',
         errorMessage: '',
         profile: null,
+        isAdmin: false,
+        allDivisions: [],
         students: [],
         requirements: [],
         records: [],
@@ -685,31 +756,49 @@
         sortDir: 'desc',
 
         // ── Init ──────────────────────────────────────────────
-        init() { this.load('advisor'); },
+        init() {
+          var self = this;
+          google.script.run
+            .withSuccessHandler(function (meta) {
+              self.isAdmin = meta.role === 'admin';
+              if (self.isAdmin) {
+                self.allDivisions = meta.divisions || [];
+                self.state = 'pick_division';
+              } else {
+                self.load('advisor');
+              }
+            })
+            .withFailureHandler(function (err) {
+              self.errorMessage = err.message || String(err);
+              self.state = 'error';
+            })
+            .dashboardGetMeta();
+        },
 
-        load(viewMode) {
+        load(viewMode, divCode) {
           this.state = 'loading';
           this.viewMode = viewMode;
+          var self = this;
           google.script.run
-            .withSuccessHandler(data => {
-              this.profile      = data.profile;
-              this.students     = data.students     || [];
-              this.requirements = data.requirements || [];
-              this.records      = data.records      || [];
-              this.floors       = data.floors       || [];
-              this.viewLoading  = false;
-              this.state = 'loaded';
+            .withSuccessHandler(function (data) {
+              self.profile      = data.profile;
+              self.students     = data.students     || [];
+              self.requirements = data.requirements || [];
+              self.records      = data.records      || [];
+              self.floors       = data.floors       || [];
+              self.viewLoading  = false;
+              self.state = 'loaded';
             })
-            .withFailureHandler(err => {
-              this.errorMessage = err.message || String(err);
-              this.viewLoading  = false;
-              this.state = 'error';
+            .withFailureHandler(function (err) {
+              self.errorMessage = err.message || String(err);
+              self.viewLoading  = false;
+              self.state = 'error';
             })
-            .advisorGetDashboardData(viewMode);
+            .advisorGetDashboardData(viewMode, divCode || null);
         },
 
         switchView(mode) {
-          if (mode === this.viewMode || this.viewLoading) return;
+          if (this.isAdmin || mode === this.viewMode || this.viewLoading) return;
           this.viewLoading = true;
           this.selectedStudent = null;
           this.inlineVaultData = null;
@@ -717,6 +806,15 @@
           this.filterFloor = 'all';
           this.selectedReqId = null;
           this.load(mode);
+        },
+
+        changeDivision() {
+          this.selectedStudent = null;
+          this.inlineVaultData = null;
+          this.selectedReqId = null;
+          this.filterYear  = 'all';
+          this.filterFloor = 'all';
+          this.state = 'pick_division';
         },
 
         // ── Filters ───────────────────────────────────────────
@@ -764,9 +862,65 @@
           return map;
         },
 
+        // ── Source-only / derived helpers ─────────────────────
+        // Returns true for source_only reqs (MRPD, ARPD, CD Upper/Lower, PERIO Case G/P, etc.)
+        // These are selectable in treatment plan but hidden from aggregated dashboard views.
+        isSourceOnly(req) {
+          return !!(req.aggregation_config && req.aggregation_config.type === 'source_only');
+        },
+
+        // For derived reqs, sums progressMap of source_ids; otherwise returns own progressMap entry.
+        effectiveProgress(req) {
+          var pm = this.progressMap();
+          var cfg = req.aggregation_config;
+          if (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length) {
+            var p = { planned: 0, inProgress: 0, completed: 0 };
+            cfg.source_ids.forEach(function (sid) {
+              var sp = pm[sid];
+              if (sp) { p.planned += sp.planned; p.inProgress += sp.inProgress; p.completed += sp.completed; }
+            });
+            return p;
+          }
+          return pm[req.requirement_id] || { planned: 0, inProgress: 0, completed: 0 };
+        },
+
+        // Returns [{label, progress}] for each source req of a derived requirement.
+        // Used to render a sub-counts strip on Overview cards.
+        reqSubCounts(req) {
+          var cfg = req.aggregation_config;
+          if (!cfg || cfg.type !== 'derived' || !cfg.source_ids || !cfg.source_ids.length) return [];
+          var pm = this.progressMap();
+          var reqs = this.requirements;
+          return cfg.source_ids
+            .map(function (sid) {
+              var src = reqs.find(function (r) { return r.requirement_id === sid; });
+              return src ? { label: src.requirement_type, progress: pm[sid] || { planned: 0, inProgress: 0, completed: 0 } } : null;
+            })
+            .filter(Boolean);
+        },
+
+        // Convert req.sub_counts (from inline vault data) into [{key, label, counts}] for x-for.
+        subCountsEntries(req) {
+          if (!req.sub_counts) return [];
+          var labels = req.sub_counts_labels || {};
+          return Object.keys(req.sub_counts).map(function (key) {
+            return { key: key, label: labels[key] || key.toUpperCase(), counts: req.sub_counts[key] };
+          });
+        },
+
+        // Count completed records for a student across a req's effective IDs (handles derived).
+        studentCompletedUnits(studentId, req) {
+          var cfg = req.aggregation_config;
+          var ids = (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
+            ? cfg.source_ids : [req.requirement_id];
+          return this.filteredRecords().filter(function (r) {
+            return r.student_id === studentId && ids.indexOf(r.requirement_id) !== -1;
+          }).filter(r => this.recordGroup(r) === 'completed').length;
+        },
+
         reqTotal(req) {
-          var m = this.progressMap()[req.requirement_id];
-          return m ? m.planned + m.inProgress + m.completed : 0;
+          var p = this.effectiveProgress(req);
+          return p.planned + p.inProgress + p.completed;
         },
 
         // ── Stats ─────────────────────────────────────────────
@@ -788,53 +942,42 @@
           if (!req) return 0;
           var min = req.is_exam ? 1 : req.minimum_rsu;
           if (!min) return 0;
-          var byStudent = {};
-          this.filteredRecords().forEach(r => {
-            if (r.requirement_id !== req.requirement_id) return;
-            if (this.recordGroup(r) !== 'completed') return;
-            byStudent[r.student_id] = (byStudent[r.student_id] || 0) + 1;
-          });
-          var met = 0;
-          Object.values(byStudent).forEach(cnt => { if (cnt >= min) met++; });
-          return met;
+          var self = this;
+          return this.filteredStudents().filter(function (s) {
+            return self.studentCompletedUnits(s.student_id, req) >= min;
+          }).length;
         },
 
         atRiskCount() {
-          var countable = this.requirements.filter(r => r.minimum_rsu > 0 || r.is_exam);
+          var self = this;
+          var countable = this.requirements.filter(r => (r.minimum_rsu > 0 || r.is_exam) && !this.isSourceOnly(r));
           if (!countable.length) return 0;
-          var byStudentReq = {};
-          this.filteredRecords().forEach(r => {
-            if (this.recordGroup(r) !== 'completed') return;
-            if (!byStudentReq[r.student_id]) byStudentReq[r.student_id] = {};
-            byStudentReq[r.student_id][r.requirement_id] = (byStudentReq[r.student_id][r.requirement_id] || 0) + 1;
-          });
           var atRisk = new Set();
-          this.filteredStudents().forEach(s => {
-            var byReq = byStudentReq[s.student_id] || {};
+          this.filteredStudents().forEach(function (s) {
             for (var i = 0; i < countable.length; i++) {
               var req = countable[i];
               var min = req.is_exam ? 1 : req.minimum_rsu;
-              if ((byReq[req.requirement_id] || 0) < min * 0.5) { atRisk.add(s.student_id); break; }
+              if (self.studentCompletedUnits(s.student_id, req) < min * 0.5) {
+                atRisk.add(s.student_id);
+                break;
+              }
             }
           });
           return atRisk.size;
         },
 
         isAtRisk(student) {
-          var countable = this.requirements.filter(r => r.minimum_rsu > 0 || r.is_exam);
+          var self = this;
+          var countable = this.requirements.filter(r => (r.minimum_rsu > 0 || r.is_exam) && !this.isSourceOnly(r));
           if (!countable.length) return false;
-          var byReq = {};
-          this.filteredRecords()
-            .filter(r => r.student_id === student.student_id && this.recordGroup(r) === 'completed')
-            .forEach(r => { byReq[r.requirement_id] = (byReq[r.requirement_id] || 0) + 1; });
-          return countable.some(req => {
+          return countable.some(function (req) {
             var min = req.is_exam ? 1 : req.minimum_rsu;
-            return (byReq[req.requirement_id] || 0) < min * 0.5;
+            return self.studentCompletedUnits(student.student_id, req) < min * 0.5;
           });
         },
 
         biggestGapReq() {
-          var countable = this.requirements.filter(r => r.minimum_rsu > 0 || r.is_exam);
+          var countable = this.requirements.filter(r => (r.minimum_rsu > 0 || r.is_exam) && !this.isSourceOnly(r));
           if (!countable.length || !this.filteredStudents().length) return null;
           var worst = null, worstRatio = Infinity;
           countable.forEach(req => {
@@ -901,12 +1044,16 @@
         },
 
         studentRowsForReq(reqId) {
+          var req = this.requirements.find(r => r.requirement_id === reqId);
+          var cfg = req && req.aggregation_config;
+          var ids = (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
+            ? cfg.source_ids : [reqId];
           var byStudent = {};
           this.filteredStudents().forEach(s => {
             byStudent[s.student_id] = { student: s, planned: 0, inProgress: 0, completed: 0 };
           });
           this.filteredRecords().forEach(r => {
-            if (r.requirement_id !== reqId || !byStudent[r.student_id]) return;
+            if (ids.indexOf(r.requirement_id) === -1 || !byStudent[r.student_id]) return;
             byStudent[r.student_id][this.recordGroup(r)]++;
           });
           var rows = Object.values(byStudent);

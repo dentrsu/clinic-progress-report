@@ -119,6 +119,13 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.653-.165-1.294-.478-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.653.165-1.294.478-1.857m0 0A5.002 5.002 0 0112 16a5.002 5.002 0 014.522 2.143M12 16V9m-2 2V9m4 2V9m-4-4h.01M12 4h.01"/></svg>
         Patients
       </a>
+      <div class="my-3 border-t border-navy-700"></div>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition"
+         :class="activeTab === 'verifyHash' ? 'bg-navy-light text-white' : ''"
+         @click.prevent="switchTab('verifyHash')">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Verify Hash
+      </a>
     </nav>
 
     <!-- User Profile -->
@@ -172,7 +179,7 @@
           <input type="text" x-model="search" placeholder="Search..." 
                  class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent w-full sm:w-64">
           <button @click="openModal('create')" 
-                  x-show="activeTab !== 'patients'"
+                  x-show="activeTab !== 'patients' && activeTab !== 'verifyHash'"
                   class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 whitespace-nowrap">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             <span x-text="activeTab === 'users' ? 'Add User' : (activeTab === 'instructors' ? 'Add Instructor' : (activeTab === 'divisions' ? 'Add Division' : (activeTab === 'floors' ? 'Add Floor' : (activeTab === 'phases' ? 'Add Phase' : (activeTab === 'catalog' ? 'Add Treatment' : (activeTab === 'caseTypes' ? 'Add Case Type' : (activeTab === 'steps' ? 'Add Step' : 'Add Requirement'))))))))"></span>
@@ -237,6 +244,11 @@
                   class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition"
                   :class="activeTab === 'patients' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
             Patients
+          </button>
+          <button @click="switchTab('verifyHash')" 
+                  class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition"
+                  :class="activeTab === 'verifyHash' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+            🔒 Verify Hash
           </button>
         </nav>
       </div>
@@ -755,6 +767,7 @@
               <th class="px-6 py-4 text-center">Selectable</th>
               <th class="px-6 py-4 text-center">Exam</th>
               <th class="px-6 py-4 text-center">Aggregation</th>
+              <th class="px-6 py-4 text-center">Order</th>
               <th class="px-6 py-4 text-right">Actions</th>
            </tr>
          </thead>
@@ -811,6 +824,10 @@
                         class="inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-100"
                         x-text="req.aggregation_config ? (req.aggregation_config.type || 'sum') : 'sum'"></span>
                 </td>
+                <!-- display_order -->
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                  <span class="text-sm text-gray-500" x-text="req.display_order || 0"></span>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                  <button @click="openModal('edit', req)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                  <button @click="deleteRequirement(req, $event)" 
@@ -822,7 +839,7 @@
              </tr>
            </template>
            <tr x-show="filteredRequirements.length === 0">
-             <td colspan="7" class="px-6 py-8 text-center text-gray-500">No requirements found.</td>
+             <td colspan="8" class="px-6 py-8 text-center text-gray-500">No requirements found.</td>
            </tr>
          </tbody>
        </table>
@@ -847,6 +864,55 @@
              <div x-show="syncResult" class="text-sm" :class="{'text-green-600': syncResult && syncResult.success, 'text-red-600': syncResult && !syncResult.success}">
                 <span x-text="syncResultMessage"></span>
              </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verify Hash Tab -->
+      <div x-show="activeTab === 'verifyHash'" class="space-y-6 animate-fade-in">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-xl">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-navy/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </div>
+            <div>
+              <h2 class="text-lg font-bold text-navy">Verify Treatment Hash</h2>
+              <p class="text-xs text-gray-500">Validate a student's verification proof from their email receipt.</p>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Verified At (ISO timestamp)</label>
+              <input type="text" x-model="hashForm.verifiedAt" placeholder="e.g. 2026-03-01T02:00:00.000Z"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Record ID (UUID)</label>
+              <input type="text" x-model="hashForm.recordId" placeholder="e.g. a1b2c3d4-e5f6-..."
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Hash (from student email)</label>
+              <input type="text" x-model="hashForm.hash" placeholder="SHA-256 hex string"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+            </div>
+            <button @click="verifyHash()" :disabled="hashVerifying"
+                    class="bg-navy hover:bg-navy-light text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+              <span x-text="hashVerifying ? 'Verifying...' : 'Verify Hash'"></span>
+            </button>
+          </div>
+
+          <!-- Result -->
+          <div x-show="hashResult !== null" class="mt-6 p-4 rounded-lg border" :class="hashResult?.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'">
+            <div class="flex items-center gap-2 font-semibold text-sm" :class="hashResult?.valid ? 'text-emerald-700' : 'text-red-700'">
+              <span x-text="hashResult?.valid ? '✅ Hash Valid — Verified' : '❌ Hash Mismatch — Invalid'"></span>
+            </div>
+            <div x-show="!hashResult?.valid" class="mt-2 text-xs text-gray-600">
+              <p class="font-medium">Expected hash:</p>
+              <p class="font-mono break-all text-red-600" x-text="hashResult?.computed"></p>
+            </div>
           </div>
         </div>
       </div>
@@ -1251,6 +1317,16 @@
               <span class="text-sm text-gray-700">Exam-type requirement <span class="text-gray-400 text-xs">(counts exam records, not sum of units)</span></span>
             </label>
           </div>
+          <!-- Display Order -->
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
+              Display Order
+              <span class="normal-case text-gray-400 font-normal ml-1">(lower = shown first; ties sorted A–Z)</span>
+            </label>
+            <input type="number" x-model="reqForm.display_order" min="0" step="1"
+                   placeholder="0"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          </div>
           <!-- Aggregation Config -->
           <div class="col-span-2">
             <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
@@ -1397,6 +1473,11 @@
         // Case Types Data
         caseTypes: [],
         filteredCaseTypes: [],
+
+        // Verify Hash
+        hashForm: { verifiedAt: '', recordId: '', hash: '' },
+        hashVerifying: false,
+        hashResult: null,
         
         search: '',
         loading: true,
@@ -1598,6 +1679,21 @@
               this.warningOpen = true;
             })
             .adminSyncPatients();
+        },
+
+        verifyHash() {
+          this.hashVerifying = true;
+          this.hashResult = null;
+          google.script.run
+            .withSuccessHandler(res => {
+              this.hashVerifying = false;
+              this.hashResult = res;
+            })
+            .withFailureHandler(err => {
+              this.hashVerifying = false;
+              this.hashResult = { valid: false, computed: 'Error: ' + err.message };
+            })
+            .adminVerifyHash(this.hashForm.verifiedAt.trim(), this.hashForm.recordId.trim(), this.hashForm.hash.trim());
         },
 
         syncStudents() {
@@ -2011,11 +2107,13 @@
         loadRequirements() {
           google.script.run
             .withSuccessHandler(data => {
-              // Sort by Division, then Requirement Type
+              // Sort by Division, then display_order, then Requirement Type
               this.requirements = data.sort((a, b) => {
                 const divA = (a.divisions ? a.divisions.name : '').toLowerCase();
                 const divB = (b.divisions ? b.divisions.name : '').toLowerCase();
                 if (divA !== divB) return divA.localeCompare(divB);
+                const orderDiff = (a.display_order || 0) - (b.display_order || 0);
+                if (orderDiff !== 0) return orderDiff;
                 return (a.requirement_type || '').toLowerCase().localeCompare((b.requirement_type || '').toLowerCase());
               });
             })
@@ -2137,7 +2235,7 @@
           } else if (this.activeTab === 'requirements') {
             // Requirements
             if (mode === 'create') {
-              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '' };
+              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '', display_order: 0 };
             } else {
               this.reqForm = { ...item, cda_requirement_type: item.cda_requirement_type || '', is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false, is_selectable: item.is_selectable !== false, is_exam: item.is_exam === true, aggregation_config: item.aggregation_config ? JSON.stringify(item.aggregation_config, null, 2) : '' };
             }

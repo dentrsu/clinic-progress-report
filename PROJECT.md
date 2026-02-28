@@ -34,6 +34,7 @@ A dedicated interface for administrators to manage users.
 - **Instructor Portal**:
   - View assigned students (team leader view).
   - Student detail modal with patient list and requirement vault link.
+  - **Verify Treatment Hash**: Collapsible section to validate a student's verification proof by recomputing the SHA-256 hash.
 - **Advisor Portal** (`?page=advisor`):
   - View advisee students filtered by the instructor's assigned division.
   - Student detail modal with embedded division-specific requirement progress (RSU & CDA tables).
@@ -41,6 +42,7 @@ A dedicated interface for administrators to manage users.
 - **Admin Console**:
   - Manage Users (Students/Instructors).
   - **Academic ID Support**: Manage Real-world Student IDs.
+  - **Verify Hash Tab**: Validate student verification proof hashes (SHA-256).
   - System Health Check.
 - **Nightly Backup**: All Supabase tables are automatically synced to Google Sheets at midnight via a GAS time-based trigger.
 - **Security**: Access restricted to users with `role: admin`.
@@ -161,11 +163,12 @@ clasp push
 
 In the Apps Script editor (`script.google.com`), go to **Project Settings → Script Properties** and add:
 
-| Key                 | Value                              |
-| ------------------- | ---------------------------------- |
-| `SUPABASE_URL`      | `https://your-project.supabase.co` |
-| `SUPABASE_KEY`      | Your Supabase **service_role** key |
-| `FALLBACK_SHEET_ID` | Google Spreadsheet ID for fallback |
+| Key                   | Value                                         |
+| --------------------- | --------------------------------------------- |
+| `SUPABASE_URL`        | `https://your-project.supabase.co`            |
+| `SUPABASE_KEY`        | Your Supabase **service_role** key            |
+| `FALLBACK_SHEET_ID`   | Google Spreadsheet ID for fallback            |
+| `VERIFICATION_SECRET` | Random secret for verification hash (SHA-256) |
 
 > ⚠️ **Never commit keys to version control.** They live only in Script Properties.
 

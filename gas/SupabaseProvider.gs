@@ -700,7 +700,7 @@ var SupabaseProvider = (function () {
      */
     listRequirements: function () {
       return _getCached(
-        "/rest/v1/requirement_list?select=*,divisions(name,code)&order=requirement_type.asc",
+        "/rest/v1/requirement_list?select=*,divisions(name,code)&order=display_order.asc,requirement_type.asc",
         1200,
       );
     },
@@ -800,7 +800,7 @@ var SupabaseProvider = (function () {
         "/rest/v1/treatment_records?student_id=eq." +
           studentId +
           "&status=in.(verified,completed,pending verification,rejected)" +
-          "&select=record_id,requirement_id,rsu_units,cda_units,status,is_exam,hn,patient_name,area,patient:patients(hn,name)",
+          "&select=record_id,requirement_id,rsu_units,cda_units,status,is_exam,perio_exams,hn,patient_name,area,patient:patients(hn,name)",
       );
     },
 
@@ -811,7 +811,7 @@ var SupabaseProvider = (function () {
       return _get(
         "/rest/v1/requirement_list?division_id=eq." +
           divisionId +
-          "&select=*&order=requirement_type.asc",
+          "&select=*&order=display_order.asc,requirement_type.asc",
       );
     },
 
@@ -869,7 +869,7 @@ var SupabaseProvider = (function () {
     getTreatmentRecord: function (recordId) {
       if (!recordId) return null;
       var select =
-        "*,treatment_catalog(treatment_name,division_id),treatment_steps(step_name,step_order),patient:patients(hn,name),student:students(user:users(name))";
+        "*,treatment_catalog(treatment_name,division_id),treatment_steps(step_name,step_order),patient:patients(hn,name),student:students(user:users(name)),division:divisions(code,name),requirement:requirement_list(requirement_type)";
       var rows = _get(
         "/rest/v1/treatment_records?record_id=eq." +
           recordId +
@@ -1003,8 +1003,12 @@ var SupabaseProvider = (function () {
         "area",
         "rsu_units",
         "cda_units",
-        "status",
+        "severity",
+        "book_number",
+        "page_number",
         "is_exam",
+        "perio_exams",
+        "status",
         "updated_at",
         "treatment_catalog(treatment_name,divisions(name,code))",
         "treatment_steps(step_name)",

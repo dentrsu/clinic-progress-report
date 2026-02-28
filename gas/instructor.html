@@ -134,6 +134,53 @@
         </div>
       </div>
     </div>
+
+    <!-- Verify Hash Section -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <button @click="hashOpen = !hashOpen" class="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-navy/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <span class="text-sm font-semibold text-navy">Verify Treatment Hash</span>
+        </div>
+        <svg class="w-4 h-4 text-gray-400 transition-transform" :class="hashOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+      </button>
+      <div x-show="hashOpen" x-collapse class="border-t border-gray-100 px-5 py-5">
+        <p class="text-xs text-gray-500 mb-4">Paste the values from a student's verification email to validate the hash.</p>
+        <div class="space-y-3 max-w-lg">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Verified At (ISO timestamp)</label>
+            <input type="text" x-model="hashForm.verifiedAt" placeholder="e.g. 2026-03-01T02:00:00.000Z"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Record ID (UUID)</label>
+            <input type="text" x-model="hashForm.recordId" placeholder="e.g. a1b2c3d4-e5f6-..."
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Hash (from student email)</label>
+            <input type="text" x-model="hashForm.hash" placeholder="SHA-256 hex string"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+          </div>
+          <button @click="verifyHash()" :disabled="hashVerifying"
+                  class="bg-navy hover:bg-navy-light text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+            <span x-text="hashVerifying ? 'Verifying...' : 'Verify Hash'"></span>
+          </button>
+        </div>
+        <div x-show="hashResult !== null" class="mt-4 p-3 rounded-lg border max-w-lg" :class="hashResult?.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'">
+          <div class="flex items-center gap-2 font-semibold text-sm" :class="hashResult?.valid ? 'text-emerald-700' : 'text-red-700'">
+            <span x-text="hashResult?.valid ? '✅ Hash Valid — Verified' : '❌ Hash Mismatch — Invalid'"></span>
+          </div>
+          <div x-show="!hashResult?.valid" class="mt-2 text-xs text-gray-600">
+            <p class="font-medium">Expected hash:</p>
+            <p class="font-mono break-all text-red-600" x-text="hashResult?.computed"></p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Student Profile Modal -->
@@ -306,6 +353,11 @@
         selectedStudent: null,
         studentPatients: [],
         loadingPatients: false,
+        showStudentDetail: false,
+        hashOpen: false,
+        hashForm: { verifiedAt: '', recordId: '', hash: '' },
+        hashVerifying: false,
+        hashResult: null,
         
         init() {
           google.script.run
@@ -383,6 +435,21 @@
                this.loadingPatients = false;
             })
             .getStudentPatients(student.student_id);
+        },
+
+        verifyHash() {
+          this.hashVerifying = true;
+          this.hashResult = null;
+          google.script.run
+            .withSuccessHandler(res => {
+              this.hashVerifying = false;
+              this.hashResult = res;
+            })
+            .withFailureHandler(err => {
+              this.hashVerifying = false;
+              this.hashResult = { valid: false, computed: 'Error: ' + err.message };
+            })
+            .adminVerifyHash(this.hashForm.verifiedAt.trim(), this.hashForm.recordId.trim(), this.hashForm.hash.trim());
         }
       }
     }

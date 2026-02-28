@@ -197,8 +197,9 @@
                 <th class="px-4 py-2.5 text-left font-medium">Submitted</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
-              <template x-for="rec in group.records" :key="rec.record_id">
+            <!-- One tbody per record so the optional detail row groups with its parent -->
+            <template x-for="rec in group.records" :key="rec.record_id">
+              <tbody class="divide-y divide-gray-100">
                 <tr :class="isSelected(rec.record_id) ? 'bg-indigo-50' : 'hover:bg-gray-50'"
                     class="transition-colors cursor-pointer"
                     @click="toggleRecord(rec.record_id)">
@@ -225,8 +226,52 @@
                   <td class="px-4 py-3 text-center font-mono text-xs text-amber-700 font-semibold" x-text="rec.cda_units"></td>
                   <td class="px-4 py-3 text-gray-400 text-[0.65rem]" x-text="formatDate(rec.updated_at)"></td>
                 </tr>
-              </template>
-            </tbody>
+                <!-- Division-specific detail strip -->
+                <template x-if="hasDivisionDetails(rec)">
+                  <tr :class="isSelected(rec.record_id) ? 'bg-indigo-50/60' : 'bg-gray-50/60'">
+                    <td></td>
+                    <td colspan="7" class="px-4 pb-2.5 pt-0">
+                      <div class="flex flex-wrap gap-1.5">
+                        <!-- OPER: book / page -->
+                        <template x-if="rec.book_number != null">
+                          <span class="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                            <span class="opacity-60">Book No.</span> <span x-text="rec.book_number"></span>
+                          </span>
+                        </template>
+                        <template x-if="rec.page_number != null">
+                          <span class="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                            <span class="opacity-60">Page No.</span> <span x-text="rec.page_number"></span>
+                          </span>
+                        </template>
+                        <!-- PERIO: severity -->
+                        <template x-if="rec.severity != null">
+                          <span class="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">
+                            <span class="opacity-60">Severity</span> <span x-text="rec.severity"></span>
+                          </span>
+                        </template>
+                        <!-- PERIO: exam flags -->
+                        <template x-if="rec.perio_exams && rec.perio_exams.ohi_1st">
+                          <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">OHI 1st Exam</span>
+                        </template>
+                        <template x-if="rec.perio_exams && rec.perio_exams.ohi_2nd">
+                          <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">OHI 2nd Exam</span>
+                        </template>
+                        <template x-if="rec.perio_exams && rec.perio_exams.srp_1st">
+                          <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">SRP 1st Exam</span>
+                        </template>
+                        <template x-if="rec.perio_exams && rec.perio_exams.srp_2nd">
+                          <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">SRP 2nd Exam</span>
+                        </template>
+                        <!-- ENDO: exam case -->
+                        <template x-if="rec.is_exam">
+                          <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200">Exam Case</span>
+                        </template>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </template>
           </table>
         </div>
 
@@ -262,6 +307,41 @@
                         x-text="rec.requirement_type"></span>
                   <span class="text-[0.65rem] text-gray-400" x-text="formatDate(rec.updated_at)"></span>
                 </div>
+                <!-- Division-specific detail chips (mobile) -->
+                <template x-if="hasDivisionDetails(rec)">
+                  <div class="flex flex-wrap gap-1.5 pt-0.5">
+                    <template x-if="rec.book_number != null">
+                      <span class="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                        <span class="opacity-60">Book</span> <span x-text="rec.book_number"></span>
+                      </span>
+                    </template>
+                    <template x-if="rec.page_number != null">
+                      <span class="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
+                        <span class="opacity-60">Page</span> <span x-text="rec.page_number"></span>
+                      </span>
+                    </template>
+                    <template x-if="rec.severity != null">
+                      <span class="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">
+                        <span class="opacity-60">Severity</span> <span x-text="rec.severity"></span>
+                      </span>
+                    </template>
+                    <template x-if="rec.perio_exams && rec.perio_exams.ohi_1st">
+                      <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">OHI 1st</span>
+                    </template>
+                    <template x-if="rec.perio_exams && rec.perio_exams.ohi_2nd">
+                      <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">OHI 2nd</span>
+                    </template>
+                    <template x-if="rec.perio_exams && rec.perio_exams.srp_1st">
+                      <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">SRP 1st</span>
+                    </template>
+                    <template x-if="rec.perio_exams && rec.perio_exams.srp_2nd">
+                      <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">SRP 2nd</span>
+                    </template>
+                    <template x-if="rec.is_exam">
+                      <span class="text-[0.65rem] font-medium px-2 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200">Exam Case</span>
+                    </template>
+                  </div>
+                </template>
               </div>
             </div>
           </template>
