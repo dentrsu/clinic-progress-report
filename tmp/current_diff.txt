@@ -1,0 +1,368 @@
+﻿diff --git a/database-context.md b/database-context.md
+index 1a7aea3..55b391f 100644
+--- a/database-context.md
++++ b/database-context.md
+@@ -124,7 +124,10 @@ create table public.requirement_list (
+   non_mc_pateint_req boolean not null default true,  -- NOTE: typo in column name (pateint)
+   is_exam boolean not null default false,            -- True: count exam records (not sum units)
+   is_selectable boolean not null default true,       -- False: hide from treatment_plan.html dropdown
+-  aggregation_config jsonb default null              -- Computation config (see rules below)
++  aggregation_config jsonb default null,             -- Computation config (see rules below)
++  display_order integer not null default 0,          -- Sort order within division group (lower first)
++  default_rsu numeric,                               -- Auto-fill RSU for new treatment records (nullable = no default)
++  default_cda numeric                                -- Auto-fill CDA for new treatment records (nullable = no default)
+ );
+ 
+ -- Key rules for requirement_list:
+@@ -134,6 +137,8 @@ create table public.requirement_list (
+ --   ΓÇó minimum_rsu = 0 AND minimum_cda = 0  ΓåÆ hidden from treatment_plan.html modal dropdown
+ --   ΓÇó is_selectable = false ΓåÆ hidden from dropdown (computed/derived requirements)
+ --   ΓÇó is_exam = true  ΓåÆ vault counts verified exam records, not sum of rsu_units/cda_units
++--   ΓÇó display_order ΓåÆ controls sort within division group (asc, ties broken by requirement_type AΓÇôZ)
++--   ΓÇó default_rsu / default_cda ΓåÆ treatment_plan modal auto-fills for new records when non-null
+ --
+ -- aggregation_config shapes (JSON):
+ --
+@@ -158,6 +163,10 @@ create table public.requirement_list (
+ --   {"type":"derived","source_ids":["uuid1","uuid2"],"operation":"sum_both"}
+ --       operation: "sum_both" (default) | "sum_rsu" | "sum_cda"
+ --       ΓåÆ aggregates computed values from other requirements already processed in pass 1
++--   {"type":"derived","source_ids":["uuid1","uuid2"],"operation":"count_both"}
++--       ΓåÆ counts raw records from divRecords matching any source_id (ignores rsu/cda unit values)
++--       ΓåÆ both RSU and CDA progress = same count; calcMethod badge = "Count"
++--       ΓåÆ use when the requirement counts how many cases were done, not how many units
+ --   {"type":"count_met","source_ids":["uuid1","uuid2",...]}
+ --       ΓåÆ counts how many source requirements have pass-1 verified progress >= their minimum
+ --       ΓåÆ each qualifying source contributes 1 to this requirement's progress
+@@ -340,9 +349,11 @@ OPER uses cross-requirement overflow and substitution logic that cannot be expre
+ | Class II         | `null` (sum)                                                                                                    | Source for transfer to Class I (RSU) and Class I/III-IV (CDA)                  |
+ | Class III        | `null` (sum)                                                                                                    | Receives transfer from Class IV                                                |
+ | Class IV         | `{"type":"sum_union","also_sum":["<DIASTEMA_UUID>"]}`                                                           | Sums rsu_units from Class IV + Diastema Closure records                        |
+-| Class V          | `null` (sum)                                                                                                    | Standard                                                                       |
++| Class V          | `null` (sum)                                                                                                    | Standard; also source for Exam Class V                                         |
+ | Class VI         | `null` (sum)                                                                                                    | Standard                                                                       |
+ | PRR              | `null` (sum)                                                                                                    | Bonus source for Class I RSU (max 1 record)                                    |
++| Exam Class II    | `{"type":"count_exam","source_ids":["f75caaa1-ae50-41e3-b9d8-aeebfe63c58a"]}`                                  | `is_selectable=false`; counts Class II records where `is_exam=true`            |
++| Exam Class V     | `{"type":"count_exam","source_ids":["c63b2e7e-6997-4b07-8141-ba2528027dc0"]}`                                  | `is_selectable=false`; counts Class V records where `is_exam=true`             |
+ | Minimum Total R  | `{"type":"derived","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>","<Diastema>"],"operation":"sum_rsu"}` | `is_selectable=false`; pass-2 sums RSU from all class types (minimum_rsu = 60) |
+ | Diastema Closure | `null` + `minimum_rsu=0`, `minimum_cda=0`                                                                       | Selectable but has no vault row; absorbed by Class IV                          |
+ | Recall (any)     | `{"type":"count_met","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>"]}`                                  | `is_selectable=false`; computed in pass-2 from raw counts                      |
+@@ -376,6 +387,8 @@ Example: Class II records [2,2,3,3] = 10 total, minimum = 6 ΓåÆ
+ 
+ **Recall computation:** Handled by `count_met` in pass-2 using **raw (pre-transfer) counts**. The OPER processor does NOT modify Recall.
+ 
++**OPER Exam toggle (treatment_plan.html):** When OPER division is selected and requirement is Class II (`f75caaa1-ae50-41e3-b9d8-aeebfe63c58a`) or Class V (`c63b2e7e-6997-4b07-8141-ba2528027dc0`), an "Exam Class II / Exam Class V" toggle appears. Enabling it sets `is_exam=true` on the record. The record's `requirement_id` stays as Class II/V ΓÇö Exam Class II/V reqs count these via `count_exam`+`source_ids`. Toggle matched by UUID (not string) to avoid DB label mismatch.
++
+ **Internal progressMap transfer fields** (set by OPER processor, consumed by output builder):
+ 
+ - `transferred_in_rsu` / `transferred_in_cda` ΓÇö array of detail-record objects (with `transferred_from` label) appended to target's record list
+diff --git a/gas/Code.gs b/gas/Code.gs
+index 916c17e..e5c2244 100644
+--- a/gas/Code.gs
++++ b/gas/Code.gs
+@@ -1,5 +1,5 @@
+ /**
+- * Code.gs ΓÇö Entry point for the Clinic Progress Report web app
++ * Code.gs ΓÇö Entry point for the DentRSU Tracker web app
+  *
+  * Responsibilities:
+  *   1. Serve the landing page via doGet()
+@@ -884,7 +884,7 @@ function doGet(e) {
+     t.appDevUrl = devUrl;
+     return t
+       .evaluate()
+-      .setTitle("Admin Console ΓÇö Clinic Progress Report")
++      .setTitle("Admin Console ΓÇö DentRSU Tracker")
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+   }
+@@ -896,7 +896,7 @@ function doGet(e) {
+     t.hn = e.parameter.hn || "";
+     return t
+       .evaluate()
+-      .setTitle("Treatment Plan ΓÇö Clinic Progress Report")
++      .setTitle("Treatment Plan ΓÇö DentRSU Tracker")
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+   }
+@@ -933,7 +933,7 @@ function doGet(e) {
+ 
+     return t
+       .evaluate()
+-      .setTitle("Requirement Vault ΓÇö Clinic Progress Report")
++      .setTitle("Requirement Vault ΓÇö DentRSU Tracker")
+       .setFaviconUrl(favicon)
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+@@ -945,7 +945,7 @@ function doGet(e) {
+     t.appDevUrl = devUrl;
+     return t
+       .evaluate()
+-      .setTitle("Student Portal ΓÇö Clinic Progress Report")
++      .setTitle("Student Portal ΓÇö DentRSU Tracker")
+       .setFaviconUrl(favicon)
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+@@ -957,7 +957,7 @@ function doGet(e) {
+     t.appDevUrl = devUrl;
+     return t
+       .evaluate()
+-      .setTitle("Instructor Portal ΓÇö Clinic Progress Report")
++      .setTitle("Instructor Portal ΓÇö DentRSU Tracker")
+       .setFaviconUrl(favicon)
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+@@ -969,7 +969,7 @@ function doGet(e) {
+     t.appDevUrl = devUrl;
+     return t
+       .evaluate()
+-      .setTitle("Advisor Portal ΓÇö Clinic Progress Report")
++      .setTitle("Advisor Portal ΓÇö DentRSU Tracker")
+       .setFaviconUrl(favicon)
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+@@ -981,7 +981,7 @@ function doGet(e) {
+     t.appDevUrl = devUrl;
+     return t
+       .evaluate()
+-      .setTitle("Verification Queue ΓÇö Clinic Progress Report")
++      .setTitle("Verification Queue ΓÇö DentRSU Tracker")
+       .setFaviconUrl(favicon)
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+@@ -993,7 +993,7 @@ function doGet(e) {
+     t.appDevUrl = devUrl;
+     return t
+       .evaluate()
+-      .setTitle("Division Dashboard ΓÇö Clinic Progress Report")
++      .setTitle("Division Dashboard ΓÇö DentRSU Tracker")
+       .setFaviconUrl(favicon)
+       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+@@ -1004,7 +1004,7 @@ function doGet(e) {
+   t.appDevUrl = devUrl;
+   return t
+     .evaluate()
+-    .setTitle("Clinic Progress Report ΓÇö RSU")
++    .setTitle("DentRSU Tracker")
+     .setFaviconUrl(favicon)
+     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+     .addMetaTag("viewport", "width=device-width, initial-scale=1");
+@@ -1536,6 +1536,15 @@ var DIVISION_PROCESSORS = {
+    *   CD   ΓåÉ CD (Upper) + CD (Lower)
+    */
+   PROSTH: function (divReqs, divRecords, progressMap) {
++    // Stable requirement UUIDs ΓÇö CD pair confirmed 2026-03-01
++    var CD_ID       = "4c282f32-2d62-4285-b3c7-76a0225b9639";
++    var CD_UPPER_ID = "d8e91cd3-6fb2-42e0-8843-53836d5cc44d";
++    var CD_LOWER_ID = "9b3872fd-b738-4f19-841e-7575b853f185";
++
++    function getById(id) {
++      return divReqs.find(function (r) { return r.requirement_id === id; }) || null;
++    }
++
+     function getByType(t) {
+       var lower = t.toLowerCase();
+       return (
+@@ -1597,10 +1606,10 @@ var DIVISION_PROCESSORS = {
+       { key: "arpd", label: "ARPD", req: getByType("arpd") },
+     ]);
+ 
+-    // ΓöÇΓöÇ CD ΓåÉ CD (Upper) + CD (Lower) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+-    applySubcounts(getByType("cd"), [
+-      { key: "cd_upper", label: "CD (Upper)", req: getByType("cd (upper)") },
+-      { key: "cd_lower", label: "CD (Lower)", req: getByType("cd (lower)") },
++    // ΓöÇΓöÇ CD ΓåÉ CD (Upper) + CD (Lower) ΓÇö look up by UUID for reliability ΓöÇΓöÇΓöÇ
++    applySubcounts(getById(CD_ID), [
++      { key: "cd_upper", label: "CD (Upper)", req: getById(CD_UPPER_ID) },
++      { key: "cd_lower", label: "CD (Lower)", req: getById(CD_LOWER_ID) },
+     ]);
+   },
+ };
+@@ -1750,26 +1759,46 @@ function _applyRequirementAggregation(
+       }
+     });
+   } else if (type === "derived") {
+-    // Sum computed values from other requirements (must be processed in pass 1 first)
++    // Compute value from other requirements (must be processed in pass 1 first)
+     var sourceIds = config.source_ids || [];
+-    var op = config.operation || "sum_both"; // sum_both | sum_rsu | sum_cda
+-    var rsu = 0,
+-      cda = 0,
+-      pRsu = 0,
+-      pCda = 0;
+-    sourceIds.forEach(function (sid) {
+-      var p = progressMap[sid] || { rsu: 0, cda: 0, p_rsu: 0, p_cda: 0 };
+-      rsu += p.rsu;
+-      cda += p.cda;
+-      pRsu += p.p_rsu;
+-      pCda += p.p_cda;
+-    });
+-    progressMap[reqId] = {
+-      rsu: op === "sum_cda" ? cda : rsu,
+-      cda: op === "sum_rsu" ? rsu : cda,
+-      p_rsu: op === "sum_cda" ? pCda : pRsu,
+-      p_cda: op === "sum_rsu" ? pRsu : pCda,
+-    };
++    var op = config.operation || "sum_both"; // sum_both | sum_rsu | sum_cda | count_both
++    if (op === "count_both") {
++      // Count raw records from divRecords matching any source_id (ignores unit values)
++      var sourceSet = {};
++      sourceIds.forEach(function (sid) { sourceSet[sid] = true; });
++      var vCount = 0, pCount = 0;
++      divRecords.forEach(function (rec) {
++        if (!sourceSet[rec.requirement_id]) return;
++        if (rec.status === "verified") {
++          vCount += 1;
++        } else if (
++          rec.status === "completed" ||
++          rec.status === "pending verification" ||
++          rec.status === "rejected"
++        ) {
++          pCount += 1;
++        }
++      });
++      progressMap[reqId] = { rsu: vCount, cda: vCount, p_rsu: pCount, p_cda: pCount };
++    } else {
++      var rsu = 0,
++        cda = 0,
++        pRsu = 0,
++        pCda = 0;
++      sourceIds.forEach(function (sid) {
++        var p = progressMap[sid] || { rsu: 0, cda: 0, p_rsu: 0, p_cda: 0 };
++        rsu += p.rsu;
++        cda += p.cda;
++        pRsu += p.p_rsu;
++        pCda += p.p_cda;
++      });
++      progressMap[reqId] = {
++        rsu: op === "sum_cda" ? cda : rsu,
++        cda: op === "sum_rsu" ? rsu : cda,
++        p_rsu: op === "sum_cda" ? pCda : pRsu,
++        p_cda: op === "sum_rsu" ? pRsu : pCda,
++      };
++    }
+   } else if (type === "count_met") {
+     // Count how many source requirements have pass-1 verified progress >= their minimum.
+     // Each qualifying source contributes 1. Requires divReqs for minimum lookups.
+@@ -2065,6 +2094,12 @@ function getStudentVaultData(targetStudentId) {
+         aggCfgParsed.type === "perio_exam_flag")
+     ) {
+       calcMethod = "Count";
++    } else if (
++      aggCfgParsed &&
++      aggCfgParsed.type === "derived" &&
++      aggCfgParsed.operation === "count_both"
++    ) {
++      calcMethod = "Count";
+     } else if (aggCfgParsed && aggCfgParsed.type === "derived") {
+       calcMethod = "Derived";
+     } else if (aggCfgParsed && aggCfgParsed.type === "count_met") {
+@@ -2079,7 +2114,39 @@ function getStudentVaultData(targetStudentId) {
+       (divisionMeta[divName] && divisionMeta[divName].reqs) || [];
+     var _divRecordsList = recordsByDiv[divName] || [];
+ 
+-    if (calcMethod === "Derived" && aggCfgParsed && aggCfgParsed.source_ids) {
++    if (
++      calcMethod === "Count" &&
++      aggCfgParsed &&
++      aggCfgParsed.type === "derived" &&
++      aggCfgParsed.operation === "count_both" &&
++      aggCfgParsed.source_ids
++    ) {
++      // Hint: per-source record counts
++      var _srcIds = aggCfgParsed.source_ids;
++      var _nameMap = {};
++      _divReqsList.forEach(function (r) {
++        _nameMap[r.requirement_id] = r.requirement_type;
++      });
++      var _sourceSet = {};
++      _srcIds.forEach(function (sid) { _sourceSet[sid] = true; });
++      var _srcCountMap = {};
++      _srcIds.forEach(function (sid) { _srcCountMap[sid] = 0; });
++      _divRecordsList.forEach(function (rec) {
++        if (_sourceSet[rec.requirement_id] && rec.status === "verified") {
++          _srcCountMap[rec.requirement_id] = (_srcCountMap[rec.requirement_id] || 0) + 1;
++        }
++      });
++      var _parts = [], _total = 0;
++      _srcIds.forEach(function (sid) {
++        var cnt = _srcCountMap[sid] || 0;
++        _parts.push((_nameMap[sid] || "Unknown") + " (" + cnt + ")");
++        _total += cnt;
++      });
++      if (_parts.length > 0) {
++        rsuCalcHint = _parts.join(" + ") + " = " + _total;
++        cdaCalcHint = rsuCalcHint;
++      }
++    } else if (calcMethod === "Derived" && aggCfgParsed && aggCfgParsed.source_ids) {
+       var _srcIds = aggCfgParsed.source_ids;
+       var _op = aggCfgParsed.operation || "sum_both";
+       var _nameMap = {};
+diff --git a/gas/dashboard.html b/gas/dashboard.html
+index a61d24b..f390645 100644
+--- a/gas/dashboard.html
++++ b/gas/dashboard.html
+@@ -83,7 +83,7 @@
+     <div class="flex-1 px-4 md:px-6 py-8 max-w-4xl mx-auto w-full">
+       <p class="text-sm text-gray-500 mb-5">Select a division to open its dashboard in whole-division view.</p>
+       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+-        <template x-for="div in allDivisions" :key="div.code">
++        <template x-for="div in allDivisions.filter(d => d.name !== 'Not Applicable')" :key="div.code">
+           <button @click="load('division', div.code)"
+                   class="group bg-white rounded-xl border border-gray-200 shadow-sm hover:border-navy hover:shadow-md transition-all p-4 text-left">
+             <div class="text-xs font-bold text-navy/60 group-hover:text-navy mb-1 uppercase tracking-widest" x-text="div.code"></div>
+@@ -881,6 +881,15 @@
+             });
+             return p;
+           }
++          if (cfg && cfg.type === 'count_exam' && cfg.source_ids && cfg.source_ids.length) {
++            var ids = cfg.source_ids;
++            var p = { planned: 0, inProgress: 0, completed: 0 };
++            this.filteredRecords().forEach(r => {
++              if (!r.is_exam || ids.indexOf(r.requirement_id) === -1) return;
++              p[this.recordGroup(r)]++;
++            });
++            return p;
++          }
+           return pm[req.requirement_id] || { planned: 0, inProgress: 0, completed: 0 };
+         },
+ 
+@@ -908,9 +917,15 @@
+           });
+         },
+ 
+-        // Count completed records for a student across a req's effective IDs (handles derived).
++        // Count completed records for a student across a req's effective IDs (handles derived/count_exam).
+         studentCompletedUnits(studentId, req) {
+           var cfg = req.aggregation_config;
++          if (cfg && cfg.type === 'count_exam' && cfg.source_ids && cfg.source_ids.length) {
++            var ids = cfg.source_ids;
++            return this.filteredRecords().filter(r =>
++              r.student_id === studentId && r.is_exam && ids.indexOf(r.requirement_id) !== -1
++            ).filter(r => this.recordGroup(r) === 'completed').length;
++          }
+           var ids = (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
+             ? cfg.source_ids : [req.requirement_id];
+           return this.filteredRecords().filter(function (r) {
+@@ -1046,14 +1061,18 @@
+         studentRowsForReq(reqId) {
+           var req = this.requirements.find(r => r.requirement_id === reqId);
+           var cfg = req && req.aggregation_config;
+-          var ids = (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
+-            ? cfg.source_ids : [reqId];
++          var isCountExam = cfg && cfg.type === 'count_exam' && cfg.source_ids && cfg.source_ids.length;
++          var ids = isCountExam
++            ? cfg.source_ids
++            : (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
++              ? cfg.source_ids : [reqId];
+           var byStudent = {};
+           this.filteredStudents().forEach(s => {
+             byStudent[s.student_id] = { student: s, planned: 0, inProgress: 0, completed: 0 };
+           });
+           this.filteredRecords().forEach(r => {
+             if (ids.indexOf(r.requirement_id) === -1 || !byStudent[r.student_id]) return;
++            if (isCountExam && !r.is_exam) return;
+             byStudent[r.student_id][this.recordGroup(r)]++;
+           });
+           var rows = Object.values(byStudent);

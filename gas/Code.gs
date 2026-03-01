@@ -1,5 +1,5 @@
 /**
- * Code.gs — Entry point for the Clinic Progress Report web app
+ * Code.gs — Entry point for the DentRSU Tracker web app
  *
  * Responsibilities:
  *   1. Serve the landing page via doGet()
@@ -884,7 +884,7 @@ function doGet(e) {
     t.appDevUrl = devUrl;
     return t
       .evaluate()
-      .setTitle("Admin Console — Clinic Progress Report")
+      .setTitle("Admin Console — DentRSU Tracker")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -896,7 +896,7 @@ function doGet(e) {
     t.hn = e.parameter.hn || "";
     return t
       .evaluate()
-      .setTitle("Treatment Plan — Clinic Progress Report")
+      .setTitle("Treatment Plan — DentRSU Tracker")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
   }
@@ -933,7 +933,7 @@ function doGet(e) {
 
     return t
       .evaluate()
-      .setTitle("Requirement Vault — Clinic Progress Report")
+      .setTitle("Requirement Vault — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -945,7 +945,7 @@ function doGet(e) {
     t.appDevUrl = devUrl;
     return t
       .evaluate()
-      .setTitle("Student Portal — Clinic Progress Report")
+      .setTitle("Student Portal — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -957,7 +957,7 @@ function doGet(e) {
     t.appDevUrl = devUrl;
     return t
       .evaluate()
-      .setTitle("Instructor Portal — Clinic Progress Report")
+      .setTitle("Instructor Portal — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -969,7 +969,7 @@ function doGet(e) {
     t.appDevUrl = devUrl;
     return t
       .evaluate()
-      .setTitle("Advisor Portal — Clinic Progress Report")
+      .setTitle("Advisor Portal — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -981,7 +981,7 @@ function doGet(e) {
     t.appDevUrl = devUrl;
     return t
       .evaluate()
-      .setTitle("Verification Queue — Clinic Progress Report")
+      .setTitle("Verification Queue — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -993,7 +993,7 @@ function doGet(e) {
     t.appDevUrl = devUrl;
     return t
       .evaluate()
-      .setTitle("Division Dashboard — Clinic Progress Report")
+      .setTitle("Division Dashboard — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -1004,7 +1004,7 @@ function doGet(e) {
   t.appDevUrl = devUrl;
   return t
     .evaluate()
-    .setTitle("Clinic Progress Report — RSU")
+    .setTitle("DentRSU Tracker")
     .setFaviconUrl(favicon)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -1536,6 +1536,15 @@ var DIVISION_PROCESSORS = {
    *   CD   ← CD (Upper) + CD (Lower)
    */
   PROSTH: function (divReqs, divRecords, progressMap) {
+    // Stable requirement UUIDs — CD pair confirmed 2026-03-01
+    var CD_ID       = "4c282f32-2d62-4285-b3c7-76a0225b9639";
+    var CD_UPPER_ID = "d8e91cd3-6fb2-42e0-8843-53836d5cc44d";
+    var CD_LOWER_ID = "9b3872fd-b738-4f19-841e-7575b853f185";
+
+    function getById(id) {
+      return divReqs.find(function (r) { return r.requirement_id === id; }) || null;
+    }
+
     function getByType(t) {
       var lower = t.toLowerCase();
       return (
@@ -1597,10 +1606,10 @@ var DIVISION_PROCESSORS = {
       { key: "arpd", label: "ARPD", req: getByType("arpd") },
     ]);
 
-    // ── CD ← CD (Upper) + CD (Lower) ─────────────────────────────────────
-    applySubcounts(getByType("cd"), [
-      { key: "cd_upper", label: "CD (Upper)", req: getByType("cd (upper)") },
-      { key: "cd_lower", label: "CD (Lower)", req: getByType("cd (lower)") },
+    // ── CD ← CD (Upper) + CD (Lower) — look up by UUID for reliability ───
+    applySubcounts(getById(CD_ID), [
+      { key: "cd_upper", label: "CD (Upper)", req: getById(CD_UPPER_ID) },
+      { key: "cd_lower", label: "CD (Lower)", req: getById(CD_LOWER_ID) },
     ]);
   },
 };
@@ -1750,26 +1759,46 @@ function _applyRequirementAggregation(
       }
     });
   } else if (type === "derived") {
-    // Sum computed values from other requirements (must be processed in pass 1 first)
+    // Compute value from other requirements (must be processed in pass 1 first)
     var sourceIds = config.source_ids || [];
-    var op = config.operation || "sum_both"; // sum_both | sum_rsu | sum_cda
-    var rsu = 0,
-      cda = 0,
-      pRsu = 0,
-      pCda = 0;
-    sourceIds.forEach(function (sid) {
-      var p = progressMap[sid] || { rsu: 0, cda: 0, p_rsu: 0, p_cda: 0 };
-      rsu += p.rsu;
-      cda += p.cda;
-      pRsu += p.p_rsu;
-      pCda += p.p_cda;
-    });
-    progressMap[reqId] = {
-      rsu: op === "sum_cda" ? cda : rsu,
-      cda: op === "sum_rsu" ? rsu : cda,
-      p_rsu: op === "sum_cda" ? pCda : pRsu,
-      p_cda: op === "sum_rsu" ? pRsu : pCda,
-    };
+    var op = config.operation || "sum_both"; // sum_both | sum_rsu | sum_cda | count_both
+    if (op === "count_both") {
+      // Count raw records from divRecords matching any source_id (ignores unit values)
+      var sourceSet = {};
+      sourceIds.forEach(function (sid) { sourceSet[sid] = true; });
+      var vCount = 0, pCount = 0;
+      divRecords.forEach(function (rec) {
+        if (!sourceSet[rec.requirement_id]) return;
+        if (rec.status === "verified") {
+          vCount += 1;
+        } else if (
+          rec.status === "completed" ||
+          rec.status === "pending verification" ||
+          rec.status === "rejected"
+        ) {
+          pCount += 1;
+        }
+      });
+      progressMap[reqId] = { rsu: vCount, cda: vCount, p_rsu: pCount, p_cda: pCount };
+    } else {
+      var rsu = 0,
+        cda = 0,
+        pRsu = 0,
+        pCda = 0;
+      sourceIds.forEach(function (sid) {
+        var p = progressMap[sid] || { rsu: 0, cda: 0, p_rsu: 0, p_cda: 0 };
+        rsu += p.rsu;
+        cda += p.cda;
+        pRsu += p.p_rsu;
+        pCda += p.p_cda;
+      });
+      progressMap[reqId] = {
+        rsu: op === "sum_cda" ? cda : rsu,
+        cda: op === "sum_rsu" ? rsu : cda,
+        p_rsu: op === "sum_cda" ? pCda : pRsu,
+        p_cda: op === "sum_rsu" ? pRsu : pCda,
+      };
+    }
   } else if (type === "count_met") {
     // Count how many source requirements have pass-1 verified progress >= their minimum.
     // Each qualifying source contributes 1. Requires divReqs for minimum lookups.
@@ -2065,6 +2094,12 @@ function getStudentVaultData(targetStudentId) {
         aggCfgParsed.type === "perio_exam_flag")
     ) {
       calcMethod = "Count";
+    } else if (
+      aggCfgParsed &&
+      aggCfgParsed.type === "derived" &&
+      aggCfgParsed.operation === "count_both"
+    ) {
+      calcMethod = "Count";
     } else if (aggCfgParsed && aggCfgParsed.type === "derived") {
       calcMethod = "Derived";
     } else if (aggCfgParsed && aggCfgParsed.type === "count_met") {
@@ -2079,7 +2114,39 @@ function getStudentVaultData(targetStudentId) {
       (divisionMeta[divName] && divisionMeta[divName].reqs) || [];
     var _divRecordsList = recordsByDiv[divName] || [];
 
-    if (calcMethod === "Derived" && aggCfgParsed && aggCfgParsed.source_ids) {
+    if (
+      calcMethod === "Count" &&
+      aggCfgParsed &&
+      aggCfgParsed.type === "derived" &&
+      aggCfgParsed.operation === "count_both" &&
+      aggCfgParsed.source_ids
+    ) {
+      // Hint: per-source record counts
+      var _srcIds = aggCfgParsed.source_ids;
+      var _nameMap = {};
+      _divReqsList.forEach(function (r) {
+        _nameMap[r.requirement_id] = r.requirement_type;
+      });
+      var _sourceSet = {};
+      _srcIds.forEach(function (sid) { _sourceSet[sid] = true; });
+      var _srcCountMap = {};
+      _srcIds.forEach(function (sid) { _srcCountMap[sid] = 0; });
+      _divRecordsList.forEach(function (rec) {
+        if (_sourceSet[rec.requirement_id] && rec.status === "verified") {
+          _srcCountMap[rec.requirement_id] = (_srcCountMap[rec.requirement_id] || 0) + 1;
+        }
+      });
+      var _parts = [], _total = 0;
+      _srcIds.forEach(function (sid) {
+        var cnt = _srcCountMap[sid] || 0;
+        _parts.push((_nameMap[sid] || "Unknown") + " (" + cnt + ")");
+        _total += cnt;
+      });
+      if (_parts.length > 0) {
+        rsuCalcHint = _parts.join(" + ") + " = " + _total;
+        cdaCalcHint = rsuCalcHint;
+      }
+    } else if (calcMethod === "Derived" && aggCfgParsed && aggCfgParsed.source_ids) {
       var _srcIds = aggCfgParsed.source_ids;
       var _op = aggCfgParsed.operation || "sum_both";
       var _nameMap = {};

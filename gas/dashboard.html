@@ -83,7 +83,7 @@
     <div class="flex-1 px-4 md:px-6 py-8 max-w-4xl mx-auto w-full">
       <p class="text-sm text-gray-500 mb-5">Select a division to open its dashboard in whole-division view.</p>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-        <template x-for="div in allDivisions" :key="div.code">
+        <template x-for="div in allDivisions.filter(d => d.name !== 'Not Applicable')" :key="div.code">
           <button @click="load('division', div.code)"
                   class="group bg-white rounded-xl border border-gray-200 shadow-sm hover:border-navy hover:shadow-md transition-all p-4 text-left">
             <div class="text-xs font-bold text-navy/60 group-hover:text-navy mb-1 uppercase tracking-widest" x-text="div.code"></div>
@@ -881,6 +881,15 @@
             });
             return p;
           }
+          if (cfg && cfg.type === 'count_exam' && cfg.source_ids && cfg.source_ids.length) {
+            var ids = cfg.source_ids;
+            var p = { planned: 0, inProgress: 0, completed: 0 };
+            this.filteredRecords().forEach(r => {
+              if (!r.is_exam || ids.indexOf(r.requirement_id) === -1) return;
+              p[this.recordGroup(r)]++;
+            });
+            return p;
+          }
           return pm[req.requirement_id] || { planned: 0, inProgress: 0, completed: 0 };
         },
 
@@ -908,9 +917,15 @@
           });
         },
 
-        // Count completed records for a student across a req's effective IDs (handles derived).
+        // Count completed records for a student across a req's effective IDs (handles derived/count_exam).
         studentCompletedUnits(studentId, req) {
           var cfg = req.aggregation_config;
+          if (cfg && cfg.type === 'count_exam' && cfg.source_ids && cfg.source_ids.length) {
+            var ids = cfg.source_ids;
+            return this.filteredRecords().filter(r =>
+              r.student_id === studentId && r.is_exam && ids.indexOf(r.requirement_id) !== -1
+            ).filter(r => this.recordGroup(r) === 'completed').length;
+          }
           var ids = (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
             ? cfg.source_ids : [req.requirement_id];
           return this.filteredRecords().filter(function (r) {
@@ -1046,14 +1061,18 @@
         studentRowsForReq(reqId) {
           var req = this.requirements.find(r => r.requirement_id === reqId);
           var cfg = req && req.aggregation_config;
-          var ids = (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
-            ? cfg.source_ids : [reqId];
+          var isCountExam = cfg && cfg.type === 'count_exam' && cfg.source_ids && cfg.source_ids.length;
+          var ids = isCountExam
+            ? cfg.source_ids
+            : (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
+              ? cfg.source_ids : [reqId];
           var byStudent = {};
           this.filteredStudents().forEach(s => {
             byStudent[s.student_id] = { student: s, planned: 0, inProgress: 0, completed: 0 };
           });
           this.filteredRecords().forEach(r => {
             if (ids.indexOf(r.requirement_id) === -1 || !byStudent[r.student_id]) return;
+            if (isCountExam && !r.is_exam) return;
             byStudent[r.student_id][this.recordGroup(r)]++;
           });
           var rows = Object.values(byStudent);

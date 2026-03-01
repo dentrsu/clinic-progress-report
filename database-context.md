@@ -124,7 +124,10 @@ create table public.requirement_list (
   non_mc_pateint_req boolean not null default true,  -- NOTE: typo in column name (pateint)
   is_exam boolean not null default false,            -- True: count exam records (not sum units)
   is_selectable boolean not null default true,       -- False: hide from treatment_plan.html dropdown
-  aggregation_config jsonb default null              -- Computation config (see rules below)
+  aggregation_config jsonb default null,             -- Computation config (see rules below)
+  display_order integer not null default 0,          -- Sort order within division group (lower first)
+  default_rsu numeric,                               -- Auto-fill RSU for new treatment records (nullable = no default)
+  default_cda numeric                                -- Auto-fill CDA for new treatment records (nullable = no default)
 );
 
 -- Key rules for requirement_list:
@@ -134,6 +137,8 @@ create table public.requirement_list (
 --   • minimum_rsu = 0 AND minimum_cda = 0  → hidden from treatment_plan.html modal dropdown
 --   • is_selectable = false → hidden from dropdown (computed/derived requirements)
 --   • is_exam = true  → vault counts verified exam records, not sum of rsu_units/cda_units
+--   • display_order → controls sort within division group (asc, ties broken by requirement_type A–Z)
+--   • default_rsu / default_cda → treatment_plan modal auto-fills for new records when non-null
 --
 -- aggregation_config shapes (JSON):
 --
@@ -158,6 +163,10 @@ create table public.requirement_list (
 --   {"type":"derived","source_ids":["uuid1","uuid2"],"operation":"sum_both"}
 --       operation: "sum_both" (default) | "sum_rsu" | "sum_cda"
 --       → aggregates computed values from other requirements already processed in pass 1
+--   {"type":"derived","source_ids":["uuid1","uuid2"],"operation":"count_both"}
+--       → counts raw records from divRecords matching any source_id (ignores rsu/cda unit values)
+--       → both RSU and CDA progress = same count; calcMethod badge = "Count"
+--       → use when the requirement counts how many cases were done, not how many units
 --   {"type":"count_met","source_ids":["uuid1","uuid2",...]}
 --       → counts how many source requirements have pass-1 verified progress >= their minimum
 --       → each qualifying source contributes 1 to this requirement's progress
@@ -340,9 +349,11 @@ OPER uses cross-requirement overflow and substitution logic that cannot be expre
 | Class II         | `null` (sum)                                                                                                    | Source for transfer to Class I (RSU) and Class I/III-IV (CDA)                  |
 | Class III        | `null` (sum)                                                                                                    | Receives transfer from Class IV                                                |
 | Class IV         | `{"type":"sum_union","also_sum":["<DIASTEMA_UUID>"]}`                                                           | Sums rsu_units from Class IV + Diastema Closure records                        |
-| Class V          | `null` (sum)                                                                                                    | Standard                                                                       |
+| Class V          | `null` (sum)                                                                                                    | Standard; also source for Exam Class V                                         |
 | Class VI         | `null` (sum)                                                                                                    | Standard                                                                       |
 | PRR              | `null` (sum)                                                                                                    | Bonus source for Class I RSU (max 1 record)                                    |
+| Exam Class II    | `{"type":"count_exam","source_ids":["f75caaa1-ae50-41e3-b9d8-aeebfe63c58a"]}`                                  | `is_selectable=false`; counts Class II records where `is_exam=true`            |
+| Exam Class V     | `{"type":"count_exam","source_ids":["c63b2e7e-6997-4b07-8141-ba2528027dc0"]}`                                  | `is_selectable=false`; counts Class V records where `is_exam=true`             |
 | Minimum Total R  | `{"type":"derived","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>","<Diastema>"],"operation":"sum_rsu"}` | `is_selectable=false`; pass-2 sums RSU from all class types (minimum_rsu = 60) |
 | Diastema Closure | `null` + `minimum_rsu=0`, `minimum_cda=0`                                                                       | Selectable but has no vault row; absorbed by Class IV                          |
 | Recall (any)     | `{"type":"count_met","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>"]}`                                  | `is_selectable=false`; computed in pass-2 from raw counts                      |
@@ -375,6 +386,8 @@ Example: Class II records [2,2,3,3] = 10 total, minimum = 6 →
 4. **Class II → Class I/III-IV (CDA)**: `greedyTransfer(Class II verified, 'cda_units', minimum_cda)`. Excess records fill Class I's CDA deficit first (1 per record), remainder goes to Class III or IV CDA. Class II CDA decreases by actual `cda_units` sum.
 
 **Recall computation:** Handled by `count_met` in pass-2 using **raw (pre-transfer) counts**. The OPER processor does NOT modify Recall.
+
+**OPER Exam toggle (treatment_plan.html):** When OPER division is selected and requirement is Class II (`f75caaa1-ae50-41e3-b9d8-aeebfe63c58a`) or Class V (`c63b2e7e-6997-4b07-8141-ba2528027dc0`), an "Exam Class II / Exam Class V" toggle appears. Enabling it sets `is_exam=true` on the record. The record's `requirement_id` stays as Class II/V — Exam Class II/V reqs count these via `count_exam`+`source_ids`. Toggle matched by UUID (not string) to avoid DB label mismatch.
 
 **Internal progressMap transfer fields** (set by OPER processor, consumed by output builder):
 
