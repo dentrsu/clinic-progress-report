@@ -407,7 +407,7 @@
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Requirement</label>
-                  <select x-model="form.requirement_id" @change="calculatePerioUnits()" class="w-full" :disabled="!form.division_id">
+                  <select x-model="form.requirement_id" @change="onRequirementChange()" class="w-full" :disabled="!form.division_id">
                     <option value="">— Select Requirement —</option>
                     <template x-for="r in filteredRequirements" :key="r.requirement_id">
                       <option :value="r.requirement_id" x-text="getRequirementLabel(r)"></option>
@@ -428,15 +428,15 @@
                 </div>
               </div>
 
-              <!-- Row 3: Exam RCT Case (ENDO only) -->
-              <div x-show="selectedDivisionCode === 'ENDO' && (selectedRequirementType.includes('Root Canal Treatment'))" x-transition class="mt-4">
+              <!-- Row 3: Exam Case Toggle (ENDO RCT / OPER Class II & V) -->
+              <div x-show="(selectedDivisionCode === 'ENDO' && selectedRequirementType.includes('Root Canal Treatment')) || (selectedDivisionCode === 'OPER' && (form.requirement_id === 'f75caaa1-ae50-41e3-b9d8-aeebfe63c58a' || form.requirement_id === 'c63b2e7e-6997-4b07-8141-ba2528027dc0'))" x-transition class="mt-4">
                 <div class="flex items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                   <label class="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" x-model="form.is_exam" class="sr-only peer">
                     <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-navy"></div>
-                    <span class="ml-3 text-xs font-bold text-navy uppercase tracking-wide">Exam RCT Case</span>
+                    <span class="ml-3 text-xs font-bold text-navy uppercase tracking-wide" x-text="selectedDivisionCode === 'OPER' ? 'Exam ' + selectedRequirementType : 'Exam RCT Case'"></span>
                   </label>
-                  <p class="text-[0.65rem] text-blue-600 italic leading-tight">Enable this for tracking as an Exam case in Endodontics.</p>
+                  <p class="text-[0.65rem] text-blue-600 italic leading-tight" x-text="selectedDivisionCode === 'OPER' ? 'Enable this for tracking as an Exam ' + selectedRequirementType + ' case in Operative.' : 'Enable this for tracking as an Exam case in Endodontics.'"></p>
                 </div>
               </div>
 
@@ -522,6 +522,15 @@
                   class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition shadow-sm disabled:opacity-50 flex items-center gap-2">
             <div x-show="requestingVerification" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             <span x-text="requestingVerification ? 'Sending...' : 'Request Verification'"></span>
+          </button>
+
+          <!-- Save only (no email) — shown when verification is available but user wants to skip -->
+          <button x-show="(!currentUser || currentUser.role === 'student') && !perioPendingSplit && (canRequestVerification || verifiedRecordChanged)"
+                  @click="saveRecord()"
+                  :disabled="saving || requestingVerification"
+                  class="px-5 py-2 bg-navy hover:bg-navy-light text-white text-sm font-semibold rounded-lg transition shadow-sm disabled:opacity-50 flex items-center gap-2">
+            <div x-show="saving" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span x-text="saving ? 'Saving...' : 'Save'"></span>
           </button>
 
           <!-- Normal combined button (non-PERIO, PERIO completed/pending/rejected, or re-verify flow) -->
@@ -661,8 +670,9 @@
           if (this.currentUser && this.currentUser.role !== 'student') return false;
           if (!this.form.instructor_id) return false;
           if (!this.form.requirement_id) return false;
-          if (this.form.rsu_units === '' || this.form.rsu_units === null) return false;
-          if (this.form.cda_units === '' || this.form.cda_units === null) return false;
+          var hasRsu = this.form.rsu_units !== '' && this.form.rsu_units !== null;
+          var hasCda = this.form.cda_units !== '' && this.form.cda_units !== null;
+          if (!hasRsu && !hasCda) return false;
           if (!this.form.start_date) return false;
           if (!this.form.complete_date) return false;
 
@@ -721,10 +731,9 @@
              // Always include the currently selected/editing requirement (backward-compat)
              (currentReqId && r.requirement_id === currentReqId) ||
              (editingReqId && r.requirement_id === editingReqId) ||
-             // For new selections: selectable + matching division + non-zero minimum
+             // For new selections: selectable + matching division
              (r.is_selectable !== false &&
-              r.division_id === divId &&
-              (r.minimum_rsu > 0 || r.minimum_cda > 0))
+              r.division_id === divId)
            );
         },
 
@@ -751,11 +760,14 @@
           return div ? (div.code || '').toUpperCase() : '';
         },
 
-        get selectedRequirementType() {
-          if (!this.form.requirement_id) return '';
+        get selectedRequirement() {
+          if (!this.form.requirement_id) return null;
           var reqId = this.form.requirement_id;
-          var req = this.requirements.find(function(r) { return r.requirement_id === reqId; });
-          return req ? req.requirement_type : '';
+          return this.requirements.find(function(r) { return r.requirement_id === reqId; }) || null;
+        },
+
+        get selectedRequirementType() {
+          return this.selectedRequirement ? this.selectedRequirement.requirement_type : '';
         },
 
         init: function() {
@@ -940,6 +952,16 @@
           } else {
             this.form.status = 'in_progress';
           }
+        },
+
+        onRequirementChange: function() {
+          this.calculatePerioUnits(); // handles PERIO auto-calc; no-op for other divisions
+          if (this.editingRecord) return; // never overwrite values when editing
+          if (this.selectedDivisionCode === 'PERIO') return; // PERIO managed by calculatePerioUnits
+          var req = this.selectedRequirement;
+          if (!req) return;
+          if (req.default_rsu != null && req.default_rsu !== '') this.form.rsu_units = req.default_rsu;
+          if (req.default_cda != null && req.default_cda !== '') this.form.cda_units = req.default_cda;
         },
 
         calculatePerioUnits: function() {

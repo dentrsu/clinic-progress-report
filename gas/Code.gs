@@ -1993,6 +1993,22 @@ function getStudentVaultData(targetStudentId) {
         });
         rsuRecords = derivedRsuRecs;
         cdaRecords = derivedCdaRecs;
+      } else if (
+        _derivedCfg &&
+        _derivedCfg.type === "count_exam" &&
+        _derivedCfg.source_ids &&
+        _derivedCfg.source_ids.length > 0
+      ) {
+        // count_exam + source_ids: collect is_exam=true records from the source requirements
+        var examSourceRecs = [];
+        _derivedCfg.source_ids.forEach(function (sid) {
+          var srcRecs = recordsDetailMap[sid] || [];
+          srcRecs.forEach(function (r) {
+            if (r.is_exam) examSourceRecs.push(r);
+          });
+        });
+        rsuRecords = examSourceRecs;
+        cdaRecords = examSourceRecs;
       } else {
         var ownRecs = recordsDetailMap[req.requirement_id] || [];
         var outIdsRsu = prog.transferred_out_ids_rsu || []; // [{ record_id, to_label }]
@@ -4278,8 +4294,14 @@ function _parseAggConfig(raw) {
 function adminCreateRequirement(form) {
   _assertAdmin();
   try {
+    Logger.log(
+      "adminCreateRequirement called. default_rsu=" +
+        JSON.stringify(form.default_rsu) +
+        " default_cda=" +
+        JSON.stringify(form.default_cda),
+    );
     var aggConfig = _parseAggConfig(form.aggregation_config);
-    SupabaseProvider.createRequirement({
+    var payload = {
       division_id: form.division_id,
       requirement_type: form.requirement_type,
       cda_requirement_type: form.cda_requirement_type || null,
@@ -4287,6 +4309,14 @@ function adminCreateRequirement(form) {
       minimum_cda: parseFloat(form.minimum_cda) || 0,
       rsu_unit: form.rsu_unit || "Case",
       cda_unit: form.cda_unit || "Case",
+      default_rsu:
+        form.default_rsu !== "" && form.default_rsu != null
+          ? parseFloat(form.default_rsu)
+          : null,
+      default_cda:
+        form.default_cda !== "" && form.default_cda != null
+          ? parseFloat(form.default_cda)
+          : null,
       is_patient_treatment:
         form.is_patient_treatment === true ||
         form.is_patient_treatment === "true",
@@ -4297,9 +4327,19 @@ function adminCreateRequirement(form) {
         form.is_selectable !== false && form.is_selectable !== "false",
       aggregation_config: aggConfig,
       display_order: parseInt(form.display_order) || 0,
-    });
-    return { success: true };
+    };
+    Logger.log("Payload to Supabase (Create): " + JSON.stringify(payload));
+    var created = SupabaseProvider.createRequirement(payload);
+    Logger.log("Supabase response (Create): " + JSON.stringify(created));
+    return {
+      success: true,
+      _debug: {
+        sent: payload,
+        received: created,
+      },
+    };
   } catch (e) {
+    Logger.log("adminCreateRequirement error: " + e.message);
     return { success: false, error: e.message };
   }
 }
@@ -4307,8 +4347,18 @@ function adminCreateRequirement(form) {
 function adminUpdateRequirement(id, form) {
   _assertAdmin();
   try {
+    Logger.log(
+      "adminUpdateRequirement called. id=" +
+        id +
+        " default_rsu=" +
+        JSON.stringify(form.default_rsu) +
+        " default_cda=" +
+        JSON.stringify(form.default_cda) +
+        " typeof_default_rsu=" +
+        typeof form.default_rsu,
+    );
     var aggConfigUpd = _parseAggConfig(form.aggregation_config);
-    SupabaseProvider.updateRequirement(id, {
+    var payload = {
       division_id: form.division_id,
       requirement_type: form.requirement_type,
       cda_requirement_type: form.cda_requirement_type || null,
@@ -4316,6 +4366,14 @@ function adminUpdateRequirement(id, form) {
       minimum_cda: parseFloat(form.minimum_cda) || 0,
       rsu_unit: form.rsu_unit || "Case",
       cda_unit: form.cda_unit || "Case",
+      default_rsu:
+        form.default_rsu !== "" && form.default_rsu != null
+          ? parseFloat(form.default_rsu)
+          : null,
+      default_cda:
+        form.default_cda !== "" && form.default_cda != null
+          ? parseFloat(form.default_cda)
+          : null,
       is_patient_treatment:
         form.is_patient_treatment === true ||
         form.is_patient_treatment === "true",
@@ -4326,8 +4384,22 @@ function adminUpdateRequirement(id, form) {
         form.is_selectable !== false && form.is_selectable !== "false",
       aggregation_config: aggConfigUpd,
       display_order: parseInt(form.display_order) || 0,
-    });
-    return { success: true };
+    };
+    Logger.log(
+      "Payload to Supabase: default_rsu=" +
+        payload.default_rsu +
+        " default_cda=" +
+        payload.default_cda,
+    );
+    var updated = SupabaseProvider.updateRequirement(id, payload);
+    Logger.log("Supabase response: " + JSON.stringify(updated));
+    return {
+      success: true,
+      _debug: {
+        sent: payload,
+        received: updated,
+      },
+    };
   } catch (e) {
     return { success: false, error: e.message };
   }

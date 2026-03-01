@@ -182,7 +182,7 @@
                   x-show="activeTab !== 'patients' && activeTab !== 'verifyHash'"
                   class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 whitespace-nowrap">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            <span x-text="activeTab === 'users' ? 'Add User' : (activeTab === 'instructors' ? 'Add Instructor' : (activeTab === 'divisions' ? 'Add Division' : (activeTab === 'floors' ? 'Add Floor' : (activeTab === 'phases' ? 'Add Phase' : (activeTab === 'catalog' ? 'Add Treatment' : (activeTab === 'caseTypes' ? 'Add Case Type' : (activeTab === 'steps' ? 'Add Step' : 'Add Requirement'))))))))"></span>
+            <span x-text="activeTab === 'users' ? 'Add User' : (activeTab === 'instructors' ? 'Add Instructor' : (activeTab === 'divisions' ? 'Add Division' : (activeTab === 'floors' ? 'Add Floor' : (activeTab === 'phases' ? 'Add Phase' : (activeTab === 'catalog' ? 'Add Treatment' : (activeTab === 'caseTypes' ? 'Add Case Type' : (activeTab === 'steps' ? 'Add Step' : 'Add Requirement')))))))"></span>
           </button>
         </div>
       </div>
@@ -762,6 +762,8 @@
              <th class="px-6 py-4">CDA Type</th>
              <th class="px-6 py-4">Min RSU (Unit)</th>
               <th class="px-6 py-4">Min CDA (Unit)</th>
+              <th class="px-6 py-4 text-center">Default RSU</th>
+              <th class="px-6 py-4 text-center">Default CDA</th>
               <th class="px-6 py-4 text-center">Pt. Tx</th>
               <th class="px-6 py-4 text-center">Non-MC</th>
               <th class="px-6 py-4 text-center">Selectable</th>
@@ -788,6 +790,12 @@
                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <span class="text-sm text-gray-700" x-text="req.minimum_cda + ' ' + (req.cda_unit || '')"></span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                  <span class="text-sm text-gray-700" x-text="req.default_rsu != null ? req.default_rsu : '—'"></span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                  <span class="text-sm text-gray-700" x-text="req.default_cda != null ? req.default_cda : '—'"></span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-center">
                   <span x-show="req.is_patient_treatment" class="text-emerald-500">
@@ -839,7 +847,7 @@
              </tr>
            </template>
            <tr x-show="filteredRequirements.length === 0">
-             <td colspan="8" class="px-6 py-8 text-center text-gray-500">No requirements found.</td>
+             <td colspan="14" class="px-6 py-8 text-center text-gray-500">No requirements found.</td>
            </tr>
          </tbody>
        </table>
@@ -926,7 +934,7 @@
     
     <!-- Panel -->
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative z-10 animate-fade-in">
-      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'instructors' ? 'Instructor' : (activeTab === 'students' ? 'Student' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : 'Requirement'))))))))))"></h2>
+      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'instructors' ? 'Instructor' : (activeTab === 'students' ? 'Student' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : 'Requirement')))))))))"></h2>
       
       <!-- User Form -->
       <div x-show="['users', 'instructors', 'students'].includes(activeTab)" class="space-y-4">
@@ -1299,6 +1307,22 @@
             <input type="text" x-model="reqForm.cda_unit" placeholder="Case"
                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
           </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
+              Default RSU
+              <span class="normal-case text-gray-400 font-normal ml-1">(auto-filled for new records; leave blank for none)</span>
+            </label>
+            <input type="number" x-model="reqForm.default_rsu" placeholder="—" min="0" step="0.01"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
+              Default CDA
+              <span class="normal-case text-gray-400 font-normal ml-1">(auto-filled for new records; leave blank for none)</span>
+            </label>
+            <input type="number" x-model="reqForm.default_cda" placeholder="—" min="0" step="0.01"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          </div>
           <div class="col-span-2 pt-2 flex flex-col space-y-2">
             <label class="flex items-center space-x-2 cursor-pointer">
               <input type="checkbox" x-model="reqForm.is_patient_treatment" class="rounded text-navy focus:ring-navy w-4 h-4 text-navy">
@@ -1608,6 +1632,8 @@
           minimum_cda: '',
           rsu_unit: '',
           cda_unit: '',
+          default_rsu: '',
+          default_cda: '',
           is_patient_treatment: true
         },
         // Case Type Form
@@ -2235,9 +2261,9 @@
           } else if (this.activeTab === 'requirements') {
             // Requirements
             if (mode === 'create') {
-              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '', display_order: 0 };
+              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', default_rsu: '', default_cda: '', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '', display_order: 0 };
             } else {
-              this.reqForm = { ...item, cda_requirement_type: item.cda_requirement_type || '', is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false, is_selectable: item.is_selectable !== false, is_exam: item.is_exam === true, aggregation_config: item.aggregation_config ? JSON.stringify(item.aggregation_config, null, 2) : '' };
+              this.reqForm = { ...item, cda_requirement_type: item.cda_requirement_type || '', default_rsu: item.default_rsu != null ? item.default_rsu : '', default_cda: item.default_cda != null ? item.default_cda : '', is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false, is_selectable: item.is_selectable !== false, is_exam: item.is_exam === true, aggregation_config: item.aggregation_config ? JSON.stringify(item.aggregation_config, null, 2) : '' };
             }
           } else {
             // Floors
@@ -2580,23 +2606,37 @@
           const handler = (res) => {
             this.saving = false;
             if (res.success) {
+              // Show detailed success message
+              let msg = 'Requirement saved successfully.';
+              if (res._debug && res._debug.sent) {
+                const s = res._debug.sent;
+                msg += `\nApplied Defaults -> RSU: ${s.default_rsu != null ? s.default_rsu : '-'}, CDA: ${s.default_cda != null ? s.default_cda : '-'}`;
+              }
+              this.warningType = 'notice';
+              this.warningMessage = msg;
+              this.warningOpen = true;
+
               this.closeModal();
-              this.loadRequirements(); 
+              // Small delay to ensure DB stability/replication before reload
+              setTimeout(() => {
+                this.loadRequirements();
+              }, 100);
             } else {
               this.errorMsg = res.error || 'Unknown error occurred.';
             }
           };
 
+          var formData = JSON.parse(JSON.stringify(this.reqForm));
           if (this.mode === 'create') {
             google.script.run
               .withSuccessHandler(handler)
               .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
-              .adminCreateRequirement(this.reqForm);
+              .adminCreateRequirement(formData);
           } else {
              google.script.run
               .withSuccessHandler(handler)
               .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
-              .adminUpdateRequirement(this.reqForm.requirement_id, this.reqForm);
+              .adminUpdateRequirement(formData.requirement_id, formData);
           }
         },
 
