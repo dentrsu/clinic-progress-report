@@ -400,34 +400,42 @@ function studentRequestEmailVerification(recordId, instructorId) {
     var appUrl = ScriptApp.getService().getUrl();
     // Build content field bag from the already-fetched record (same values shown in email)
     var _tokenFields = {
-      hn:               record.hn || "",
-      rsu_units:        record.rsu_units,
-      cda_units:        record.cda_units,
-      requirement_id:   record.requirement_id || "",
+      hn: record.hn || "",
+      rsu_units: record.rsu_units,
+      cda_units: record.cda_units,
+      requirement_id: record.requirement_id || "",
       requirement_type: reqType,
-      treatment_name:   treatmentName,
-      step_name:        stepName,
-      area:             record.area,
-      severity:         record.severity,
-      book_number:      record.book_number,
-      page_number:      record.page_number,
+      treatment_name: treatmentName,
+      step_name: stepName,
+      area: record.area,
+      severity: record.severity,
+      book_number: record.book_number,
+      page_number: record.page_number,
     };
     var _vTok = _generateActionToken(recordId, "verified", _tokenFields);
     var _rTok = _generateActionToken(recordId, "rejected", _tokenFields);
     var verifyUrl =
       appUrl +
-      "?action=verify_record&record_id=" + recordId +
+      "?action=verify_record&record_id=" +
+      recordId +
       "&status=verified" +
-      "&token=" + _vTok.token +
-      "&issued_at=" + encodeURIComponent(_vTok.issuedAt) +
-      "&cd=" + _vTok.cd;
+      "&token=" +
+      _vTok.token +
+      "&issued_at=" +
+      encodeURIComponent(_vTok.issuedAt) +
+      "&cd=" +
+      _vTok.cd;
     var rejectUrl =
       appUrl +
-      "?action=verify_record&record_id=" + recordId +
+      "?action=verify_record&record_id=" +
+      recordId +
       "&status=rejected" +
-      "&token=" + _rTok.token +
-      "&issued_at=" + encodeURIComponent(_rTok.issuedAt) +
-      "&cd=" + _rTok.cd;
+      "&token=" +
+      _rTok.token +
+      "&issued_at=" +
+      encodeURIComponent(_rTok.issuedAt) +
+      "&cd=" +
+      _rTok.cd;
 
     // Build division-specific detail rows
     var td = "padding: 8px; border-bottom: 1px solid #edf2f7;";
@@ -639,9 +647,7 @@ function _getSecret() {
     "VERIFICATION_SECRET",
   );
   if (!s)
-    throw new Error(
-      "VERIFICATION_SECRET script property is not configured.",
-    );
+    throw new Error("VERIFICATION_SECRET script property is not configured.");
   return s;
 }
 
@@ -656,10 +662,15 @@ function _hmacSha256Bytes(key, message) {
   var SHA = Utilities.DigestAlgorithm.SHA_256;
   var UTF8 = Utilities.Charset.UTF_8;
   var keyBytes = Utilities.newBlob(key, "UTF-8").getBytes();
-  if (keyBytes.length > BLOCK) keyBytes = Utilities.computeDigest(SHA, key, UTF8);
+  if (keyBytes.length > BLOCK)
+    keyBytes = Utilities.computeDigest(SHA, key, UTF8);
   while (keyBytes.length < BLOCK) keyBytes.push(0);
-  var ipad = keyBytes.map(function (b) { return (b & 0xff) ^ 0x36; });
-  var opad = keyBytes.map(function (b) { return (b & 0xff) ^ 0x5c; });
+  var ipad = keyBytes.map(function (b) {
+    return (b & 0xff) ^ 0x36;
+  });
+  var opad = keyBytes.map(function (b) {
+    return (b & 0xff) ^ 0x5c;
+  });
   var msgBytes = Utilities.newBlob(message, "UTF-8").getBytes();
   var inner = Utilities.computeDigest(SHA, ipad.concat(msgBytes));
   return Utilities.computeDigest(SHA, opad.concat(inner));
@@ -741,7 +752,12 @@ function _contentDigest(fields) {
  * @param {string} verifiedBy    user_id of the verifying instructor
  * @returns {string}  "v2:<64-hex-char HMAC-SHA256>"
  */
-function _computeVerificationHash(verifiedAt, recordId, contentFields, verifiedBy) {
+function _computeVerificationHash(
+  verifiedAt,
+  recordId,
+  contentFields,
+  verifiedBy,
+) {
   var content = _canonicalContentString(contentFields);
   var message = [recordId, verifiedAt, verifiedBy || "", content].join("\x00");
   return "v2:" + _bytesToHex(_hmacSha256Bytes(_getSecret(), message));
@@ -801,9 +817,10 @@ function _validateActionToken(recordId, action, token, issuedAt, cd) {
     };
   }
   var payload = [recordId, action, issuedAt, cd].join("\x00");
-  var expected = _bytesToHex(
-    _hmacSha256Bytes(_getSecret(), payload),
-  ).slice(0, 32);
+  var expected = _bytesToHex(_hmacSha256Bytes(_getSecret(), payload)).slice(
+    0,
+    32,
+  );
   var t = token || "";
   if (expected.length !== t.length) {
     return { valid: false, reason: "Invalid verification token." };
@@ -831,24 +848,32 @@ function _validateActionToken(recordId, action, token, issuedAt, cd) {
  * @param {Object} contentFields Flat content field bag
  * @returns {string}  Full URL string
  */
-function _buildVerifierUrl(appUrl, verifiedAt, recordId, requirementId, verifiedBy, vHash, contentFields) {
+function _buildVerifierUrl(
+  appUrl,
+  verifiedAt,
+  recordId,
+  requirementId,
+  verifiedBy,
+  vHash,
+  contentFields,
+) {
   var f = contentFields || {};
   var parts = [
     "page=verify",
-    "verified_at="      + encodeURIComponent(verifiedAt                   || ""),
-    "record_id="        + encodeURIComponent(recordId                     || ""),
-    "requirement_id="   + encodeURIComponent(requirementId                || ""),
-    "verified_by="      + encodeURIComponent(verifiedBy                   || ""),
-    "hash="             + encodeURIComponent(vHash                        || ""),
-    "rsu_units="        + encodeURIComponent(_strField(f.rsu_units)),
-    "cda_units="        + encodeURIComponent(_strField(f.cda_units)),
+    "verified_at=" + encodeURIComponent(verifiedAt || ""),
+    "record_id=" + encodeURIComponent(recordId || ""),
+    "requirement_id=" + encodeURIComponent(requirementId || ""),
+    "verified_by=" + encodeURIComponent(verifiedBy || ""),
+    "hash=" + encodeURIComponent(vHash || ""),
+    "rsu_units=" + encodeURIComponent(_strField(f.rsu_units)),
+    "cda_units=" + encodeURIComponent(_strField(f.cda_units)),
     "requirement_type=" + encodeURIComponent(_strField(f.requirement_type)),
-    "treatment_name="   + encodeURIComponent(_strField(f.treatment_name)),
-    "step_name="        + encodeURIComponent(_strField(f.step_name)),
-    "area="             + encodeURIComponent(_strField(f.area)),
-    "severity="         + encodeURIComponent(_strField(f.severity)),
-    "book_number="      + encodeURIComponent(_strField(f.book_number)),
-    "page_number="      + encodeURIComponent(_strField(f.page_number)),
+    "treatment_name=" + encodeURIComponent(_strField(f.treatment_name)),
+    "step_name=" + encodeURIComponent(_strField(f.step_name)),
+    "area=" + encodeURIComponent(_strField(f.area)),
+    "severity=" + encodeURIComponent(_strField(f.severity)),
+    "book_number=" + encodeURIComponent(_strField(f.book_number)),
+    "page_number=" + encodeURIComponent(_strField(f.page_number)),
   ];
   return appUrl + "?" + parts.join("&");
 }
@@ -866,13 +891,23 @@ function _buildVerifierUrl(appUrl, verifiedAt, recordId, requirementId, verified
  * @param {string} [verifierUrl] Optional pre-filled URL to ?page=verify
  * @returns {string}  HTML string
  */
-function _buildHashProofHtml(verifiedAt, recordId, requirementId, verifiedBy, vHash, verifierUrl) {
-  var td    = "padding:4px 0;";
-  var label = td + "color:#374151;font-weight:600;width:110px;white-space:nowrap;";
-  var mono  = td + "font-family:monospace;color:#1f2937;word-break:break-all;";
+function _buildHashProofHtml(
+  verifiedAt,
+  recordId,
+  requirementId,
+  verifiedBy,
+  vHash,
+  verifierUrl,
+) {
+  var td = "padding:4px 0;";
+  var label =
+    td + "color:#374151;font-weight:600;width:110px;white-space:nowrap;";
+  var mono = td + "font-family:monospace;color:#1f2937;word-break:break-all;";
   var verifyBtn = verifierUrl
     ? "<div style='margin-top:12px;text-align:center;'>" +
-      "<a href='" + verifierUrl + "' " +
+      "<a href='" +
+      verifierUrl +
+      "' " +
       "style='display:inline-block;padding:8px 20px;background:#166534;color:#ffffff;" +
       "text-decoration:none;border-radius:6px;font-size:12px;font-weight:700;" +
       "letter-spacing:0.02em;'>Open in Verifier (pre-filled)</a></div>"
@@ -881,11 +916,46 @@ function _buildHashProofHtml(verifiedAt, recordId, requirementId, verifiedBy, vH
     "<div style='margin-top:20px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'>" +
     "<p style='margin:0 0 8px;font-size:12px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;'>Verification Proof</p>" +
     "<table style='width:100%;border-collapse:collapse;font-size:12px;'>" +
-    "<tr><td style='" + label + "'>Verified At</td>"     + "<td style='" + mono + "'>"              + verifiedAt            + "</td></tr>" +
-    "<tr><td style='" + label + "'>Record ID</td>"       + "<td style='" + mono + "'>"              + recordId              + "</td></tr>" +
-    "<tr><td style='" + label + "'>Requirement ID</td>"  + "<td style='" + mono + "font-size:11px;'>" + (requirementId || "-") + "</td></tr>" +
-    "<tr><td style='" + label + "'>Verified By</td>"     + "<td style='" + mono + "font-size:11px;'>" + (verifiedBy    || "-") + "</td></tr>" +
-    "<tr><td style='" + label + "'>Hash</td>"            + "<td style='" + mono + "font-size:11px;'>" + vHash                 + "</td></tr>" +
+    "<tr><td style='" +
+    label +
+    "'>Verified At</td>" +
+    "<td style='" +
+    mono +
+    "'>" +
+    verifiedAt +
+    "</td></tr>" +
+    "<tr><td style='" +
+    label +
+    "'>Record ID</td>" +
+    "<td style='" +
+    mono +
+    "'>" +
+    recordId +
+    "</td></tr>" +
+    "<tr><td style='" +
+    label +
+    "'>Requirement ID</td>" +
+    "<td style='" +
+    mono +
+    "font-size:11px;'>" +
+    (requirementId || "-") +
+    "</td></tr>" +
+    "<tr><td style='" +
+    label +
+    "'>Verified By</td>" +
+    "<td style='" +
+    mono +
+    "font-size:11px;'>" +
+    (verifiedBy || "-") +
+    "</td></tr>" +
+    "<tr><td style='" +
+    label +
+    "'>Hash</td>" +
+    "<td style='" +
+    mono +
+    "font-size:11px;'>" +
+    vHash +
+    "</td></tr>" +
     "</table>" +
     verifyBtn +
     "<p style='margin:10px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof of verification. Use the button above or copy all fields to the standalone verifier.</p>" +
@@ -940,16 +1010,31 @@ function adminVerifyHashFromEmail(params) {
 
   // Parse numeric fields — form sends strings; _strField handles empty/dash
   var contentFields = {
-    rsu_units:        params.rsu_units !== "" && params.rsu_units != null ? Number(params.rsu_units) : null,
-    cda_units:        params.cda_units !== "" && params.cda_units != null ? Number(params.cda_units) : null,
-    requirement_id:   params.requirement_id,
+    rsu_units:
+      params.rsu_units !== "" && params.rsu_units != null
+        ? Number(params.rsu_units)
+        : null,
+    cda_units:
+      params.cda_units !== "" && params.cda_units != null
+        ? Number(params.cda_units)
+        : null,
+    requirement_id: params.requirement_id,
     requirement_type: params.requirement_type,
-    treatment_name:   params.treatment_name,
-    step_name:        params.step_name,
-    area:             params.area,
-    severity:         params.severity !== "" && params.severity != null ? Number(params.severity) : null,
-    book_number:      params.book_number !== "" && params.book_number != null ? Number(params.book_number) : null,
-    page_number:      params.page_number !== "" && params.page_number != null ? Number(params.page_number) : null,
+    treatment_name: params.treatment_name,
+    step_name: params.step_name,
+    area: params.area,
+    severity:
+      params.severity !== "" && params.severity != null
+        ? Number(params.severity)
+        : null,
+    book_number:
+      params.book_number !== "" && params.book_number != null
+        ? Number(params.book_number)
+        : null,
+    page_number:
+      params.page_number !== "" && params.page_number != null
+        ? Number(params.page_number)
+        : null,
   };
 
   var computed = _computeVerificationHash(
@@ -971,8 +1056,8 @@ function adminVerifyHashFromEmail(params) {
     }
   }
   return {
-    valid:    diff === 0,
-    version:  "v2",
+    valid: diff === 0,
+    version: "v2",
     computed: computed,
   };
 }
@@ -1016,20 +1101,29 @@ function adminVerifyHash(verifiedAt, recordId, hash) {
   var record = SupabaseProvider.getTreatmentRecord(recordId);
   if (!record) throw new Error("Record not found.");
   var contentFields = {
-    hn:               record.hn || "",
-    rsu_units:        record.rsu_units,
-    cda_units:        record.cda_units,
-    requirement_id:   record.requirement_id || "",
-    requirement_type: (record.requirement && record.requirement.requirement_type) || "",
-    treatment_name:   (record.treatment_catalog && record.treatment_catalog.treatment_name) || "",
-    step_name:        (record.treatment_steps && record.treatment_steps.step_name) || "",
-    area:             record.area,
-    severity:         record.severity,
-    book_number:      record.book_number,
-    page_number:      record.page_number,
+    hn: record.hn || "",
+    rsu_units: record.rsu_units,
+    cda_units: record.cda_units,
+    requirement_id: record.requirement_id || "",
+    requirement_type:
+      (record.requirement && record.requirement.requirement_type) || "",
+    treatment_name:
+      (record.treatment_catalog && record.treatment_catalog.treatment_name) ||
+      "",
+    step_name:
+      (record.treatment_steps && record.treatment_steps.step_name) || "",
+    area: record.area,
+    severity: record.severity,
+    book_number: record.book_number,
+    page_number: record.page_number,
   };
   var verifiedBy = record.verified_by || "";
-  var computed = _computeVerificationHash(verifiedAt, recordId, contentFields, verifiedBy);
+  var computed = _computeVerificationHash(
+    verifiedAt,
+    recordId,
+    contentFields,
+    verifiedBy,
+  );
 
   // Constant-time comparison
   var diff = 0;
@@ -1043,9 +1137,9 @@ function adminVerifyHash(verifiedAt, recordId, hash) {
     }
   }
   return {
-    valid:          diff === 0,
-    version:        "v2",
-    computed:       computed,
+    valid: diff === 0,
+    version: "v2",
+    computed: computed,
     current_fields: contentFields,
   };
 }
@@ -1055,12 +1149,12 @@ function adminVerifyHash(verifiedAt, recordId, hash) {
  * @param {Object} e - DoGet event parameter
  */
 function processEmailVerification(e) {
-  var recordId     = e.parameter.record_id;
-  var actionStatus = e.parameter.status;    // 'verified' | 'rejected'
-  var token        = e.parameter.token;     // HMAC action token (v2 emails)
-  var issuedAt     = e.parameter.issued_at; // token issuedAt (v2 emails)
-  var cd           = e.parameter.cd;        // content digest (v2 emails)
-  var url          = ScriptApp.getService().getUrl();
+  var recordId = e.parameter.record_id;
+  var actionStatus = e.parameter.status; // 'verified' | 'rejected'
+  var token = e.parameter.token; // HMAC action token (v2 emails)
+  var issuedAt = e.parameter.issued_at; // token issuedAt (v2 emails)
+  var cd = e.parameter.cd; // content digest (v2 emails)
+  var url = ScriptApp.getService().getUrl();
 
   var htmlTemplate =
     "<div style='font-family: Arial, sans-serif; text-align: center; padding: 50px; max-width: 500px; margin: 0 auto; border: 1px solid #ccc; border-radius: 10px; margin-top: 50px;'>" +
@@ -1094,7 +1188,13 @@ function processEmailVerification(e) {
     // Layer 1: HMAC token validation (v2 email format).
     // Old email links without a token fall through for backward compatibility.
     if (token) {
-      var tokenCheck = _validateActionToken(recordId, actionStatus, token, issuedAt, cd);
+      var tokenCheck = _validateActionToken(
+        recordId,
+        actionStatus,
+        token,
+        issuedAt,
+        cd,
+      );
       if (!tokenCheck.valid) {
         throw new Error(
           "Invalid or expired verification link: " + tokenCheck.reason,
@@ -1111,23 +1211,28 @@ function processEmailVerification(e) {
     // Skip for old emails that have no cd param.
     if (token && cd) {
       var currentFields = {
-        hn:               record.hn || "",
-        rsu_units:        record.rsu_units,
-        cda_units:        record.cda_units,
-        requirement_id:   record.requirement_id || "",
-        requirement_type: (record.requirement && record.requirement.requirement_type) || "",
-        treatment_name:   (record.treatment_catalog && record.treatment_catalog.treatment_name) || "",
-        step_name:        (record.treatment_steps && record.treatment_steps.step_name) || "",
-        area:             record.area,
-        severity:         record.severity,
-        book_number:      record.book_number,
-        page_number:      record.page_number,
+        hn: record.hn || "",
+        rsu_units: record.rsu_units,
+        cda_units: record.cda_units,
+        requirement_id: record.requirement_id || "",
+        requirement_type:
+          (record.requirement && record.requirement.requirement_type) || "",
+        treatment_name:
+          (record.treatment_catalog &&
+            record.treatment_catalog.treatment_name) ||
+          "",
+        step_name:
+          (record.treatment_steps && record.treatment_steps.step_name) || "",
+        area: record.area,
+        severity: record.severity,
+        book_number: record.book_number,
+        page_number: record.page_number,
       };
       var currentCd = _contentDigest(currentFields);
       if (currentCd !== cd) {
         throw new Error(
           "This record was modified after the verification request was sent. " +
-          "Please ask the student to re-request verification.",
+            "Please ask the student to re-request verification.",
         );
       }
     }
@@ -1176,21 +1281,48 @@ function processEmailVerification(e) {
           if (actionStatus === "verified") {
             var vAt = updates.verified_at;
             var _proofFields = currentFields || {
-              hn:               record.hn || "",
-              rsu_units:        record.rsu_units,
-              cda_units:        record.cda_units,
-              requirement_id:   record.requirement_id || "",
-              requirement_type: (record.requirement && record.requirement.requirement_type) || "",
-              treatment_name:   (record.treatment_catalog && record.treatment_catalog.treatment_name) || "",
-              step_name:        (record.treatment_steps && record.treatment_steps.step_name) || "",
-              area:             record.area,
-              severity:         record.severity,
-              book_number:      record.book_number,
-              page_number:      record.page_number,
+              hn: record.hn || "",
+              rsu_units: record.rsu_units,
+              cda_units: record.cda_units,
+              requirement_id: record.requirement_id || "",
+              requirement_type:
+                (record.requirement && record.requirement.requirement_type) ||
+                "",
+              treatment_name:
+                (record.treatment_catalog &&
+                  record.treatment_catalog.treatment_name) ||
+                "",
+              step_name:
+                (record.treatment_steps && record.treatment_steps.step_name) ||
+                "",
+              area: record.area,
+              severity: record.severity,
+              book_number: record.book_number,
+              page_number: record.page_number,
             };
-            var vHash = _computeVerificationHash(vAt, recordId, _proofFields, profile.user_id);
-            var _verifierUrl = _buildVerifierUrl(url, vAt, recordId, _proofFields.requirement_id, profile.user_id, vHash, _proofFields);
-            hashSection = _buildHashProofHtml(vAt, recordId, _proofFields.requirement_id, profile.user_id, vHash, _verifierUrl);
+            var vHash = _computeVerificationHash(
+              vAt,
+              recordId,
+              _proofFields,
+              profile.user_id,
+            );
+            var _verifierUrl = _buildVerifierUrl(
+              url,
+              vAt,
+              recordId,
+              _proofFields.requirement_id,
+              profile.user_id,
+              vHash,
+              _proofFields,
+            );
+            hashSection = _buildHashProofHtml(
+              vAt,
+              recordId,
+              _proofFields.requirement_id,
+              profile.user_id,
+              vHash,
+              _verifierUrl,
+            );
           }
 
           // Build optional detail rows
@@ -1997,12 +2129,16 @@ var DIVISION_PROCESSORS = {
    */
   PROSTH: function (divReqs, divRecords, progressMap) {
     // Stable requirement UUIDs — CD pair confirmed 2026-03-01
-    var CD_ID       = "4c282f32-2d62-4285-b3c7-76a0225b9639";
+    var CD_ID = "4c282f32-2d62-4285-b3c7-76a0225b9639";
     var CD_UPPER_ID = "d8e91cd3-6fb2-42e0-8843-53836d5cc44d";
     var CD_LOWER_ID = "9b3872fd-b738-4f19-841e-7575b853f185";
 
     function getById(id) {
-      return divReqs.find(function (r) { return r.requirement_id === id; }) || null;
+      return (
+        divReqs.find(function (r) {
+          return r.requirement_id === id;
+        }) || null
+      );
     }
 
     function getByType(t) {
@@ -2225,8 +2361,11 @@ function _applyRequirementAggregation(
     if (op === "count_both") {
       // Count raw records from divRecords matching any source_id (ignores unit values)
       var sourceSet = {};
-      sourceIds.forEach(function (sid) { sourceSet[sid] = true; });
-      var vCount = 0, pCount = 0;
+      sourceIds.forEach(function (sid) {
+        sourceSet[sid] = true;
+      });
+      var vCount = 0,
+        pCount = 0;
       divRecords.forEach(function (rec) {
         if (!sourceSet[rec.requirement_id]) return;
         if (rec.status === "verified") {
@@ -2239,7 +2378,12 @@ function _applyRequirementAggregation(
           pCount += 1;
         }
       });
-      progressMap[reqId] = { rsu: vCount, cda: vCount, p_rsu: pCount, p_cda: pCount };
+      progressMap[reqId] = {
+        rsu: vCount,
+        cda: vCount,
+        p_rsu: pCount,
+        p_cda: pCount,
+      };
     } else {
       var rsu = 0,
         cda = 0,
@@ -2588,15 +2732,21 @@ function getStudentVaultData(targetStudentId) {
         _nameMap[r.requirement_id] = r.requirement_type;
       });
       var _sourceSet = {};
-      _srcIds.forEach(function (sid) { _sourceSet[sid] = true; });
+      _srcIds.forEach(function (sid) {
+        _sourceSet[sid] = true;
+      });
       var _srcCountMap = {};
-      _srcIds.forEach(function (sid) { _srcCountMap[sid] = 0; });
+      _srcIds.forEach(function (sid) {
+        _srcCountMap[sid] = 0;
+      });
       _divRecordsList.forEach(function (rec) {
         if (_sourceSet[rec.requirement_id] && rec.status === "verified") {
-          _srcCountMap[rec.requirement_id] = (_srcCountMap[rec.requirement_id] || 0) + 1;
+          _srcCountMap[rec.requirement_id] =
+            (_srcCountMap[rec.requirement_id] || 0) + 1;
         }
       });
-      var _parts = [], _total = 0;
+      var _parts = [],
+        _total = 0;
       _srcIds.forEach(function (sid) {
         var cnt = _srcCountMap[sid] || 0;
         _parts.push((_nameMap[sid] || "Unknown") + " (" + cnt + ")");
@@ -2606,7 +2756,11 @@ function getStudentVaultData(targetStudentId) {
         rsuCalcHint = _parts.join(" + ") + " = " + _total;
         cdaCalcHint = rsuCalcHint;
       }
-    } else if (calcMethod === "Derived" && aggCfgParsed && aggCfgParsed.source_ids) {
+    } else if (
+      calcMethod === "Derived" &&
+      aggCfgParsed &&
+      aggCfgParsed.source_ids
+    ) {
       var _srcIds = aggCfgParsed.source_ids;
       var _op = aggCfgParsed.operation || "sum_both";
       var _nameMap = {};
@@ -3449,17 +3603,17 @@ function instructorBulkUpdateRecordStatus(payload) {
         var proofRows = sum.items
           .map(function (r) {
             var _bulkContentFields = {
-              hn:               r.hn,
-              rsu_units:        r.rsu_units,
-              cda_units:        r.cda_units,
-              requirement_id:   r.requirement_id,
+              hn: r.hn,
+              rsu_units: r.rsu_units,
+              cda_units: r.cda_units,
+              requirement_id: r.requirement_id,
               requirement_type: r.requirement_type,
-              treatment_name:   r.treatment_name,
-              step_name:        r.step_name,
-              area:             r.area,
-              severity:         r.severity,
-              book_number:      r.book_number,
-              page_number:      r.page_number,
+              treatment_name: r.treatment_name,
+              step_name: r.step_name,
+              area: r.area,
+              severity: r.severity,
+              book_number: r.book_number,
+              page_number: r.page_number,
             };
             var vHash = _computeVerificationHash(
               r._verified_at,
@@ -3528,7 +3682,9 @@ function instructorBulkUpdateRecordStatus(payload) {
               "</td></tr>" +
               "</table>" +
               "<div style='margin-top:10px;text-align:center;'>" +
-              "<a href='" + _bulkVerifierUrl + "' style='display:inline-block;padding:6px 16px;" +
+              "<a href='" +
+              _bulkVerifierUrl +
+              "' style='display:inline-block;padding:6px 16px;" +
               "background:#166534;color:#ffffff;text-decoration:none;border-radius:6px;" +
               "font-size:11px;font-weight:700;'>Open in Verifier (pre-filled)</a>" +
               "</div></div>"
@@ -5121,17 +5277,23 @@ function instructorVerifyTreatmentRecord(recordId) {
           var pageNum = record.page_number;
 
           var _ivContentFields = {
-            hn:               record.hn || "",
-            rsu_units:        record.rsu_units,
-            cda_units:        record.cda_units,
-            requirement_id:   record.requirement_id || "",
-            requirement_type: (record.requirement && record.requirement.requirement_type) || "",
-            treatment_name:   (record.treatment_catalog && record.treatment_catalog.treatment_name) || "",
-            step_name:        (record.treatment_steps && record.treatment_steps.step_name) || "",
-            area:             record.area,
-            severity:         record.severity,
-            book_number:      record.book_number,
-            page_number:      record.page_number,
+            hn: record.hn || "",
+            rsu_units: record.rsu_units,
+            cda_units: record.cda_units,
+            requirement_id: record.requirement_id || "",
+            requirement_type:
+              (record.requirement && record.requirement.requirement_type) || "",
+            treatment_name:
+              (record.treatment_catalog &&
+                record.treatment_catalog.treatment_name) ||
+              "",
+            step_name:
+              (record.treatment_steps && record.treatment_steps.step_name) ||
+              "",
+            area: record.area,
+            severity: record.severity,
+            book_number: record.book_number,
+            page_number: record.page_number,
           };
           var vHash = _computeVerificationHash(
             verifiedAt,
@@ -5562,6 +5724,7 @@ function studentListInstructorsByDivision(divisionId) {
 
 /**
  * Submit a Rotate Clinic Requirement.
+ * Creates the record as 'pending verification' and emails the instructor.
  * @param {Object} form
  * @returns {Object} { success, error? }
  */
@@ -5583,14 +5746,125 @@ function studentSubmitRotateRequirement(form) {
       area: form.area || null,
       rsu_units: form.rsu_units ? Number(form.rsu_units) : 0,
       cda_units: form.cda_units ? Number(form.cda_units) : 0,
-      status: "completed",
+      status: "pending verification",
       hn: form.hn || null,
       patient_name: form.patient_name || null,
     };
 
-    SupabaseProvider.createTreatmentRecord(payload);
+    var record = SupabaseProvider.createTreatmentRecord(payload);
+    if (!record || !record.record_id) {
+      throw new Error("Failed to create record.");
+    }
+
+    // Fetch full record with joins for email content
+    var fullRecord = SupabaseProvider.getTreatmentRecord(record.record_id);
+    if (!fullRecord) throw new Error("Could not fetch created record.");
+
+    // Resolve instructor email
+    var instructor = SupabaseProvider.getInstructorById(form.instructor_id);
+    if (!instructor) throw new Error("Instructor not found.");
+    var instEmail = instructor.users
+      ? instructor.users.email
+      : instructor.user
+        ? instructor.user.email
+        : null;
+    if (!instEmail) throw new Error("Instructor email not found.");
+
+    // Build email details
+    var patientHn = fullRecord.hn || "-";
+    var patientName = fullRecord.patient_name || "-";
+    var divCode = fullRecord.division ? fullRecord.division.code : "";
+    var divName = fullRecord.division ? fullRecord.division.name : "Rotate Clinic";
+    var reqType = fullRecord.requirement ? fullRecord.requirement.requirement_type : "";
+    var studentName = profile.name;
+
+    var appUrl = ScriptApp.getService().getUrl();
+
+    // Build action tokens (content digest over clinical fields)
+    var _tokenFields = {
+      hn: fullRecord.hn || "",
+      rsu_units: fullRecord.rsu_units,
+      cda_units: fullRecord.cda_units,
+      requirement_id: fullRecord.requirement_id || "",
+      requirement_type: reqType,
+      treatment_name: "",
+      step_name: "",
+      area: fullRecord.area,
+      severity: fullRecord.severity,
+      book_number: fullRecord.book_number,
+      page_number: fullRecord.page_number,
+    };
+    var _vTok = _generateActionToken(record.record_id, "verified", _tokenFields);
+    var _rTok = _generateActionToken(record.record_id, "rejected", _tokenFields);
+    var verifyUrl =
+      appUrl +
+      "?action=verify_record&record_id=" +
+      record.record_id +
+      "&status=verified" +
+      "&token=" + _vTok.token +
+      "&issued_at=" + encodeURIComponent(_vTok.issuedAt) +
+      "&cd=" + _vTok.cd;
+    var rejectUrl =
+      appUrl +
+      "?action=verify_record&record_id=" +
+      record.record_id +
+      "&status=rejected" +
+      "&token=" + _rTok.token +
+      "&issued_at=" + encodeURIComponent(_rTok.issuedAt) +
+      "&cd=" + _rTok.cd;
+
+    // Build email body
+    var td = "padding: 8px; border-bottom: 1px solid #edf2f7;";
+    var divRows = "";
+
+    if (divName) {
+      divRows +=
+        "<tr><td style='" + td + "'><strong>Clinic:</strong></td>" +
+        "<td style='" + td + "'>" + divName + "</td></tr>";
+    }
+    if (reqType) {
+      divRows +=
+        "<tr><td style='" + td + "'><strong>Requirement:</strong></td>" +
+        "<td style='" + td + "'>" + reqType + "</td></tr>";
+    }
+    if (fullRecord.rsu_units != null && fullRecord.rsu_units !== "") {
+      divRows +=
+        "<tr><td style='" + td + "'><strong>RSU Units:</strong></td>" +
+        "<td style='" + td + "'>" + fullRecord.rsu_units + "</td></tr>";
+    }
+    if (fullRecord.cda_units != null && fullRecord.cda_units !== "") {
+      divRows +=
+        "<tr><td style='" + td + "'><strong>CDA Units:</strong></td>" +
+        "<td style='" + td + "'>" + fullRecord.cda_units + "</td></tr>";
+    }
+
+    var htmlBody =
+      "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>" +
+      "<h2 style='color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>Verification Request (Rotate Clinic)</h2>" +
+      "<p><strong>Student:</strong> " + studentName + " has requested verification for a rotate clinic requirement.</p>" +
+      "<table style='width: 100%; border-collapse: collapse; margin: 20px 0;'>" +
+      "<tr><td style='" + td + "'><strong>Patient HN:</strong></td><td style='" + td + "'>" + patientHn + "</td></tr>" +
+      "<tr><td style='" + td + "'><strong>Patient Name:</strong></td><td style='" + td + "'>" + patientName + "</td></tr>" +
+      "<tr><td style='" + td + "'><strong>Area:</strong></td><td style='" + td + "'>" + (fullRecord.area || "-") + "</td></tr>" +
+      divRows +
+      "</table>" +
+      "<p style='margin-bottom: 30px;'>Please review the work and click one of the actions below:</p>" +
+      "<div style='text-align: center;'>" +
+      "<p style='margin: 0 0 12px 0;'><a href='" + verifyUrl + "' style='background-color: #10b981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Verify Treatment</a></p>" +
+      "<p style='margin: 0;'><a href='" + rejectUrl + "' style='background-color: #ef4444; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Reject Treatment</a></p>" +
+      "</div>" +
+      "<p style='margin-top: 30px; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px;'>Note: Clicking these links will securely process the action based on your active Google Workspace login.</p>" +
+      "</div>";
+
+    MailApp.sendEmail({
+      to: instEmail,
+      subject: "Verification Request: " + (reqType || divName) + " (" + divCode + ") — " + studentName,
+      htmlBody: htmlBody,
+    });
+
     return { success: true };
   } catch (e) {
+    Logger.log("studentSubmitRotateRequirement error: " + e.message);
     return { success: false, error: e.message };
   }
 }
