@@ -489,3 +489,90 @@ where record_id = 'RECORD_UUID';
 ```
 
 ---
+
+## 5. Verification Hash System
+
+### Overview
+
+Verification proofs are embedded in student notification emails after a record is verified. The hash cryptographically binds the clinical content to the verification event so tampering can be detected later.
+
+### Hash algorithm (v2, 2026-03-02)
+
+```
+message  = recordId \x00 verifiedAt \x00 verifiedBy \x00 canonicalContent
+hash     = "v2:" + HMAC-SHA256(VERIFICATION_SECRET, message)   // hex, 64 chars
+```
+
+`canonicalContent` is a null-byte-delimited string of 11 clinical fields in fixed order:
+
+```
+hn \x00 rsu_units \x00 cda_units \x00 requirement_id \x00 requirement_type
+   \x00 treatment_name \x00 step_name \x00 area \x00 severity
+   \x00 book_number \x00 page_number
+```
+
+Null / undefined / `"-"` display placeholders are all normalised to `""` before concatenation.
+
+### Legacy hash (v1, pre-2026-03-02)
+
+```
+hash = SHA256(verifiedAt + "|" + recordId + "|" + VERIFICATION_SECRET)   // hex, 64 chars
+```
+
+No `"v2:"` prefix. `adminVerifyHash` detects the prefix and selects the appropriate algorithm.
+
+### Email action tokens
+
+Verify/reject links in instructor emails carry a signed, expiring token:
+
+```
+payload = recordId \x00 action \x00 issuedAt \x00 contentDigest
+token   = first 32 hex chars of HMAC-SHA256(VERIFICATION_SECRET, payload)
+```
+
+`contentDigest` = first 32 hex chars of SHA-256(canonicalContent) at submission time.
+
+URL params: `&token=<32hex>&issued_at=<ISO>&cd=<32hex>`
+
+TTL: 7 days. Old emails without `token`/`cd` fall through for backward compatibility.
+
+### Admin verification — two modes
+
+#### DB-assisted (`adminVerifyHash`)
+
+Call `adminVerifyHash(verifiedAt, recordId, hash)` — fetches the current record from DB internally:
+
+- **v2**: recomputes hash from current DB state, returns `{valid, computed, current_fields}`. A mismatch means DB fields were changed after verification — compare `current_fields` against the email to identify what was altered.
+- **v1**: uses legacy algorithm, returns `{valid, computed, note}`.
+
+#### Standalone (`adminVerifyHashFromEmail`) — no DB access required
+
+Route: `?page=verify` (accessible to admin and instructor roles). A form-based page where the admin copies all fields directly from the email. No DB is queried — the hash is recomputed purely from the supplied inputs.
+
+Call `adminVerifyHashFromEmail(params)` with **all 15 fields**:
+
+| Group | Field | Source in email |
+|---|---|---|
+| Proof block | `verified_at` | Green box → "Verified At" |
+| Proof block | `record_id` | Green box → "Record ID" |
+| Proof block | `requirement_id` | Green box → "Requirement ID" |
+| Proof block | `verified_by` | Green box → "Verified By" |
+| Proof block | `hash` | Green box → "Hash" |
+| Email body | `hn` | Table → "Patient HN" |
+| Email body | `requirement_type` | Table → "Requirement" |
+| Email body | `treatment_name` | Table → "Treatment" |
+| Email body | `step_name` | Table → "Step" |
+| Email body | `rsu_units` | Table → "RSU Units" (blank if absent) |
+| Email body | `cda_units` | Table → "CDA Units" (blank if absent) |
+| Email body | `area` | Table → "Area / Teeth" (blank if absent) |
+| Email body | `severity` | Table → "Severity" (blank if absent) |
+| Email body | `book_number` | Table → "Book Number" (blank if absent) |
+| Email body | `page_number` | Table → "Page Number" (blank if absent) |
+
+Returns `{valid, version, computed}`. Only supports v2 hashes.
+
+### Script Property required
+
+`VERIFICATION_SECRET` must be set in GAS Script Properties. The system throws on startup if missing.
+
+---

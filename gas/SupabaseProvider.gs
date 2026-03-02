@@ -1008,6 +1008,7 @@ var SupabaseProvider = (function () {
         "page_number",
         "is_exam",
         "perio_exams",
+        "requirement_id",
         "status",
         "updated_at",
         "treatment_catalog(treatment_name,divisions(name,code))",

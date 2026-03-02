@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verification Workflow — DentRSU Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      color: #1a202c;
+      background: #f8fafc;
+      line-height: 1.55;
+    }
+
+    /* ── Sticky nav ── */
+    .top-nav {
+      position: sticky; top: 0; z-index: 50;
+      background: #1a365d; color: #fff;
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .top-nav a.back {
+      display: flex; align-items: center; gap-6px;
+      color: #fff; text-decoration: none;
+      background: rgba(255,255,255,.12); border-radius: 6px;
+      padding: 5px 10px; font-size: 12px; font-weight: 600;
+      transition: background .15s;
+    }
+    .top-nav a.back:hover { background: rgba(255,255,255,.22); }
+    .top-nav .nav-title {
+      flex: 1; text-align: center;
+      font-size: 13px; font-weight: 700; letter-spacing: .02em;
+    }
+    .top-nav button.pdf-btn {
+      background: #c4972f; color: #fff; border: none;
+      border-radius: 6px; padding: 5px 14px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: background .15s;
+    }
+    .top-nav button.pdf-btn:hover { background: #a87a22; }
+
+    /* ── Page shell ── */
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 32px 44px 48px;
+    }
+
+    /* ── Typography ── */
+    h1 { font-size: 22px; font-weight: 800; color: #1a365d; }
+    h2 { font-size: 15px; font-weight: 700; color: #2d3748; margin-bottom: 10px; }
+    h3 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    p  { margin-bottom: 8px; }
+
+    /* ── Header band ── */
+    .doc-header {
+      display: flex; align-items: flex-start; gap: 16px;
+      border-bottom: 3px solid #2b6cb0; padding-bottom: 18px; margin-bottom: 28px;
+    }
+    .doc-header .badge {
+      background: #2b6cb0; color: #fff;
+      font-size: 10px; font-weight: 700; letter-spacing: .08em;
+      padding: 3px 8px; border-radius: 4px; white-space: nowrap; margin-top: 4px;
+    }
+    .doc-header p { font-size: 12px; color: #4a5568; margin: 4px 0 0; }
+
+    /* ── Section spacing ── */
+    .section { margin-bottom: 30px; }
+
+    /* ── Role pills ── */
+    .roles { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+    .role-pill {
+      flex: 1; min-width: 160px;
+      border-radius: 10px; padding: 12px 14px;
+      border: 1.5px solid;
+    }
+    .role-pill.student  { background:#ebf8ff; border-color:#90cdf4; }
+    .role-pill.instr    { background:#f0fff4; border-color:#9ae6b4; }
+    .role-pill.admin    { background:#faf5ff; border-color:#d6bcfa; }
+    .role-pill h3       { font-size: 11px; }
+    .role-pill.student h3 { color:#2b6cb0; }
+    .role-pill.instr h3   { color:#276749; }
+    .role-pill.admin h3   { color:#553c9a; }
+    .role-pill ul { font-size: 11px; color: #4a5568; padding-left: 14px; }
+    .role-pill ul li { margin-bottom: 2px; }
+
+    /* ── Flowchart lane ── */
+    .lane-head {
+      padding: 5px 8px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em;
+      text-align: center; border-radius: 6px 6px 0 0;
+    }
+    .lane-head.student { background:#bee3f8; color:#2b6cb0; }
+    .lane-head.system  { background:#c6f6d5; color:#276749; }
+    .lane-head.instr   { background:#e9d8fd; color:#553c9a; }
+
+    /* Step rows */
+    .step-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 1fr 1fr;
+      width: 100%; border-bottom: 1px dashed #e2e8f0;
+    }
+    .step-row:last-child { border-bottom: none; }
+    .step-num {
+      padding: 8px 10px; font-size: 10px; font-weight: 700; color: #718096;
+      border-right: 1px solid #e2e8f0; display: flex; align-items: center;
+    }
+    .cell {
+      padding: 8px 10px; border-right: 1px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: center; min-height: 52px;
+    }
+    .cell:last-child { border-right: none; }
+    .box {
+      border-radius: 7px; padding: 7px 10px;
+      font-size: 11px; font-weight: 600; text-align: center;
+      line-height: 1.4; width: 100%;
+    }
+    .box.student { background:#bee3f8; color:#1a365d; border: 1.5px solid #90cdf4; }
+    .box.system  { background:#c6f6d5; color:#1c4532; border: 1.5px solid #68d391; }
+    .box.instr   { background:#e9d8fd; color:#322659; border: 1.5px solid #b794f4; }
+    .box.decision{
+      background:#fefcbf; color:#744210; border: 1.5px solid #f6e05e;
+      clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%);
+      padding: 10px 16px;
+    }
+
+    /* ── Hash proof ── */
+    .hash-box {
+      background: #f0fdf4; border: 1.5px solid #86efac;
+      border-radius: 10px; padding: 16px 18px; margin-bottom: 14px;
+    }
+    .hash-box h2 { color: #166534; margin-bottom: 8px; }
+    .fields-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; margin: 10px 0;
+    }
+    .field-chip {
+      font-size: 11px; font-family: monospace;
+      background: #dcfce7; color: #14532d; border-radius: 4px;
+      padding: 3px 7px; border: 1px solid #86efac;
+    }
+    .field-chip.section-a { background: #eff6ff; color: #1e3a8a; border-color: #bfdbfe; }
+
+    /* ── Verifier paths ── */
+    .paths { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .path-card { border-radius: 10px; padding: 14px 16px; border: 1.5px solid; }
+    .path-card.quick  { background: #f0fff4; border-color: #68d391; }
+    .path-card.manual { background: #fffff0; border-color: #f6e05e; }
+    .path-card h3 { font-size: 12px; margin-bottom: 8px; }
+    .path-card.quick  h3 { color: #276749; }
+    .path-card.manual h3 { color: #744210; }
+    .path-card ol  { font-size: 11px; color: #4a5568; padding-left: 15px; }
+    .path-card ol li { margin-bottom: 3px; }
+
+    /* ── Status table ── */
+    table.qref { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+    table.qref th { background: #edf2f7; color: #4a5568; text-align: left; padding: 6px 10px; font-weight: 700; }
+    table.qref td { padding: 6px 10px; border-bottom: 1px solid #edf2f7; vertical-align: top; }
+    table.qref tr:last-child td { border-bottom: none; }
+    .tag { display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+    .tag.s { background: #bee3f8; color: #2b6cb0; }
+    .tag.i { background: #c6f6d5; color: #276749; }
+
+    /* ── Callout ── */
+    .callout {
+      border-left: 4px solid #2b6cb0; background: #ebf8ff;
+      padding: 10px 14px; border-radius: 0 8px 8px 0;
+      font-size: 11px; color: #2c5282; margin-bottom: 14px;
+    }
+    .callout strong { font-weight: 700; }
+
+    /* ── FAQ ── */
+    .faq-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; }
+    .faq-item p:first-child { font-weight: 700; color: #2d3748; margin-bottom: 4px; }
+    .faq-item p:last-child  { font-size: 11px; color: #4a5568; margin: 0; }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; }
+      .top-nav { display: none !important; }
+      .page { padding: 0; max-width: 100%; }
+      .section { page-break-inside: avoid; }
+      h2 { page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Sticky nav bar ── -->
+  <nav class="top-nav">
+    <a href="<?= appUrl ?>" class="back">
+      <svg style="width:14px;height:14px;margin-right:5px;display:inline;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+      </svg>
+      Home
+    </a>
+    <span class="nav-title">Verification Workflow Guide</span>
+    <button class="pdf-btn" onclick="window.print()">Save as PDF</button>
+  </nav>
+
+  <div class="page">
+
+    <!-- ── Document header ── -->
+    <div class="doc-header">
+      <div>
+        <h1>Treatment Record Verification</h1>
+        <p>How the verification process works in DentRSU Tracker — for students, instructors, and administrators.</p>
+      </div>
+      <span class="badge">DentRSU Tracker</span>
+    </div>
+
+    <!-- ── Roles ── -->
+    <div class="section">
+      <h2>Who is involved?</h2>
+      <div class="roles">
+        <div class="role-pill student">
+          <h3>Student</h3>
+          <ul>
+            <li>Records treatments in the system</li>
+            <li>Requests verification from instructor</li>
+            <li>Receives proof email after approval</li>
+            <li>Keeps the email as official record</li>
+          </ul>
+        </div>
+        <div class="role-pill instr">
+          <h3>Instructor</h3>
+          <ul>
+            <li>Receives verification request email</li>
+            <li>Clicks Verify or Reject in the email</li>
+            <li>Can also bulk-verify from the queue</li>
+            <li>Can verify authenticity of proof emails</li>
+          </ul>
+        </div>
+        <div class="role-pill admin">
+          <h3>Admin / Advisor</h3>
+          <ul>
+            <li>Oversees progress across divisions</li>
+            <li>Can use Standalone Verifier to check any proof email</li>
+            <li>No special action needed in normal flow</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Flowchart ── -->
+    <div class="section">
+      <h2>Verification Workflow — Step by Step</h2>
+
+      <div style="display:grid;grid-template-columns:110px 1fr 1fr 1fr;width:100%;gap:0;margin-bottom:2px;">
+        <div style="background:transparent;"></div>
+        <div class="lane-head student">Student</div>
+        <div class="lane-head system">System</div>
+        <div class="lane-head instr">Instructor</div>
+      </div>
+
+      <div style="border:1px solid #e2e8f0;border-radius:0 0 8px 8px;overflow:hidden;">
+
+        <div class="step-row">
+          <div class="step-num">Step 1</div>
+          <div class="cell" style="grid-column:2/4;">
+            <div class="box student">Student completes a treatment step<br><span style="font-weight:400;font-size:10px;">(fills in RSU, CDA, area, step, etc.)</span></div>
+          </div>
+          <div class="cell"></div>
+        </div>
+
+        <div class="step-row">
+          <div class="step-num">Step 2</div>
+          <div class="cell">
+            <div class="box student">Clicks<br>"Request Verification"</div>
+          </div>
+          <div class="cell">
+            <div class="box system">System sends email to instructor<br><span style="font-weight:400;font-size:10px;">(with signed action links)</span></div>
+          </div>
+          <div class="cell">
+            <div class="box instr">Instructor<br>receives email</div>
+          </div>
+        </div>
+
+        <div class="step-row">
+          <div class="step-num">Step 3</div>
+          <div class="cell"></div>
+          <div class="cell"></div>
+          <div class="cell">
+            <div class="box decision" style="font-size:11px;font-weight:700;">Verify or Reject?</div>
+          </div>
+        </div>
+
+        <div class="step-row">
+          <div class="step-num">Step 4a<br><span style="font-size:9px;color:#276749;">✓ Verified</span></div>
+          <div class="cell">
+            <div class="box system" style="background:#c6f6d5;">Record marked<br><strong>Verified ✓</strong></div>
+          </div>
+          <div class="cell">
+            <div class="box system">System sends <strong>proof email</strong> to student<br><span style="font-weight:400;font-size:10px;">(with hash proof block)</span></div>
+          </div>
+          <div class="cell">
+            <div class="box instr" style="background:#c6f6d5;color:#1c4532;">Clicks "Verify" button<br>in email</div>
+          </div>
+        </div>
+
+        <div class="step-row">
+          <div class="step-num">Step 4b<br><span style="font-size:9px;color:#c53030;">✗ Rejected</span></div>
+          <div class="cell">
+            <div class="box" style="background:#fed7e2;color:#702459;border:1.5px solid #fbb6ce;">Record marked<br><strong>Rejected ✗</strong></div>
+          </div>
+          <div class="cell">
+            <div class="box system" style="background:#fed7e2;color:#702459;">System sends<br>rejection email to student</div>
+          </div>
+          <div class="cell">
+            <div class="box instr" style="background:#fed7e2;color:#702459;">Clicks "Reject" button<br>in email</div>
+          </div>
+        </div>
+
+        <div class="step-row">
+          <div class="step-num">Step 5</div>
+          <div class="cell" style="grid-column:2/5;">
+            <div class="box student" style="text-align:left;background:#eff6ff;border-color:#bfdbfe;color:#1e3a8a;">
+              Student receives the proof email and <strong>archives it</strong> — this email is the official record of verification.
+              The green proof block contains a cryptographic hash that proves the email has not been tampered with.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Bulk note ── -->
+    <div class="callout">
+      <strong>Bulk Verification (Verification Queue):</strong> Instructors can also verify or reject multiple records at once from the Verification Queue page. Each student still receives an individual summary email containing proof blocks for every verified record.
+    </div>
+
+    <!-- ── Hash proof explainer ── -->
+    <div class="section">
+      <div class="hash-box">
+        <h2>What is the Verification Proof Block?</h2>
+        <p style="font-size:11px;color:#4a5568;margin-bottom:10px;">
+          The green box at the bottom of every verification email contains a <strong>cryptographic hash</strong> — a unique digital fingerprint computed from the exact content of the record at the moment of verification. If any field is changed after verification, the hash will no longer match.
+        </p>
+
+        <h3 style="color:#166534;margin-bottom:8px;">Fields covered by the hash</h3>
+        <p style="font-size:10px;color:#4a5568;margin-bottom:6px;"><strong style="color:#1e3a8a;">Section A</strong> — From the proof block itself:</p>
+        <div class="fields-grid" style="margin-bottom:10px;">
+          <span class="field-chip section-a">Verified At (timestamp)</span>
+          <span class="field-chip section-a">Record ID (UUID)</span>
+          <span class="field-chip section-a">Requirement ID (UUID)</span>
+          <span class="field-chip section-a">Verified By (Instructor ID)</span>
+        </div>
+        <p style="font-size:10px;color:#4a5568;margin-bottom:6px;"><strong style="color:#166534;">Section B</strong> — From the email content table:</p>
+        <div class="fields-grid">
+          <span class="field-chip">RSU Units</span>
+          <span class="field-chip">CDA Units</span>
+          <span class="field-chip">Requirement Type</span>
+          <span class="field-chip">Treatment Name</span>
+          <span class="field-chip">Step Name</span>
+          <span class="field-chip">Area / Teeth</span>
+          <span class="field-chip">Severity (PERIO)</span>
+          <span class="field-chip">Book Number (OPER)</span>
+          <span class="field-chip">Page Number (OPER)</span>
+        </div>
+        <p style="font-size:10px;color:#4a5568;margin-top:10px;">
+          The hash uses <strong>HMAC-SHA256</strong> with a server secret key — it cannot be forged without the key.
+          The prefix <code style="background:#dcfce7;padding:1px 5px;border-radius:3px;">v2:</code> identifies the algorithm version.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── How to verify ── -->
+    <div class="section">
+      <h2>How to Verify an Email's Authenticity</h2>
+      <p style="font-size:11px;color:#4a5568;margin-bottom:14px;">
+        Anyone with instructor or admin access can confirm that a proof email is genuine and that the record has not been altered since verification.
+      </p>
+
+      <div class="paths">
+        <div class="path-card quick">
+          <h3>Option A — One Click (Recommended)</h3>
+          <ol>
+            <li>Open the verification email.</li>
+            <li>Find the green <strong>Verification Proof</strong> block.</li>
+            <li>Click <strong>"Open in Verifier (pre-filled)"</strong>.</li>
+            <li>All fields fill automatically.</li>
+            <li>Click <strong>Verify Hash</strong>.</li>
+            <li>Green = authentic. Red = mismatch.</li>
+          </ol>
+        </div>
+        <div class="path-card manual">
+          <h3>Option B — Manual Entry</h3>
+          <ol>
+            <li>Open <strong>Verify Email Proof</strong> from the home page.</li>
+            <li>Copy the 5 values from the green proof block into <strong>Section A</strong>.</li>
+            <li>Copy the clinical values from the email table into <strong>Section B</strong>.</li>
+            <li>Click <strong>Verify Hash</strong>.</li>
+            <li>Green = authentic. Red = mismatch or wrong field.</li>
+          </ol>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;padding:10px 14px;background:#fff5f5;border:1.5px solid #fc8181;border-radius:8px;font-size:11px;color:#c53030;">
+        <strong>If verification fails:</strong> re-check that each value is copied exactly as shown in the email (no extra spaces). A red result means at least one field differs from what was recorded at the time of verification — this may indicate the record was edited after approval.
+      </div>
+    </div>
+
+    <!-- ── Status reference ── -->
+    <div class="section">
+      <h2>Record Status Reference</h2>
+      <table class="qref">
+        <thead>
+          <tr>
+            <th style="width:150px;">Status</th>
+            <th>Meaning</th>
+            <th style="width:100px;">Who acts next</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>In Progress</strong></td>
+            <td>Student has started recording but not yet requested verification.</td>
+            <td><span class="tag s">Student</span></td>
+          </tr>
+          <tr>
+            <td><strong>Pending Verification</strong></td>
+            <td>Student has requested verification. Waiting for instructor action.</td>
+            <td><span class="tag i">Instructor</span></td>
+          </tr>
+          <tr>
+            <td><strong>Verified ✓</strong></td>
+            <td>Instructor approved the record. A proof email has been sent to the student.</td>
+            <td>— Done —</td>
+          </tr>
+          <tr>
+            <td><strong>Rejected ✗</strong></td>
+            <td>Instructor rejected the record. Student must correct and re-submit.</td>
+            <td><span class="tag s">Student</span></td>
+          </tr>
+          <tr>
+            <td><strong>Completed</strong></td>
+            <td>Record has been marked complete (treatment step finished).</td>
+            <td>— Done —</td>
+          </tr>
+          <tr>
+            <td><strong>Void</strong></td>
+            <td>Record cancelled and excluded from all calculations.</td>
+            <td>— Excluded —</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── FAQ ── -->
+    <div class="section">
+      <h2>Frequently Asked Questions</h2>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <div class="faq-item">
+          <p>Can I request verification for a new record directly (without saving first)?</p>
+          <p>Yes. The "Request Verification" button works on both new and existing records. The system saves the record first, then sends the verification email.</p>
+        </div>
+
+        <div class="faq-item">
+          <p>What happens if I edit a record after it has been verified?</p>
+          <p>The record in the system will no longer match the original proof email. If someone runs the verifier against the old email, the hash check will fail — this is intentional and indicates the record was changed post-approval.</p>
+        </div>
+
+        <div class="faq-item">
+          <p>The "Open in Verifier" button says the hash is invalid. Why?</p>
+          <p>This can happen if (1) the record was edited in the database after verification, (2) the email was corrupted or altered, or (3) the proof belongs to a different record. Check all fields against the email carefully.</p>
+        </div>
+
+        <div class="faq-item">
+          <p>Is the Standalone Verifier accessible without logging in?</p>
+          <p>No. The verifier requires an instructor or admin account. The computation itself uses no database, but a system login is required to access the tool.</p>
+        </div>
+
+        <div class="faq-item">
+          <p>What does the "v2:" prefix on the hash mean?</p>
+          <p>It identifies the hash algorithm version (HMAC-SHA256 with content coverage). Older emails without this prefix used a simpler algorithm and can only be checked through the database-assisted admin tool, not the standalone verifier.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Footer ── -->
+    <div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:12px;font-size:10px;color:#a0aec0;text-align:center;">
+      DentRSU Tracker &mdash; Internal Document &mdash; Rangsit University College of Dental Medicine
+    </div>
+
+  </div>
+</body>
+</html>

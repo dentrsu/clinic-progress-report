@@ -398,16 +398,36 @@ function studentRequestEmailVerification(recordId, instructorId) {
     var reqType = record.requirement ? record.requirement.requirement_type : "";
 
     var appUrl = ScriptApp.getService().getUrl();
+    // Build content field bag from the already-fetched record (same values shown in email)
+    var _tokenFields = {
+      hn:               record.hn || "",
+      rsu_units:        record.rsu_units,
+      cda_units:        record.cda_units,
+      requirement_id:   record.requirement_id || "",
+      requirement_type: reqType,
+      treatment_name:   treatmentName,
+      step_name:        stepName,
+      area:             record.area,
+      severity:         record.severity,
+      book_number:      record.book_number,
+      page_number:      record.page_number,
+    };
+    var _vTok = _generateActionToken(recordId, "verified", _tokenFields);
+    var _rTok = _generateActionToken(recordId, "rejected", _tokenFields);
     var verifyUrl =
       appUrl +
-      "?action=verify_record&record_id=" +
-      recordId +
-      "&status=verified";
+      "?action=verify_record&record_id=" + recordId +
+      "&status=verified" +
+      "&token=" + _vTok.token +
+      "&issued_at=" + encodeURIComponent(_vTok.issuedAt) +
+      "&cd=" + _vTok.cd;
     var rejectUrl =
       appUrl +
-      "?action=verify_record&record_id=" +
-      recordId +
-      "&status=rejected";
+      "?action=verify_record&record_id=" + recordId +
+      "&status=rejected" +
+      "&token=" + _rTok.token +
+      "&issued_at=" + encodeURIComponent(_rTok.issuedAt) +
+      "&cd=" + _rTok.cd;
 
     // Build division-specific detail rows
     var td = "padding: 8px; border-bottom: 1px solid #edf2f7;";
@@ -605,26 +625,53 @@ function studentRequestEmailVerification(recordId, instructorId) {
   }
 }
 
+// ──────────────────────────────────────────────
+//  Verification Crypto Helpers
+// ──────────────────────────────────────────────
+
 /**
- * Compute a one-way verification hash for a treatment record.
- * Input: SHA-256( verifiedAt | recordId | VERIFICATION_SECRET )
- * @param {string} verifiedAt  ISO-8601 timestamp of verification
- * @param {string} recordId    UUID of the treatment record
- * @returns {string} Hex-encoded SHA-256 hash
+ * Get VERIFICATION_SECRET from Script Properties.
+ * Throws if not set — fail-loud, never silently fall back to an empty key.
+ * @returns {string}
  */
-function _computeVerificationHash(verifiedAt, recordId) {
-  var secret =
-    PropertiesService.getScriptProperties().getProperty(
-      "VERIFICATION_SECRET",
-    ) || "";
-  var raw = verifiedAt + "|" + recordId + "|" + secret;
-  var digest = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    raw,
-    Utilities.Charset.UTF_8,
+function _getSecret() {
+  var s = PropertiesService.getScriptProperties().getProperty(
+    "VERIFICATION_SECRET",
   );
-  // Convert byte array to hex string
-  return digest
+  if (!s)
+    throw new Error(
+      "VERIFICATION_SECRET script property is not configured.",
+    );
+  return s;
+}
+
+/**
+ * HMAC-SHA256 (RFC 2104) implemented via GAS Utilities.computeDigest.
+ * @param {string} key     Secret key string
+ * @param {string} message Message to authenticate
+ * @returns {number[]}     Raw byte array (32 bytes)
+ */
+function _hmacSha256Bytes(key, message) {
+  var BLOCK = 64;
+  var SHA = Utilities.DigestAlgorithm.SHA_256;
+  var UTF8 = Utilities.Charset.UTF_8;
+  var keyBytes = Utilities.newBlob(key, "UTF-8").getBytes();
+  if (keyBytes.length > BLOCK) keyBytes = Utilities.computeDigest(SHA, key, UTF8);
+  while (keyBytes.length < BLOCK) keyBytes.push(0);
+  var ipad = keyBytes.map(function (b) { return (b & 0xff) ^ 0x36; });
+  var opad = keyBytes.map(function (b) { return (b & 0xff) ^ 0x5c; });
+  var msgBytes = Utilities.newBlob(message, "UTF-8").getBytes();
+  var inner = Utilities.computeDigest(SHA, ipad.concat(msgBytes));
+  return Utilities.computeDigest(SHA, opad.concat(inner));
+}
+
+/**
+ * Convert a raw byte array to a lowercase hex string.
+ * @param {number[]} bytes
+ * @returns {string}
+ */
+function _bytesToHex(bytes) {
+  return bytes
     .map(function (b) {
       return ("0" + ((b + 256) % 256).toString(16)).slice(-2);
     })
@@ -632,11 +679,314 @@ function _computeVerificationHash(verifiedAt, recordId) {
 }
 
 /**
+ * Normalize a single field value for use in the canonical content string.
+ * Treats null, undefined, and the display placeholder "-" as empty string.
+ * Numeric values are stringified; everything else is coerced to string.
+ * @param {*} v
+ * @returns {string}
+ */
+function _strField(v) {
+  if (v == null || v === "-") return "";
+  return String(v);
+}
+
+/**
+ * Build a deterministic null-byte-delimited canonical string from the
+ * clinical fields shown in verification emails.
+ * Null byte (\x00) separator prevents boundary ambiguity — field values
+ * never contain \x00. "-" display placeholders are normalised to "".
+ * @param {Object} f  Flat field bag — values as primitives or null/"-"
+ * @returns {string}
+ */
+function _canonicalContentString(f) {
+  return [
+    _strField(f.rsu_units),
+    _strField(f.cda_units),
+    _strField(f.requirement_id),
+    _strField(f.requirement_type),
+    _strField(f.treatment_name),
+    _strField(f.step_name),
+    _strField(f.area),
+    _strField(f.severity),
+    _strField(f.book_number),
+    _strField(f.page_number),
+  ].join("\x00");
+}
+
+/**
+ * Compute a 128-bit (32 hex chars) content digest of a record's clinical fields.
+ * Embedded in action-token URLs at submission time and re-verified at click time
+ * to detect any edits made between request and instructor action.
+ * @param {Object} fields  Flat content field bag
+ * @returns {string}  32-char hex string
+ */
+function _contentDigest(fields) {
+  var content = _canonicalContentString(fields);
+  return _bytesToHex(
+    Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      content,
+      Utilities.Charset.UTF_8,
+    ),
+  ).slice(0, 32);
+}
+
+/**
+ * Compute the v2 HMAC-SHA256 proof hash for a verified treatment record.
+ * Covers: recordId, verifiedAt, verifiedBy, and all clinical fields in the email.
+ * Prefixed "v2:" to distinguish from legacy v1 hashes in older emails.
+ * @param {string} verifiedAt    ISO-8601 timestamp
+ * @param {string} recordId      UUID
+ * @param {Object} contentFields Flat content field bag (_canonicalContentString-compatible)
+ * @param {string} verifiedBy    user_id of the verifying instructor
+ * @returns {string}  "v2:<64-hex-char HMAC-SHA256>"
+ */
+function _computeVerificationHash(verifiedAt, recordId, contentFields, verifiedBy) {
+  var content = _canonicalContentString(contentFields);
+  var message = [recordId, verifiedAt, verifiedBy || "", content].join("\x00");
+  return "v2:" + _bytesToHex(_hmacSha256Bytes(_getSecret(), message));
+}
+
+/**
+ * Legacy v1 algorithm — SHA256(verifiedAt + "|" + recordId + "|" + secret).
+ * Kept only for adminVerifyHash backward compatibility with hashes in old emails.
+ * Do NOT call for new verifications.
+ */
+function _computeVerificationHashV1(verifiedAt, recordId) {
+  var raw = verifiedAt + "|" + recordId + "|" + _getSecret();
+  return _bytesToHex(
+    Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      raw,
+      Utilities.Charset.UTF_8,
+    ),
+  );
+}
+
+/**
+ * Generate a signed, content-bound, expiring action token for an email
+ * verify/reject link.
+ * HMAC-SHA256 payload: recordId \x00 action \x00 issuedAt \x00 contentDigest
+ * Token = first 32 hex chars (128-bit) — sufficient for single-use short-lived links.
+ * @param {string} recordId  UUID
+ * @param {string} action    'verified' | 'rejected'
+ * @param {Object} fields    Flat content field bag
+ * @returns {{ token: string, issuedAt: string, cd: string }}
+ */
+function _generateActionToken(recordId, action, fields) {
+  var issuedAt = new Date().toISOString();
+  var cd = _contentDigest(fields);
+  var payload = [recordId, action, issuedAt, cd].join("\x00");
+  var token = _bytesToHex(_hmacSha256Bytes(_getSecret(), payload)).slice(0, 32);
+  return { token: token, issuedAt: issuedAt, cd: cd };
+}
+
+/**
+ * Validate an action token from an email link.
+ * Checks expiry (7 days) and HMAC integrity using a constant-time comparison.
+ * @param {string} recordId
+ * @param {string} action    'verified' | 'rejected'
+ * @param {string} token     Token from URL param
+ * @param {string} issuedAt  issuedAt from URL param
+ * @param {string} cd        Content digest from URL param
+ * @returns {{ valid: boolean, reason: string|null }}
+ */
+function _validateActionToken(recordId, action, token, issuedAt, cd) {
+  var TTL_DAYS = 7;
+  var age = (Date.now() - new Date(issuedAt).getTime()) / 86400000;
+  if (isNaN(age) || age < 0 || age > TTL_DAYS) {
+    return {
+      valid: false,
+      reason: "Verification link has expired (valid for 7 days).",
+    };
+  }
+  var payload = [recordId, action, issuedAt, cd].join("\x00");
+  var expected = _bytesToHex(
+    _hmacSha256Bytes(_getSecret(), payload),
+  ).slice(0, 32);
+  var t = token || "";
+  if (expected.length !== t.length) {
+    return { valid: false, reason: "Invalid verification token." };
+  }
+  var diff = 0;
+  for (var i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ t.charCodeAt(i);
+  }
+  return {
+    valid: diff === 0,
+    reason: diff === 0 ? null : "Invalid verification token.",
+  };
+}
+
+/**
+ * Build a pre-filled URL to the standalone verifier page (?page=verify).
+ * All 15 hash input fields are encoded as query parameters so the form is
+ * ready to submit with one click — no manual copying required.
+ * @param {string} appUrl        Web app base URL (ScriptApp.getService().getUrl())
+ * @param {string} verifiedAt    ISO-8601 timestamp
+ * @param {string} recordId      UUID
+ * @param {string} requirementId UUID
+ * @param {string} verifiedBy    user_id UUID
+ * @param {string} vHash         v2 hash string
+ * @param {Object} contentFields Flat content field bag
+ * @returns {string}  Full URL string
+ */
+function _buildVerifierUrl(appUrl, verifiedAt, recordId, requirementId, verifiedBy, vHash, contentFields) {
+  var f = contentFields || {};
+  var parts = [
+    "page=verify",
+    "verified_at="      + encodeURIComponent(verifiedAt                   || ""),
+    "record_id="        + encodeURIComponent(recordId                     || ""),
+    "requirement_id="   + encodeURIComponent(requirementId                || ""),
+    "verified_by="      + encodeURIComponent(verifiedBy                   || ""),
+    "hash="             + encodeURIComponent(vHash                        || ""),
+    "rsu_units="        + encodeURIComponent(_strField(f.rsu_units)),
+    "cda_units="        + encodeURIComponent(_strField(f.cda_units)),
+    "requirement_type=" + encodeURIComponent(_strField(f.requirement_type)),
+    "treatment_name="   + encodeURIComponent(_strField(f.treatment_name)),
+    "step_name="        + encodeURIComponent(_strField(f.step_name)),
+    "area="             + encodeURIComponent(_strField(f.area)),
+    "severity="         + encodeURIComponent(_strField(f.severity)),
+    "book_number="      + encodeURIComponent(_strField(f.book_number)),
+    "page_number="      + encodeURIComponent(_strField(f.page_number)),
+  ];
+  return appUrl + "?" + parts.join("&");
+}
+
+/**
+ * Build the "Verification Proof" HTML block for student notification emails.
+ * Single source of truth — called from all verification paths.
+ * All five proof-block values are hash inputs — the admin needs every one for
+ * standalone verification. The optional verifierUrl pre-fills the verify page.
+ * @param {string} verifiedAt    ISO-8601 timestamp
+ * @param {string} recordId      UUID of the treatment record
+ * @param {string} requirementId UUID of the linked requirement
+ * @param {string} verifiedBy    user_id UUID of the verifying instructor
+ * @param {string} vHash         Precomputed v2 hash string (starts with "v2:")
+ * @param {string} [verifierUrl] Optional pre-filled URL to ?page=verify
+ * @returns {string}  HTML string
+ */
+function _buildHashProofHtml(verifiedAt, recordId, requirementId, verifiedBy, vHash, verifierUrl) {
+  var td    = "padding:4px 0;";
+  var label = td + "color:#374151;font-weight:600;width:110px;white-space:nowrap;";
+  var mono  = td + "font-family:monospace;color:#1f2937;word-break:break-all;";
+  var verifyBtn = verifierUrl
+    ? "<div style='margin-top:12px;text-align:center;'>" +
+      "<a href='" + verifierUrl + "' " +
+      "style='display:inline-block;padding:8px 20px;background:#166534;color:#ffffff;" +
+      "text-decoration:none;border-radius:6px;font-size:12px;font-weight:700;" +
+      "letter-spacing:0.02em;'>Open in Verifier (pre-filled)</a></div>"
+    : "";
+  return (
+    "<div style='margin-top:20px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'>" +
+    "<p style='margin:0 0 8px;font-size:12px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;'>Verification Proof</p>" +
+    "<table style='width:100%;border-collapse:collapse;font-size:12px;'>" +
+    "<tr><td style='" + label + "'>Verified At</td>"     + "<td style='" + mono + "'>"              + verifiedAt            + "</td></tr>" +
+    "<tr><td style='" + label + "'>Record ID</td>"       + "<td style='" + mono + "'>"              + recordId              + "</td></tr>" +
+    "<tr><td style='" + label + "'>Requirement ID</td>"  + "<td style='" + mono + "font-size:11px;'>" + (requirementId || "-") + "</td></tr>" +
+    "<tr><td style='" + label + "'>Verified By</td>"     + "<td style='" + mono + "font-size:11px;'>" + (verifiedBy    || "-") + "</td></tr>" +
+    "<tr><td style='" + label + "'>Hash</td>"            + "<td style='" + mono + "font-size:11px;'>" + vHash                 + "</td></tr>" +
+    "</table>" +
+    verifyBtn +
+    "<p style='margin:10px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof of verification. Use the button above or copy all fields to the standalone verifier.</p>" +
+    "</div>"
+  );
+}
+
+/**
+ * Standalone verification — recompute a v2 hash purely from the values in the email.
+ * No DB fetch. The admin supplies all hash inputs directly (copied from the proof email).
+ * All five proof-block fields + all clinical body fields are required inputs.
+ *
+ * @param {Object} params
+ *   params.verified_at      — from proof block "Verified At"
+ *   params.record_id        — from proof block "Record ID"
+ *   params.requirement_id   — from proof block "Requirement ID"
+ *   params.verified_by      — from proof block "Verified By"
+ *   params.hash             — from proof block "Hash" (must start with "v2:")
+ *   params.hn               — from email body "Patient HN"
+ *   params.rsu_units        — from email body "RSU Units" (number or blank)
+ *   params.cda_units        — from email body "CDA Units" (number or blank)
+ *   params.requirement_type — from email body "Requirement"
+ *   params.treatment_name   — from email body "Treatment"
+ *   params.step_name        — from email body "Step" (optional)
+ *   params.area             — from email body "Area / Teeth" (optional)
+ *   params.severity         — from email body "Severity" (optional, PERIO)
+ *   params.book_number      — from email body "Book Number" (optional, OPER)
+ *   params.page_number      — from email body "Page Number" (optional, OPER)
+ * @returns {{ valid: boolean, version: string, computed: string }}
+ */
+function adminVerifyHashFromEmail(params) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (
+    !profile.found ||
+    !profile.active ||
+    (profile.role !== "admin" && profile.role !== "instructor")
+  ) {
+    throw new Error("Access Denied: Admin or instructor only.");
+  }
+
+  var trimmed = (params.hash || "").trim();
+  if (!trimmed.startsWith("v2:")) {
+    return {
+      valid: false,
+      version: "v1",
+      computed: "",
+      note: "This tool only validates v2 hashes. Legacy v1 hashes require the DB-based adminVerifyHash function.",
+    };
+  }
+
+  // Parse numeric fields — form sends strings; _strField handles empty/dash
+  var contentFields = {
+    rsu_units:        params.rsu_units !== "" && params.rsu_units != null ? Number(params.rsu_units) : null,
+    cda_units:        params.cda_units !== "" && params.cda_units != null ? Number(params.cda_units) : null,
+    requirement_id:   params.requirement_id,
+    requirement_type: params.requirement_type,
+    treatment_name:   params.treatment_name,
+    step_name:        params.step_name,
+    area:             params.area,
+    severity:         params.severity !== "" && params.severity != null ? Number(params.severity) : null,
+    book_number:      params.book_number !== "" && params.book_number != null ? Number(params.book_number) : null,
+    page_number:      params.page_number !== "" && params.page_number != null ? Number(params.page_number) : null,
+  };
+
+  var computed = _computeVerificationHash(
+    params.verified_at,
+    params.record_id,
+    contentFields,
+    params.verified_by || "",
+  );
+
+  // Constant-time comparison
+  var diff = 0;
+  var a = computed;
+  var b = trimmed;
+  if (a.length !== b.length) {
+    diff = 1;
+  } else {
+    for (var i = 0; i < a.length; i++) {
+      diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+  }
+  return {
+    valid:    diff === 0,
+    version:  "v2",
+    computed: computed,
+  };
+}
+
+/**
  * Admin function: recompute verification hash and compare.
- * @param {string} verifiedAt  ISO-8601 timestamp
- * @param {string} recordId    UUID
- * @param {string} hash        Hash string provided by the student
- * @returns {{ valid: boolean, computed: string }}
+ * v2 hashes: fetches the current record from DB and recomputes the
+ * content-inclusive HMAC-SHA256. A mismatch means the record was modified
+ * after verification — current_fields shows what the DB contains now.
+ * v1 hashes (no "v2:" prefix): uses the legacy algorithm for backward compat.
+ * @param {string} verifiedAt  ISO-8601 timestamp (from the proof email)
+ * @param {string} recordId    UUID (from the proof email)
+ * @param {string} hash        Hash string from the proof email
+ * @returns {{ valid: boolean, version: string, computed: string, current_fields?: Object, note?: string }}
  */
 function adminVerifyHash(verifiedAt, recordId, hash) {
   var user = getCurrentUser();
@@ -649,10 +999,54 @@ function adminVerifyHash(verifiedAt, recordId, hash) {
   ) {
     throw new Error("Access Denied: Admin or instructor only.");
   }
-  var computed = _computeVerificationHash(verifiedAt, recordId);
+  var trimmed = (hash || "").trim();
+
+  // Legacy v1: no "v2:" prefix — use old algorithm for backward compatibility
+  if (!trimmed.startsWith("v2:")) {
+    var v1 = _computeVerificationHashV1(verifiedAt, recordId);
+    return {
+      valid: v1 === trimmed.toLowerCase(),
+      version: "v1",
+      computed: v1,
+      note: "Legacy hash — clinical content not covered. Consider re-verifying.",
+    };
+  }
+
+  // v2: fetch current record from DB to recompute content-inclusive hash
+  var record = SupabaseProvider.getTreatmentRecord(recordId);
+  if (!record) throw new Error("Record not found.");
+  var contentFields = {
+    hn:               record.hn || "",
+    rsu_units:        record.rsu_units,
+    cda_units:        record.cda_units,
+    requirement_id:   record.requirement_id || "",
+    requirement_type: (record.requirement && record.requirement.requirement_type) || "",
+    treatment_name:   (record.treatment_catalog && record.treatment_catalog.treatment_name) || "",
+    step_name:        (record.treatment_steps && record.treatment_steps.step_name) || "",
+    area:             record.area,
+    severity:         record.severity,
+    book_number:      record.book_number,
+    page_number:      record.page_number,
+  };
+  var verifiedBy = record.verified_by || "";
+  var computed = _computeVerificationHash(verifiedAt, recordId, contentFields, verifiedBy);
+
+  // Constant-time comparison
+  var diff = 0;
+  var a = computed;
+  var b = trimmed;
+  if (a.length !== b.length) {
+    diff = 1;
+  } else {
+    for (var i = 0; i < a.length; i++) {
+      diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+  }
   return {
-    valid: computed === (hash || "").trim().toLowerCase(),
-    computed: computed,
+    valid:          diff === 0,
+    version:        "v2",
+    computed:       computed,
+    current_fields: contentFields,
   };
 }
 
@@ -661,9 +1055,12 @@ function adminVerifyHash(verifiedAt, recordId, hash) {
  * @param {Object} e - DoGet event parameter
  */
 function processEmailVerification(e) {
-  var recordId = e.parameter.record_id;
-  var actionStatus = e.parameter.status; // 'verified' or 'rejected'
-  var url = ScriptApp.getService().getUrl();
+  var recordId     = e.parameter.record_id;
+  var actionStatus = e.parameter.status;    // 'verified' | 'rejected'
+  var token        = e.parameter.token;     // HMAC action token (v2 emails)
+  var issuedAt     = e.parameter.issued_at; // token issuedAt (v2 emails)
+  var cd           = e.parameter.cd;        // content digest (v2 emails)
+  var url          = ScriptApp.getService().getUrl();
 
   var htmlTemplate =
     "<div style='font-family: Arial, sans-serif; text-align: center; padding: 50px; max-width: 500px; margin: 0 auto; border: 1px solid #ccc; border-radius: 10px; margin-top: 50px;'>" +
@@ -694,6 +1091,47 @@ function processEmailVerification(e) {
       throw new Error("Invalid request parameters.");
     }
 
+    // Layer 1: HMAC token validation (v2 email format).
+    // Old email links without a token fall through for backward compatibility.
+    if (token) {
+      var tokenCheck = _validateActionToken(recordId, actionStatus, token, issuedAt, cd);
+      if (!tokenCheck.valid) {
+        throw new Error(
+          "Invalid or expired verification link: " + tokenCheck.reason,
+        );
+      }
+    }
+
+    // Fetch the record before updating (needed for Layer 3 + email notification)
+    var record = SupabaseProvider.getTreatmentRecord(recordId);
+    if (!record) throw new Error("Record not found.");
+
+    // Layer 2: Re-verify that the record content matches the email's content digest.
+    // If a student edited the record after requesting verification, cd will differ.
+    // Skip for old emails that have no cd param.
+    if (token && cd) {
+      var currentFields = {
+        hn:               record.hn || "",
+        rsu_units:        record.rsu_units,
+        cda_units:        record.cda_units,
+        requirement_id:   record.requirement_id || "",
+        requirement_type: (record.requirement && record.requirement.requirement_type) || "",
+        treatment_name:   (record.treatment_catalog && record.treatment_catalog.treatment_name) || "",
+        step_name:        (record.treatment_steps && record.treatment_steps.step_name) || "",
+        area:             record.area,
+        severity:         record.severity,
+        book_number:      record.book_number,
+        page_number:      record.page_number,
+      };
+      var currentCd = _contentDigest(currentFields);
+      if (currentCd !== cd) {
+        throw new Error(
+          "This record was modified after the verification request was sent. " +
+          "Please ask the student to re-request verification.",
+        );
+      }
+    }
+
     var updates = {
       status: actionStatus,
       updated_at: new Date().toISOString(),
@@ -708,7 +1146,6 @@ function processEmailVerification(e) {
 
     // Attempt to notify student
     try {
-      var record = SupabaseProvider.getTreatmentRecord(recordId);
       if (record && record.student_id) {
         var student = SupabaseProvider.getStudentById(record.student_id);
         if (student && student.user && student.user.email) {
@@ -721,7 +1158,6 @@ function processEmailVerification(e) {
             ? record.treatment_steps.step_name
             : "";
           var pHn = record.hn || (record.patient ? record.patient.hn : "-");
-
           var pName =
             record.patient_name || (record.patient ? record.patient.name : "-");
           var areaTeeth = record.area || "-";
@@ -739,23 +1175,22 @@ function processEmailVerification(e) {
           var hashSection = "";
           if (actionStatus === "verified") {
             var vAt = updates.verified_at;
-            var vHash = _computeVerificationHash(vAt, recordId);
-            hashSection =
-              "<div style='margin-top:20px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'>" +
-              "<p style='margin:0 0 8px;font-size:12px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;'>Verification Proof</p>" +
-              "<table style='width:100%;border-collapse:collapse;font-size:13px;'>" +
-              "<tr><td style='padding:4px 0;color:#374151;font-weight:600;width:100px;'>Verified At</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;'>" +
-              vAt +
-              "</td></tr>" +
-              "<tr><td style='padding:4px 0;color:#374151;font-weight:600;'>Record ID</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;word-break:break-all;'>" +
-              recordId +
-              "</td></tr>" +
-              "<tr><td style='padding:4px 0;color:#374151;font-weight:600;'>Hash</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;word-break:break-all;font-size:11px;'>" +
-              vHash +
-              "</td></tr>" +
-              "</table>" +
-              "<p style='margin:8px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof of verification. The hash can be validated by your program administrator.</p>" +
-              "</div>";
+            var _proofFields = currentFields || {
+              hn:               record.hn || "",
+              rsu_units:        record.rsu_units,
+              cda_units:        record.cda_units,
+              requirement_id:   record.requirement_id || "",
+              requirement_type: (record.requirement && record.requirement.requirement_type) || "",
+              treatment_name:   (record.treatment_catalog && record.treatment_catalog.treatment_name) || "",
+              step_name:        (record.treatment_steps && record.treatment_steps.step_name) || "",
+              area:             record.area,
+              severity:         record.severity,
+              book_number:      record.book_number,
+              page_number:      record.page_number,
+            };
+            var vHash = _computeVerificationHash(vAt, recordId, _proofFields, profile.user_id);
+            var _verifierUrl = _buildVerifierUrl(url, vAt, recordId, _proofFields.requirement_id, profile.user_id, vHash, _proofFields);
+            hashSection = _buildHashProofHtml(vAt, recordId, _proofFields.requirement_id, profile.user_id, vHash, _verifierUrl);
           }
 
           // Build optional detail rows
@@ -994,6 +1429,31 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Division Dashboard — DentRSU Tracker")
+      .setFaviconUrl(favicon)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
+  if (page === "guide") {
+    var t = HtmlService.createTemplateFromFile("verification-workflow");
+    t.appUrl = url;
+    t.appDevUrl = devUrl;
+    return t
+      .evaluate()
+      .setTitle("Verification Workflow — DentRSU Tracker")
+      .setFaviconUrl(favicon)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
+  if (page === "verify") {
+    var t = HtmlService.createTemplateFromFile("verify");
+    t.appUrl = url;
+    t.appDevUrl = devUrl;
+    t.prefill = JSON.stringify(e.parameter || {});
+    return t
+      .evaluate()
+      .setTitle("Verify Email Proof — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -2861,6 +3321,7 @@ function instructorGetPendingVerifications() {
       page_number: rec.page_number != null ? rec.page_number : null,
       is_exam: !!rec.is_exam,
       perio_exams: rec.perio_exams || null,
+      requirement_id: rec.requirement_id || null,
       treatment_name: rec.treatment_catalog
         ? rec.treatment_catalog.treatment_name
         : "-",
@@ -2951,6 +3412,7 @@ function instructorBulkUpdateRecordStatus(payload) {
   // Send one summary email per student
   var statusLabel = action === "verified" ? "Verified ✅" : "Rejected ❌";
   var instructorName = profile.name || "Your instructor";
+  var appUrl = ScriptApp.getService().getUrl();
   Object.keys(studentSummary).forEach(function (email) {
     try {
       var sum = studentSummary[email];
@@ -2986,7 +3448,34 @@ function instructorBulkUpdateRecordStatus(payload) {
       if (action === "verified") {
         var proofRows = sum.items
           .map(function (r) {
-            var vHash = _computeVerificationHash(r._verified_at, r.record_id);
+            var _bulkContentFields = {
+              hn:               r.hn,
+              rsu_units:        r.rsu_units,
+              cda_units:        r.cda_units,
+              requirement_id:   r.requirement_id,
+              requirement_type: r.requirement_type,
+              treatment_name:   r.treatment_name,
+              step_name:        r.step_name,
+              area:             r.area,
+              severity:         r.severity,
+              book_number:      r.book_number,
+              page_number:      r.page_number,
+            };
+            var vHash = _computeVerificationHash(
+              r._verified_at,
+              r.record_id,
+              _bulkContentFields,
+              profile.user_id,
+            );
+            var _bulkVerifierUrl = _buildVerifierUrl(
+              appUrl,
+              r._verified_at,
+              r.record_id,
+              r.requirement_id || null,
+              profile.user_id,
+              vHash,
+              _bulkContentFields,
+            );
             // Build optional detail chips
             var details = "";
             if (r.area && r.area !== "-")
@@ -3022,16 +3511,27 @@ function instructorBulkUpdateRecordStatus(payload) {
                 ? "<div style='margin-bottom:4px;'>" + details + "</div>"
                 : "") +
               "<table style='width:100%;border-collapse:collapse;font-size:11px;'>" +
-              "<tr><td style='padding:2px 0;color:#6b7280;width:80px;'>Verified At</td><td style='font-family:monospace;color:#1f2937;'>" +
+              "<tr><td style='padding:2px 0;color:#6b7280;width:100px;white-space:nowrap;'>Verified At</td><td style='font-family:monospace;color:#1f2937;'>" +
               r._verified_at +
               "</td></tr>" +
-              "<tr><td style='padding:2px 0;color:#6b7280;'>Record ID</td><td style='font-family:monospace;color:#1f2937;word-break:break-all;'>" +
+              "<tr><td style='padding:2px 0;color:#6b7280;'>Record ID</td><td style='font-family:monospace;color:#1f2937;word-break:break-all;font-size:10px;'>" +
               r.record_id +
+              "</td></tr>" +
+              "<tr><td style='padding:2px 0;color:#6b7280;'>Requirement ID</td><td style='font-family:monospace;color:#1f2937;word-break:break-all;font-size:10px;'>" +
+              (r.requirement_id || "-") +
+              "</td></tr>" +
+              "<tr><td style='padding:2px 0;color:#6b7280;'>Verified By</td><td style='font-family:monospace;color:#1f2937;word-break:break-all;font-size:10px;'>" +
+              profile.user_id +
               "</td></tr>" +
               "<tr><td style='padding:2px 0;color:#6b7280;'>Hash</td><td style='font-family:monospace;color:#1f2937;word-break:break-all;font-size:10px;'>" +
               vHash +
               "</td></tr>" +
-              "</table></div>"
+              "</table>" +
+              "<div style='margin-top:10px;text-align:center;'>" +
+              "<a href='" + _bulkVerifierUrl + "' style='display:inline-block;padding:6px 16px;" +
+              "background:#166534;color:#ffffff;text-decoration:none;border-radius:6px;" +
+              "font-size:11px;font-weight:700;'>Open in Verifier (pre-filled)</a>" +
+              "</div></div>"
             );
           })
           .join("");
@@ -3039,7 +3539,7 @@ function instructorBulkUpdateRecordStatus(payload) {
           "<div style='margin-top:20px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'>" +
           "<p style='margin:0 0 8px;font-size:12px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;'>Verification Proof</p>" +
           proofRows +
-          "<p style='margin:8px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof. The hash can be validated by your program administrator.</p>" +
+          "<p style='margin:8px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof. All fields in each block are required to validate the hash using the standalone verifier.</p>" +
           "</div>";
       }
 
@@ -4620,23 +5120,42 @@ function instructorVerifyTreatmentRecord(recordId) {
           var bookNum = record.book_number;
           var pageNum = record.page_number;
 
-          var vHash = _computeVerificationHash(verifiedAt, recordId);
-          var hashSection =
-            "<div style='margin-top:20px;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;'>" +
-            "<p style='margin:0 0 8px;font-size:12px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.05em;'>Verification Proof</p>" +
-            "<table style='width:100%;border-collapse:collapse;font-size:13px;'>" +
-            "<tr><td style='padding:4px 0;color:#374151;font-weight:600;width:100px;'>Verified At</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;'>" +
-            verifiedAt +
-            "</td></tr>" +
-            "<tr><td style='padding:4px 0;color:#374151;font-weight:600;'>Record ID</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;word-break:break-all;'>" +
-            recordId +
-            "</td></tr>" +
-            "<tr><td style='padding:4px 0;color:#374151;font-weight:600;'>Hash</td><td style='padding:4px 0;font-family:monospace;color:#1f2937;word-break:break-all;font-size:11px;'>" +
-            vHash +
-            "</td></tr>" +
-            "</table>" +
-            "<p style='margin:8px 0 0;font-size:11px;color:#6b7280;'>Keep this email as proof of verification. The hash can be validated by your program administrator.</p>" +
-            "</div>";
+          var _ivContentFields = {
+            hn:               record.hn || "",
+            rsu_units:        record.rsu_units,
+            cda_units:        record.cda_units,
+            requirement_id:   record.requirement_id || "",
+            requirement_type: (record.requirement && record.requirement.requirement_type) || "",
+            treatment_name:   (record.treatment_catalog && record.treatment_catalog.treatment_name) || "",
+            step_name:        (record.treatment_steps && record.treatment_steps.step_name) || "",
+            area:             record.area,
+            severity:         record.severity,
+            book_number:      record.book_number,
+            page_number:      record.page_number,
+          };
+          var vHash = _computeVerificationHash(
+            verifiedAt,
+            recordId,
+            _ivContentFields,
+            verifierId,
+          );
+          var _ivVerifierUrl = _buildVerifierUrl(
+            ScriptApp.getService().getUrl(),
+            verifiedAt,
+            recordId,
+            _ivContentFields.requirement_id,
+            verifierId,
+            vHash,
+            _ivContentFields,
+          );
+          var hashSection = _buildHashProofHtml(
+            verifiedAt,
+            recordId,
+            _ivContentFields.requirement_id,
+            verifierId,
+            vHash,
+            _ivVerifierUrl,
+          );
 
           // Build optional detail rows
           var optionalRows = "";

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify Email Proof — DentRSU Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .field-label { @apply block text-xs font-semibold text-gray-600 mb-1; }
+    .field-input { @apply w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white; }
+    .field-mono  { @apply w-full border border-gray-300 rounded-md px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="verifyApp()" x-cloak>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+    <a href="<?= appUrl ?>" class="text-gray-400 hover:text-gray-600">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div class="flex items-center gap-2">
+      <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+      </svg>
+      <h1 class="text-base font-bold text-gray-800">Verify Email Proof</h1>
+    </div>
+    <span class="ml-auto text-xs text-gray-400">Standalone — no DB access required</span>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Instruction banner -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+      <p class="font-semibold mb-1">How to use</p>
+      <ol class="list-decimal list-inside space-y-1 text-xs text-blue-700">
+        <li>Open the student's verification proof email.</li>
+        <li><strong>Quick:</strong> click the green <strong>Open in Verifier (pre-filled)</strong> button in the email — all fields fill automatically.</li>
+        <li><strong>Manual:</strong> copy the five values from the green <strong>Verification Proof</strong> block into Section A, then copy the clinical details from the email table into Section B.</li>
+        <li>Click <strong>Verify Hash</strong> — the hash is recomputed and compared entirely from your inputs, with no database access.</li>
+      </ol>
+    </div>
+
+    <!-- Section A: Proof Block -->
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="bg-emerald-50 border-b border-emerald-200 px-4 py-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <span class="text-sm font-bold text-emerald-800">Section A — From the Verification Proof Block</span>
+        <span class="ml-auto text-xs text-emerald-600">(the green box at the bottom of the email)</span>
+      </div>
+      <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        <div class="sm:col-span-2">
+          <label class="field-label">Verified At <span class="text-red-500">*</span></label>
+          <input x-model="form.verified_at" class="field-mono" type="text"
+                 placeholder="2026-03-02T10:00:00.000Z" />
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="field-label">Record ID <span class="text-red-500">*</span></label>
+          <input x-model="form.record_id" class="field-mono" type="text"
+                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="field-label">Requirement ID <span class="text-red-500">*</span></label>
+          <input x-model="form.requirement_id" class="field-mono" type="text"
+                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="field-label">Verified By (User ID) <span class="text-red-500">*</span></label>
+          <input x-model="form.verified_by" class="field-mono" type="text"
+                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="field-label">Hash <span class="text-red-500">*</span></label>
+          <textarea x-model="form.hash" class="field-mono" rows="3"
+                    placeholder="v2:abcdef1234..."></textarea>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Section B: Email Body Fields -->
+    <section class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+        <span class="text-sm font-bold text-gray-700">Section B — From the Email Content Table</span>
+        <span class="ml-auto text-xs text-gray-400">(leave blank if not shown in the email)</span>
+      </div>
+      <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        <div>
+          <label class="field-label">Requirement Type</label>
+          <input x-model="form.requirement_type" class="field-input" type="text" placeholder="e.g. Class II" />
+        </div>
+
+        <div>
+          <label class="field-label">Treatment Name</label>
+          <input x-model="form.treatment_name" class="field-input" type="text" placeholder="e.g. Composite Resin" />
+        </div>
+
+        <div>
+          <label class="field-label">Step Name</label>
+          <input x-model="form.step_name" class="field-input" type="text" placeholder="e.g. Completed" />
+        </div>
+
+        <div>
+          <label class="field-label">RSU Units</label>
+          <input x-model="form.rsu_units" class="field-input" type="number" step="any"
+                 placeholder="leave blank if not shown" />
+        </div>
+
+        <div>
+          <label class="field-label">CDA Units</label>
+          <input x-model="form.cda_units" class="field-input" type="number" step="any"
+                 placeholder="leave blank if not shown" />
+        </div>
+
+        <div>
+          <label class="field-label">Area / Teeth</label>
+          <input x-model="form.area" class="field-input" type="text" placeholder="e.g. 24" />
+        </div>
+
+        <div>
+          <label class="field-label">Severity</label>
+          <input x-model="form.severity" class="field-input" type="number" step="any"
+                 placeholder="leave blank if not shown" />
+        </div>
+
+        <div>
+          <label class="field-label">Book Number</label>
+          <input x-model="form.book_number" class="field-input" type="number" step="any"
+                 placeholder="leave blank if not shown" />
+        </div>
+
+        <div>
+          <label class="field-label">Page Number</label>
+          <input x-model="form.page_number" class="field-input" type="number" step="any"
+                 placeholder="leave blank if not shown" />
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Error -->
+    <div x-show="error" class="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700" x-text="error"></div>
+
+    <!-- Submit -->
+    <button @click="verify()"
+            :disabled="loading || !form.hash || !form.record_id || !form.verified_at"
+            class="w-full py-3 rounded-xl font-bold text-sm transition-all"
+            :class="loading || !form.hash || !form.record_id || !form.verified_at
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:shadow-lg'">
+      <span x-show="!loading">Verify Hash</span>
+      <span x-show="loading">Verifying…</span>
+    </button>
+
+    <!-- Result -->
+    <template x-if="result">
+      <section class="rounded-xl border-2 overflow-hidden"
+               :class="result.valid ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50'">
+
+        <!-- Verdict header -->
+        <div class="px-5 py-4 flex items-center gap-3"
+             :class="result.valid ? 'bg-emerald-100' : 'bg-red-100'">
+          <template x-if="result.valid">
+            <svg class="w-8 h-8 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </template>
+          <template x-if="!result.valid">
+            <svg class="w-8 h-8 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </template>
+          <div>
+            <p class="text-lg font-bold" :class="result.valid ? 'text-emerald-800' : 'text-red-800'"
+               x-text="result.valid ? 'Hash Valid — Email is Authentic' : 'Hash Invalid — Possible Tampering'"></p>
+            <p class="text-xs mt-0.5" :class="result.valid ? 'text-emerald-600' : 'text-red-600'"
+               x-text="result.valid
+                 ? 'The email content matches exactly what was recorded at the time of verification.'
+                 : 'The computed hash does not match. At least one field in the email differs from what was hashed.'"></p>
+          </div>
+        </div>
+
+        <!-- Computed hash comparison -->
+        <div class="px-5 py-4 space-y-3">
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Hash from Email</p>
+            <p class="font-mono text-xs break-all p-2 rounded bg-white border border-gray-200" x-text="form.hash.trim()"></p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Computed Hash</p>
+            <p class="font-mono text-xs break-all p-2 rounded bg-white border border-gray-200" x-text="result.computed"></p>
+          </div>
+
+          <!-- Diff hint when invalid -->
+          <template x-if="!result.valid">
+            <div class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-800">
+              <p class="font-semibold mb-1">Possible causes</p>
+              <ul class="list-disc list-inside space-y-0.5">
+                <li>A field was copied incorrectly — re-check each value against the email.</li>
+                <li>The record was edited in the database after verification.</li>
+                <li>The email content was altered before reaching you.</li>
+                <li>The hash belongs to a different record or verification event.</li>
+              </ul>
+            </div>
+          </template>
+        </div>
+
+      </section>
+    </template>
+
+    <!-- Field reference -->
+    <details class="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <summary class="px-4 py-3 text-sm font-semibold text-gray-700 cursor-pointer select-none">
+        Field reference — where to find each value in the email
+      </summary>
+      <div class="px-4 pb-4">
+        <table class="w-full text-xs text-gray-600 border-collapse">
+          <thead>
+            <tr class="border-b border-gray-200">
+              <th class="py-2 text-left font-semibold text-gray-700 w-40">Field</th>
+              <th class="py-2 text-left font-semibold text-gray-700">Location in email</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Verified At</td><td class="py-1.5">Green proof block → "Verified At" row</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Record ID</td><td class="py-1.5">Green proof block → "Record ID" row</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Requirement ID</td><td class="py-1.5">Green proof block → "Requirement ID" row</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Verified By</td><td class="py-1.5">Green proof block → "Verified By" row</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Hash</td><td class="py-1.5">Green proof block → "Hash" row (starts with "v2:")</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Requirement Type</td><td class="py-1.5">Email table → "Requirement"</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Treatment Name</td><td class="py-1.5">Email table → "Treatment"</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Step Name</td><td class="py-1.5">Email table → "Step" (leave blank if absent)</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">RSU Units</td><td class="py-1.5">Email table → "RSU Units" (leave blank if absent)</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">CDA Units</td><td class="py-1.5">Email table → "CDA Units" (leave blank if absent)</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Area / Teeth</td><td class="py-1.5">Email table → "Area / Teeth" (leave blank if absent)</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Severity</td><td class="py-1.5">Email table → "Severity" — PERIO only (leave blank if absent)</td></tr>
+            <tr class="border-b border-gray-100"><td class="py-1.5 font-mono">Book Number</td><td class="py-1.5">Email table → "Book Number" — OPER only (leave blank if absent)</td></tr>
+            <tr class=""><td class="py-1.5 font-mono">Page Number</td><td class="py-1.5">Email table → "Page Number" — OPER only (leave blank if absent)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+  </main>
+
+  <script>
+    // Server-injected prefill from URL query params (via doGet e.parameter)
+    var _prefill = <?!= prefill ?>;
+
+    function verifyApp() {
+      return {
+        loading: false,
+        error:   null,
+        result:  null,
+        form: {
+          verified_at:      '',
+          record_id:        '',
+          requirement_id:   '',
+          verified_by:      '',
+          hash:             '',
+          rsu_units:        '',
+          cda_units:        '',
+          requirement_type: '',
+          treatment_name:   '',
+          step_name:        '',
+          area:             '',
+          severity:         '',
+          book_number:      '',
+          page_number:      '',
+        },
+
+        init() {
+          // Pre-fill from URL query params passed by the server (e.parameter in doGet)
+          var self = this;
+          var allowed = [
+            'verified_at', 'record_id', 'requirement_id', 'verified_by', 'hash',
+            'rsu_units', 'cda_units', 'requirement_type', 'treatment_name',
+            'step_name', 'area', 'severity', 'book_number', 'page_number',
+          ];
+          allowed.forEach(function(f) {
+            if (_prefill[f] != null && _prefill[f] !== '') self.form[f] = _prefill[f];
+          });
+        },
+
+        verify() {
+          this.error  = null;
+          this.result = null;
+
+          var h = (this.form.hash || '').trim();
+          if (!h) { this.error = 'Hash is required.'; return; }
+          if (!h.startsWith('v2:')) {
+            this.error = 'Only v2 hashes are supported by this tool (must start with "v2:"). Legacy v1 hashes require the DB-based admin tool.';
+            return;
+          }
+          if (!this.form.record_id.trim())   { this.error = 'Record ID is required.';   return; }
+          if (!this.form.verified_at.trim()) { this.error = 'Verified At is required.'; return; }
+
+          this.loading = true;
+          // Pass a plain object copy to avoid Alpine proxy serialization issues
+          var params = JSON.parse(JSON.stringify(this.form));
+          var self = this;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.loading = false;
+              if (res && typeof res.valid !== 'undefined') {
+                self.result = res;
+              } else {
+                self.error = 'Unexpected response from server.';
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.loading = false;
+              self.error = err.message || 'Verification failed.';
+            })
+            .adminVerifyHashFromEmail(params);
+        },
+      };
+    }
+  </script>
+</body>
+</html>
