@@ -51,11 +51,8 @@
   <div x-show="state === 'loading'" x-transition class="text-center animate-fade-in">
     <div class="flex flex-col items-center gap-5">
       <!-- University crest placeholder -->
-      <div class="w-16 h-16 rounded-full bg-navy flex items-center justify-center shadow-lg">
-        <svg class="w-8 h-8 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
-        </svg>
+      <div class="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-lg overflow-hidden">
+        <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-1" />
       </div>
       <div class="spinner mx-auto"></div>
       <p class="text-sm text-gray-500 font-medium tracking-wide">Verifying your account…</p>
@@ -150,11 +147,8 @@
     <!-- Header / Branding strip -->
     <div class="bg-navy rounded-t-2xl px-6 py-5 text-center">
       <div class="flex items-center justify-center gap-3 mb-2">
-        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-          <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
-          </svg>
+        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden">
+          <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-0.5" />
         </div>
         <div>
           <h1 class="text-white text-base font-semibold tracking-tight">Clinic Progress Report</h1>
@@ -197,10 +191,9 @@
               </svg>
             </template>
             <template x-if="profile.role === 'student'">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
-              </svg>
+              <div class="w-4 h-4 rounded-full bg-white flex items-center justify-center overflow-hidden inline-[flex]">
+                <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain" />
+              </div>
             </template>
             <span x-text="profile.role"></span>
           </span>

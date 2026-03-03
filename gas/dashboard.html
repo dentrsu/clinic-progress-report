@@ -42,10 +42,8 @@
 
   <!-- ── Loading ─────────────────────────────────────────────── -->
   <div x-show="state === 'loading'" class="min-h-screen flex flex-col items-center justify-center animate-fade-in">
-    <div class="w-16 h-16 rounded-full bg-navy flex items-center justify-center shadow-lg mb-5">
-      <svg class="w-8 h-8 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-      </svg>
+    <div class="w-16 h-16 rounded-full bg-white flex items-center justify-center p-1 shadow-lg mb-5 overflow-hidden">
+        <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain" />
     </div>
     <div class="spinner border-4 border-navy/20 border-t-navy w-10 h-10 rounded-full mb-4"></div>
     <p class="text-sm text-gray-500 font-medium">Loading Dashboard...</p>
@@ -66,10 +64,8 @@
   <!-- ── Division Picker (Admin only) ─────────────────────────── -->
   <div x-show="state === 'pick_division'" style="display:none" class="min-h-screen bg-surface flex flex-col animate-fade-in">
     <header class="bg-navy text-white px-4 md:px-6 py-4 flex items-center gap-3 shadow-lg">
-      <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-        <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-        </svg>
+      <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden">
+        <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-0.5" />
       </div>
       <div>
         <h1 class="text-base md:text-lg font-bold leading-tight">Division Dashboard</h1>
@@ -106,10 +102,8 @@
     <!-- Header -->
     <header class="bg-navy text-white px-4 md:px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-lg print:static print:shadow-none">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-          <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-          </svg>
+        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden">
+        <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-0.5" />
         </div>
         <div>
           <h1 class="text-base md:text-lg font-bold leading-tight">Division Dashboard</h1>

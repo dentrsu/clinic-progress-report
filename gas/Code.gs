@@ -1439,7 +1439,7 @@ function doGet(e) {
     return processEmailVerification(e);
   }
 
-  var favicon = "https://img2.pic.in.th/image2aa7d890b471f6fa.th.png";
+  var favicon = "https://img2.pic.in.th/logo9365a3657362b3e3.th.png";
   var page = e.parameter.page;
   var url = ScriptApp.getService().getUrl(); // Always returns /exec URL
   var scriptId = ScriptApp.getScriptId();
@@ -3421,6 +3421,10 @@ function instructorGetPendingVerifications() {
   var instructorId = profile.instructor_id;
   if (!instructorId) throw new Error("Instructor record not found.");
 
+  // Get instructor's division to filter records
+  var instructor = SupabaseProvider.getInstructorById(instructorId);
+  var instructorDivisionId = instructor ? instructor.division_id : null;
+
   // 1. Get team students
   var students = SupabaseProvider.listStudentsByTeamLeader(instructorId) || [];
   if (students.length === 0) return [];
@@ -3456,10 +3460,19 @@ function instructorGetPendingVerifications() {
   var records =
     SupabaseProvider.listPendingRecordsByStudentIds(studentIds) || [];
 
-  // 4. Attach records to their student
+  // 4. Attach records to their student, filtering by instructor's division
   records.forEach(function (rec) {
     var stu = studentMap[rec.student_id];
     if (!stu) return;
+
+    // Filter: only show records that belong to the instructor's division
+    if (instructorDivisionId) {
+      var recDivisionId =
+        rec.division_id ||
+        (rec.treatment_catalog ? rec.treatment_catalog.division_id : null);
+      if (recDivisionId && recDivisionId !== instructorDivisionId) return;
+    }
+
     stu.records.push({
       record_id: rec.record_id,
       student_email: stu.email,
@@ -3837,6 +3850,17 @@ function getUserProfile(email) {
         profile.first_clinic_year = student.first_clinic_year;
         profile.floor_id = student.floor_id || null;
         profile.unit_id = student.unit_id || null;
+
+        // Division instructor assignments
+        profile.oper_instructor_id = student.oper_instructor_id || null;
+        profile.endo_instructor_id = student.endo_instructor_id || null;
+        profile.perio_instructor_id = student.perio_instructor_id || null;
+        profile.prosth_instructor_id = student.prosth_instructor_id || null;
+        profile.diag_instructor_id = student.diag_instructor_id || null;
+        profile.radio_instructor_id = student.radio_instructor_id || null;
+        profile.sur_instructor_id = student.sur_instructor_id || null;
+        profile.ortho_instructor_id = student.ortho_instructor_id || null;
+        profile.pedo_instructor_id = student.pedo_instructor_id || null;
 
         // Resolve Team Leaders
         var tl1Id = student.team_leader_1_id;
@@ -5191,6 +5215,15 @@ function studentGetTreatmentPlan(hn) {
           name: s.user && s.user.name ? s.user.name : "Student " + i,
           academic_id: s.academic_id || "",
           slot: i,
+          oper_instructor_id: s.oper_instructor_id,
+          endo_instructor_id: s.endo_instructor_id,
+          perio_instructor_id: s.perio_instructor_id,
+          prosth_instructor_id: s.prosth_instructor_id,
+          diag_instructor_id: s.diag_instructor_id,
+          radio_instructor_id: s.radio_instructor_id,
+          sur_instructor_id: s.sur_instructor_id,
+          ortho_instructor_id: s.ortho_instructor_id,
+          pedo_instructor_id: s.pedo_instructor_id,
         });
       } else {
         students.push({
@@ -5760,8 +5793,40 @@ function studentSubmitRotateRequirement(form) {
     var fullRecord = SupabaseProvider.getTreatmentRecord(record.record_id);
     if (!fullRecord) throw new Error("Could not fetch created record.");
 
+    // Resolve division code for instructor mapping
+    var div = SupabaseProvider.getDivisionById(form.division_id);
+    var divCode = div ? (div.code || "").toUpperCase() : "";
+    var divName = div ? div.name : "Rotate Clinic";
+
+    // Map division code → student's assigned instructor column
+    var divInstColumnMap = {
+      OPER: "oper_instructor_id",
+      ENDO: "endo_instructor_id",
+      PERIO: "perio_instructor_id",
+      PROSTH: "prosth_instructor_id",
+      DIAG: "diag_instructor_id",
+      RADIO: "radio_instructor_id",
+      SUR: "sur_instructor_id",
+      ORTHO: "ortho_instructor_id",
+      PEDO: "pedo_instructor_id",
+    };
+
+    // Get the student record to access division instructor assignments
+    var studentRecord = SupabaseProvider.getStudentById(profile.student_id);
+
+    // Determine which instructor to email: prefer the student's division-assigned instructor
+    var targetInstructorId = null;
+    var instColumn = divInstColumnMap[divCode];
+    if (instColumn && studentRecord && studentRecord[instColumn]) {
+      targetInstructorId = studentRecord[instColumn];
+    }
+    // Fall back to the instructor selected in the form
+    if (!targetInstructorId) {
+      targetInstructorId = form.instructor_id;
+    }
+
     // Resolve instructor email
-    var instructor = SupabaseProvider.getInstructorById(form.instructor_id);
+    var instructor = SupabaseProvider.getInstructorById(targetInstructorId);
     if (!instructor) throw new Error("Instructor not found.");
     var instEmail = instructor.users
       ? instructor.users.email
@@ -5773,10 +5838,11 @@ function studentSubmitRotateRequirement(form) {
     // Build email details
     var patientHn = fullRecord.hn || "-";
     var patientName = fullRecord.patient_name || "-";
-    var divCode = fullRecord.division ? fullRecord.division.code : "";
-    var divName = fullRecord.division ? fullRecord.division.name : "Rotate Clinic";
-    var reqType = fullRecord.requirement ? fullRecord.requirement.requirement_type : "";
+    var reqType = fullRecord.requirement
+      ? fullRecord.requirement.requirement_type
+      : "";
     var studentName = profile.name;
+    var studentEmail = profile.email;
 
     var appUrl = ScriptApp.getService().getUrl();
 
@@ -5794,24 +5860,38 @@ function studentSubmitRotateRequirement(form) {
       book_number: fullRecord.book_number,
       page_number: fullRecord.page_number,
     };
-    var _vTok = _generateActionToken(record.record_id, "verified", _tokenFields);
-    var _rTok = _generateActionToken(record.record_id, "rejected", _tokenFields);
+    var _vTok = _generateActionToken(
+      record.record_id,
+      "verified",
+      _tokenFields,
+    );
+    var _rTok = _generateActionToken(
+      record.record_id,
+      "rejected",
+      _tokenFields,
+    );
     var verifyUrl =
       appUrl +
       "?action=verify_record&record_id=" +
       record.record_id +
       "&status=verified" +
-      "&token=" + _vTok.token +
-      "&issued_at=" + encodeURIComponent(_vTok.issuedAt) +
-      "&cd=" + _vTok.cd;
+      "&token=" +
+      _vTok.token +
+      "&issued_at=" +
+      encodeURIComponent(_vTok.issuedAt) +
+      "&cd=" +
+      _vTok.cd;
     var rejectUrl =
       appUrl +
       "?action=verify_record&record_id=" +
       record.record_id +
       "&status=rejected" +
-      "&token=" + _rTok.token +
-      "&issued_at=" + encodeURIComponent(_rTok.issuedAt) +
-      "&cd=" + _rTok.cd;
+      "&token=" +
+      _rTok.token +
+      "&issued_at=" +
+      encodeURIComponent(_rTok.issuedAt) +
+      "&cd=" +
+      _rTok.cd;
 
     // Build email body
     var td = "padding: 8px; border-bottom: 1px solid #edf2f7;";
@@ -5819,52 +5899,258 @@ function studentSubmitRotateRequirement(form) {
 
     if (divName) {
       divRows +=
-        "<tr><td style='" + td + "'><strong>Clinic:</strong></td>" +
-        "<td style='" + td + "'>" + divName + "</td></tr>";
+        "<tr><td style='" +
+        td +
+        "'><strong>Clinic:</strong></td>" +
+        "<td style='" +
+        td +
+        "'>" +
+        divName +
+        "</td></tr>";
     }
     if (reqType) {
       divRows +=
-        "<tr><td style='" + td + "'><strong>Requirement:</strong></td>" +
-        "<td style='" + td + "'>" + reqType + "</td></tr>";
+        "<tr><td style='" +
+        td +
+        "'><strong>Requirement:</strong></td>" +
+        "<td style='" +
+        td +
+        "'>" +
+        reqType +
+        "</td></tr>";
     }
     if (fullRecord.rsu_units != null && fullRecord.rsu_units !== "") {
       divRows +=
-        "<tr><td style='" + td + "'><strong>RSU Units:</strong></td>" +
-        "<td style='" + td + "'>" + fullRecord.rsu_units + "</td></tr>";
+        "<tr><td style='" +
+        td +
+        "'><strong>RSU Units:</strong></td>" +
+        "<td style='" +
+        td +
+        "'>" +
+        fullRecord.rsu_units +
+        "</td></tr>";
     }
     if (fullRecord.cda_units != null && fullRecord.cda_units !== "") {
       divRows +=
-        "<tr><td style='" + td + "'><strong>CDA Units:</strong></td>" +
-        "<td style='" + td + "'>" + fullRecord.cda_units + "</td></tr>";
+        "<tr><td style='" +
+        td +
+        "'><strong>CDA Units:</strong></td>" +
+        "<td style='" +
+        td +
+        "'>" +
+        fullRecord.cda_units +
+        "</td></tr>";
     }
 
     var htmlBody =
       "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>" +
       "<h2 style='color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>Verification Request (Rotate Clinic)</h2>" +
-      "<p><strong>Student:</strong> " + studentName + " has requested verification for a rotate clinic requirement.</p>" +
+      "<p><strong>Student:</strong> " +
+      studentName +
+      " has requested verification for a rotate clinic requirement.</p>" +
       "<table style='width: 100%; border-collapse: collapse; margin: 20px 0;'>" +
-      "<tr><td style='" + td + "'><strong>Patient HN:</strong></td><td style='" + td + "'>" + patientHn + "</td></tr>" +
-      "<tr><td style='" + td + "'><strong>Patient Name:</strong></td><td style='" + td + "'>" + patientName + "</td></tr>" +
-      "<tr><td style='" + td + "'><strong>Area:</strong></td><td style='" + td + "'>" + (fullRecord.area || "-") + "</td></tr>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Patient HN:</strong></td><td style='" +
+      td +
+      "'>" +
+      patientHn +
+      "</td></tr>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Patient Name:</strong></td><td style='" +
+      td +
+      "'>" +
+      patientName +
+      "</td></tr>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Area:</strong></td><td style='" +
+      td +
+      "'>" +
+      (fullRecord.area || "-") +
+      "</td></tr>" +
       divRows +
       "</table>" +
       "<p style='margin-bottom: 30px;'>Please review the work and click one of the actions below:</p>" +
       "<div style='text-align: center;'>" +
-      "<p style='margin: 0 0 12px 0;'><a href='" + verifyUrl + "' style='background-color: #10b981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Verify Treatment</a></p>" +
-      "<p style='margin: 0;'><a href='" + rejectUrl + "' style='background-color: #ef4444; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Reject Treatment</a></p>" +
+      "<p style='margin: 0 0 12px 0;'><a href='" +
+      verifyUrl +
+      "' style='background-color: #10b981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Verify Treatment</a></p>" +
+      "<p style='margin: 0;'><a href='" +
+      rejectUrl +
+      "' style='background-color: #ef4444; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Reject Treatment</a></p>" +
       "</div>" +
       "<p style='margin-top: 30px; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px;'>Note: Clicking these links will securely process the action based on your active Google Workspace login.</p>" +
       "</div>";
 
+    // Send verification email to instructor
     MailApp.sendEmail({
       to: instEmail,
-      subject: "Verification Request: " + (reqType || divName) + " (" + divCode + ") — " + studentName,
+      subject:
+        "Verification Request: " +
+        (reqType || divName) +
+        " (" +
+        divCode +
+        ") — " +
+        studentName,
       htmlBody: htmlBody,
     });
+
+    // Send confirmation copy to student
+    if (studentEmail) {
+      var instName = instructor.users
+        ? instructor.users.name
+        : instructor.user
+          ? instructor.user.name
+          : "Instructor";
+      var studentHtmlBody =
+        "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>" +
+        "<h2 style='color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>Verification Request Sent</h2>" +
+        "<p>Your rotate clinic requirement has been submitted and a verification request has been sent to <strong>" +
+        instName +
+        "</strong>.</p>" +
+        "<table style='width: 100%; border-collapse: collapse; margin: 20px 0;'>" +
+        "<tr><td style='" +
+        td +
+        "'><strong>Patient HN:</strong></td><td style='" +
+        td +
+        "'>" +
+        patientHn +
+        "</td></tr>" +
+        "<tr><td style='" +
+        td +
+        "'><strong>Patient Name:</strong></td><td style='" +
+        td +
+        "'>" +
+        patientName +
+        "</td></tr>" +
+        "<tr><td style='" +
+        td +
+        "'><strong>Area:</strong></td><td style='" +
+        td +
+        "'>" +
+        (fullRecord.area || "-") +
+        "</td></tr>" +
+        divRows +
+        "</table>" +
+        "<p style='font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px;'>You will be notified once your instructor reviews the record.</p>" +
+        "</div>";
+
+      MailApp.sendEmail({
+        to: studentEmail,
+        subject:
+          "Confirmation: Verification Requested — " +
+          (reqType || divName) +
+          " (" +
+          divCode +
+          ")",
+        htmlBody: studentHtmlBody,
+      });
+    }
 
     return { success: true };
   } catch (e) {
     Logger.log("studentSubmitRotateRequirement error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * List existing rotate records (no patient_id) for the logged-in student
+ * in a specific division.
+ * @param {string} divisionId
+ * @returns {Array}
+ */
+function studentGetRotateRecordsByDivision(divisionId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("Student only.");
+  }
+
+  return (
+    SupabaseProvider.listRotateRecordsByStudentAndDivision(
+      profile.student_id,
+      divisionId,
+    ) || []
+  );
+}
+
+/**
+ * Update an existing rotate record (student only, must own the record).
+ * @param {Object} payload — { record_id, requirement_id, division_id, hn, patient_name, area, instructor_id, rsu_units, cda_units }
+ * @returns {{ success: boolean, error?: string }}
+ */
+function studentUpdateRotateRecord(payload) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("Student only.");
+  }
+
+  try {
+    // Verify ownership
+    var existing = SupabaseProvider.getTreatmentRecord(payload.record_id);
+    if (!existing) throw new Error("Record not found.");
+    if (existing.student_id !== profile.student_id)
+      throw new Error("You can only edit your own records.");
+
+    // Only allow editing records that are not yet verified
+    if (existing.status === "verified")
+      throw new Error("Cannot edit a verified record.");
+
+    var updates = {
+      requirement_id: payload.requirement_id || existing.requirement_id,
+      division_id: payload.division_id || existing.division_id,
+      hn: payload.hn || null,
+      patient_name: payload.patient_name || null,
+      area: payload.area || null,
+      instructor_id: payload.instructor_id || existing.instructor_id,
+      rsu_units:
+        payload.rsu_units != null ? payload.rsu_units : existing.rsu_units,
+      cda_units:
+        payload.cda_units != null ? payload.cda_units : existing.cda_units,
+    };
+
+    SupabaseProvider.updateTreatmentRecord(payload.record_id, updates);
+    return { success: true };
+  } catch (e) {
+    Logger.log("studentUpdateRotateRecord error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Delete an existing rotate record (student only, must own and not verified).
+ * @param {string} recordId
+ * @returns {{ success: boolean, error?: string }}
+ */
+function studentDeleteRotateRecord(recordId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("Student only.");
+  }
+
+  try {
+    var existing = SupabaseProvider.getTreatmentRecord(recordId);
+    if (!existing) throw new Error("Record not found.");
+    if (existing.student_id !== profile.student_id)
+      throw new Error("You can only delete your own records.");
+    if (existing.status === "verified")
+      throw new Error("Cannot delete a verified record.");
+
+    SupabaseProvider.deleteTreatmentRecord(recordId);
+    return { success: true };
+  } catch (e) {
+    Logger.log("studentDeleteRotateRecord error: " + e.message);
     return { success: false, error: e.message };
   }
 }

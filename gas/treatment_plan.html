@@ -643,6 +643,26 @@
           return this._snapshotForm() !== this.originalFormSnapshot;
         },
 
+        getAutoInstructorId(divCode) {
+            if (!this.form.student_id || !divCode) return null;
+            const student = this.students.find(function(s) { return s.student_id === this.form.student_id; }.bind(this));
+            if (!student) return null;
+
+            const code = divCode.toUpperCase();
+            switch (code) {
+                case 'OPER': return student.oper_instructor_id;
+                case 'ENDO': return student.endo_instructor_id;
+                case 'PERIO': return student.perio_instructor_id;
+                case 'PROSTH': return student.prosth_instructor_id;
+                case 'DIAG': return student.diag_instructor_id;
+                case 'RADIO': return student.radio_instructor_id;
+                case 'SUR': return student.sur_instructor_id;
+                case 'ORTHO': return student.ortho_instructor_id;
+                case 'PEDO': return student.pedo_instructor_id;
+                default: return null;
+            }
+        },
+
         _snapshotForm: function() {
           var f = this.form;
           return JSON.stringify({
@@ -873,13 +893,27 @@
               : { ohi_1st: false, ohi_2nd: false, srp_1st: false, srp_2nd: false };
             this.form.status = record.status || 'planned';
 
-            // 3. Delay setting dependent fields (Catalog, Instructor, Requirement) to allow filters to update
-            setTimeout(function() {
-               self.form.treatment_id = record.treatment_id || '';
-               self.form.instructor_id = record.instructor_id || '';
-               self.form.requirement_id = record.requirement_id || '';
-               
-               // 4. Delay setting Step ID (depends on treatment_id) and showing modal
+               // 3. Delay setting dependent fields (Catalog, Instructor, Requirement) to allow filters to update
+               setTimeout(function() {
+                 self.form.treatment_id = record.treatment_id || '';
+                 
+                 // Prefer the record's existing instructor. If absent, fall back to auto-assigned instructor mapping structure (helps imported records or records inserted via quick-add).
+                 if (record.instructor_id) {
+                     self.form.instructor_id = record.instructor_id;
+                 } else {
+                     const divCode = self.selectedDivisionCode;
+                     const autoInstId = self.getAutoInstructorId(divCode);
+                     // Verify the auto instructor exists in the filtered list before assigning
+                     if (autoInstId && self.filteredInstructors.some(function(i) { return i.instructor_id === autoInstId; })) {
+                         self.form.instructor_id = autoInstId;
+                     } else {
+                         self.form.instructor_id = '';
+                     }
+                 }
+                 
+                 self.form.requirement_id = record.requirement_id || '';
+                 
+                 // 4. Delay setting Step ID (depends on treatment_id) and showing modal
                setTimeout(function() {
                   self.form.step_id = record.step_id || '';
                   self.originalWasVerified = record.status === 'verified';
@@ -910,12 +944,21 @@
         },
 
         onDivisionChange: function() {
+          var self = this;
           this.form.treatment_id = '';
           this.form.step_id = '';
           this.form.instructor_id = '';
           this.form.requirement_id = '';
           this.form.perio_exams = null;
           this.updateStatus();
+          
+          setTimeout(function() {
+             const divCode = self.selectedDivisionCode;
+             const autoInstId = self.getAutoInstructorId(divCode);
+             if (autoInstId && self.filteredInstructors.some(function(i) { return i.instructor_id === autoInstId; })) {
+                self.form.instructor_id = autoInstId;
+             }
+          }, 50);
         },
 
         onTreatmentChange: function() {

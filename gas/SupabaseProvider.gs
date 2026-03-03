@@ -987,6 +987,43 @@ var SupabaseProvider = (function () {
     },
 
     /**
+     * List rotate clinic records (no patient_id) for a specific student and division.
+     * @param {string} studentId
+     * @param {string} divisionId
+     * @returns {Array}
+     */
+    listRotateRecordsByStudentAndDivision: function (studentId, divisionId) {
+      if (!studentId || !divisionId) return [];
+      var select = [
+        "record_id",
+        "student_id",
+        "division_id",
+        "requirement_id",
+        "patient_id",
+        "hn",
+        "patient_name",
+        "area",
+        "rsu_units",
+        "cda_units",
+        "status",
+        "created_at",
+        "updated_at",
+        "treatment_catalog(treatment_name)",
+        "requirement_list(requirement_type)",
+      ].join(",");
+      return _get(
+        "/rest/v1/treatment_records?student_id=eq." +
+          studentId +
+          "&division_id=eq." +
+          divisionId +
+          "&status=neq.void" +
+          "&select=" +
+          select +
+          "&order=created_at.desc",
+      );
+    },
+
+    /**
      * List treatment records with 'pending verification' status for a set of students.
      * Used by the instructor verification queue.
      * @param {Array<string>} studentIds — UUIDs
@@ -1009,9 +1046,10 @@ var SupabaseProvider = (function () {
         "is_exam",
         "perio_exams",
         "requirement_id",
+        "division_id",
         "status",
         "updated_at",
-        "treatment_catalog(treatment_name,divisions(name,code))",
+        "treatment_catalog(treatment_name,division_id,divisions(name,code))",
         "treatment_steps(step_name)",
         "requirement_list(requirement_type)",
         "patient:patients(hn,name)",

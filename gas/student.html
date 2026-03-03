@@ -50,11 +50,8 @@
   <div x-show="state === 'loading'" x-transition class="text-center animate-fade-in">
     <div class="flex flex-col items-center gap-5">
       <!-- University crest placeholder -->
-      <div class="w-16 h-16 rounded-full bg-navy flex items-center justify-center shadow-lg">
-        <svg class="w-8 h-8 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
-        </svg>
+      <div class="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-lg overflow-hidden">
+        <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-1" />
       </div>
       <div class="spinner mx-auto"></div>
       <p class="text-sm text-gray-500 font-medium tracking-wide">Verifying your account…</p>
@@ -149,11 +146,8 @@
     <!-- Header / Branding strip -->
     <div class="bg-navy rounded-t-2xl px-6 py-5 text-center">
       <div class="flex items-center justify-center gap-3 mb-2">
-        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-          <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                  d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
-          </svg>
+        <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden">
+          <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-0.5" />
         </div>
         <div>
           <h1 class="text-white text-base font-semibold tracking-tight">Student Portal</h1>
@@ -198,18 +192,17 @@
               </svg>
             </template>
             <template x-if="profile.role === 'student'">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
-              </svg>
+              <div class="w-4 h-4 rounded-full bg-white flex items-center justify-center overflow-hidden inline-[flex]">
+                <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain" />
+              </div>
             </template>
             <span x-text="profile.role"></span>
           </span>
           <template x-if="profile.role === 'student'">
             <div class="mt-2 flex justify-center">
               <a href="<?= appUrl ?>?page=vault" target="_blank"
-                 class="text-xs font-bold text-gold hover:text-gold-light hover:underline flex items-center gap-1 transition">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                 class="group inline-flex items-center gap-1.5 bg-gradient-to-r from-gold to-yellow-600 text-white px-4 py-1.5 rounded-full text-base font-semibold shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <svg class="w-3.5 h-3.5 transition-transform group-hover:scale-110 duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                 Requirement Vault
               </a>
             </div>
@@ -242,12 +235,12 @@
               <span class="detail-value" x-text="getTeamLeaderName()"></span>
             </div>
             
-            <!-- Rotate Clinic Link -->
+            <!-- Rotate Clinic Button -->
             <div class="mt-4 pt-3 border-t border-gray-100 text-center">
               <button @click="openRotateModal()" 
-                      class="text-sm font-semibold text-navy hover:text-navy-light hover:underline flex items-center justify-center gap-1 transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                Add Requirement (rotate clinic/ไม่อยู่ใน treatment plan)
+                      class="group relative overflow-hidden inline-flex items-center gap-1.5 bg-gradient-to-r from-navy to-navy-light text-white px-4 py-2 rounded-lg font-medium text-base shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                <svg class="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                <span>Add Requirement ที่ไม่อยู่ใน treatment plan รวม</span>
               </button>
             </div>
           </div>
@@ -650,7 +643,7 @@
 
   <!-- ─── Error Popup Modal ─── -->
   <div x-show="errorModalOpen" style="display: none;"
-       class="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+       class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
        x-transition.opacity>
     
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in"
@@ -667,6 +660,35 @@
                 class="w-full py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">
           Close
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Confirm Delete Modal ─── -->
+  <div x-show="confirmDeleteOpen" style="display: none;"
+       class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+       x-transition.opacity>
+    
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in"
+         @click.outside="confirmDeleteOpen = false">
+      <div class="p-6 text-center">
+        <div class="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2">Delete Record?</h3>
+        <p class="text-sm text-gray-500 mb-6">Are you sure you want to delete this record? This action cannot be undone.</p>
+        <div class="flex gap-3">
+          <button @click="confirmDeleteOpen = false" 
+                  class="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition">
+            Cancel
+          </button>
+          <button @click="executeDeleteRotateRecord()" 
+                  class="flex-1 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -714,8 +736,15 @@
 
         <div x-show="!rotateLoading" class="space-y-4">
           
+          <!-- Edit Mode Banner -->
+          <div x-show="isEditingRotate" class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2">
+            <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            <span class="text-xs font-medium text-amber-700">Editing existing record</span>
+            <button @click="cancelEditRotate()" class="ml-auto text-xs font-semibold text-amber-600 hover:text-amber-800 underline">Cancel Edit</button>
+          </div>
+
           <!-- 1. Division -->
-          <div>
+          <div class="rotate-form-top">
             <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Select Division</label>
             <select x-model="rotateForm.division_id" @change="onRotateDivisionChange()"
                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy">
@@ -804,17 +833,94 @@
             </select>
           </div>
 
+          <!-- 6. Existing Rotate Records -->
+          <div x-show="rotateForm.division_id" class="mt-2">
+            <div class="border-t border-gray-200 pt-3">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-bold text-navy uppercase tracking-wider">Previous Submissions</h4>
+                <div x-show="rotateRecordsLoading" class="spinner w-3 h-3 border-navy/20 border-t-navy"></div>
+              </div>
+
+              <!-- Status Filter Pills -->
+              <div x-show="rotateExistingRecords.length > 0" class="flex flex-wrap gap-1.5 mb-2">
+                <button @click="rotateStatusFilter = 'all'"
+                        :class="rotateStatusFilter === 'all' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                        class="px-2.5 py-1 rounded-full text-[0.6rem] font-semibold transition">
+                  All <span x-text="'(' + rotateStatusCounts().all + ')'" class="opacity-75"></span>
+                </button>
+                <template x-for="st in ['pending verification', 'verified', 'rejected', 'planned']" :key="st">
+                  <button x-show="rotateStatusCounts()[st]"
+                          @click="rotateStatusFilter = st"
+                          :class="rotateStatusFilter === st ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                          class="px-2.5 py-1 rounded-full text-[0.6rem] font-semibold transition capitalize">
+                    <span x-text="st"></span>
+                    <span x-text="'(' + rotateStatusCounts()[st] + ')'" class="opacity-75"></span>
+                  </button>
+                </template>
+              </div>
+
+              <!-- Records List -->
+              <div class="max-h-48 overflow-y-auto space-y-1.5 pr-1" x-show="!rotateRecordsLoading">
+                <template x-for="rec in filteredRotateRecords()" :key="rec.record_id">
+                  <div class="bg-gray-50 rounded-lg border border-gray-200 px-3 py-2 text-xs"
+                       :class="editingRotateId === rec.record_id ? 'ring-2 ring-amber-400 bg-amber-50/50' : ''">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 mb-0.5">
+                          <span class="font-semibold text-gray-800 truncate" x-text="rec.requirement_list ? rec.requirement_list.requirement_type : '-'"></span>
+                          <span class="shrink-0 px-1.5 py-0.5 rounded text-[0.55rem] font-bold uppercase"
+                                :class="{
+                                  'bg-amber-100 text-amber-700': rec.status === 'pending verification',
+                                  'bg-emerald-100 text-emerald-700': rec.status === 'verified',
+                                  'bg-red-100 text-red-700': rec.status === 'rejected',
+                                  'bg-gray-100 text-gray-500': rec.status === 'planned',
+                                }" x-text="rec.status"></span>
+                        </div>
+                        <div class="text-gray-500 flex items-center gap-2 flex-wrap">
+                          <span x-show="rec.hn" x-text="'HN: ' + rec.hn"></span>
+                          <span x-show="rec.patient_name" x-text="rec.patient_name"></span>
+                          <span class="text-gray-400" x-text="formatDate(rec.created_at)"></span>
+                        </div>
+                        <div class="text-gray-400 mt-0.5 flex gap-3">
+                          <span x-show="rec.rsu_units" class="font-mono text-indigo-600" x-text="rec.rsu_units + ' RSU'"></span>
+                          <span x-show="rec.cda_units" class="font-mono text-amber-600" x-text="rec.cda_units + ' CDA'"></span>
+                        </div>
+                      </div>
+                      <!-- Action buttons (only for non-verified) -->
+                      <div class="flex gap-1 shrink-0" x-show="rec.status !== 'verified'">
+                        <button @click.stop="editRotateRecord(rec)" title="Edit"
+                                class="p-1 rounded hover:bg-blue-100 text-gray-400 hover:text-blue-600 transition">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </button>
+                        <button @click.stop="deleteRotateRecord(rec.record_id)" title="Delete"
+                                class="p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-600 transition">
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <div x-show="filteredRotateRecords().length === 0 && !rotateRecordsLoading" class="text-center py-3 text-gray-400 text-xs italic">
+                  No previous submissions for this division.
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
       <!-- Footer -->
       <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-         <button @click="rotateModalOpen = false" class="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium text-sm">Cancel</button>
+         <button @click="isEditingRotate ? cancelEditRotate() : (rotateModalOpen = false)" 
+                 class="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium text-sm"
+                 x-text="isEditingRotate ? 'Cancel Edit' : 'Cancel'"></button>
          <button @click="submitRotateRequirement()" 
                  :disabled="rotateSubmitting || !rotateForm.division_id || !rotateForm.requirement_id || !rotateForm.instructor_id"
-                 class="px-4 py-2 bg-navy text-white font-medium rounded-lg shadow hover:bg-navy-light disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                 :class="isEditingRotate ? 'bg-amber-600 hover:bg-amber-700' : 'bg-navy hover:bg-navy-light'"
+                 class="px-4 py-2 text-white font-medium rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
             <span x-show="rotateSubmitting" class="spinner w-4 h-4 border-white/30 border-t-white"></span>
-            <span x-text="rotateSubmitting ? 'Submitting...' : 'Submit'"></span>
+            <span x-text="rotateSubmitting ? (isEditingRotate ? 'Saving...' : 'Submitting...') : (isEditingRotate ? 'Save Changes' : 'Submit')"></span>
          </button>
       </div>
 
@@ -1091,6 +1197,8 @@
         errorModalMessage: '',
         rotateSuccessOpen: false,
         rotateSuccessMessage: '',
+        confirmDeleteOpen: false,
+        confirmDeleteId: null,
 
         showErrorModal(msg) {
            this.errorModalMessage = msg;
@@ -1105,6 +1213,11 @@
         rotateDivisions: [],
         rotateRequirements: [],
         rotateInstructors: [],
+        rotateExistingRecords: [],
+        rotateRecordsLoading: false,
+        rotateStatusFilter: 'all',
+        isEditingRotate: false,
+        editingRotateId: null,
         rotateForm: {
            division_id: '',
            requirement_id: '',
@@ -1124,6 +1237,10 @@
 
         openRotateModal() {
            this.rotateForm = { division_id: '', requirement_id: '', rsu_units: 0, cda_units: 0, instructor_id: '', area: '', hn: '', patient_name: '', min_rsu: 0, min_cda: 0, rsu_unit: '', cda_unit: '', is_patient_treatment: false };
+           this.rotateExistingRecords = [];
+           this.rotateStatusFilter = 'all';
+           this.isEditingRotate = false;
+           this.editingRotateId = null;
            this.rotateModalOpen = true;
            this.rotateLoading = true;
            this.rotateOptionsLoading = false;
@@ -1144,18 +1261,23 @@
            const divId = this.rotateForm.division_id;
            this.rotateRequirements = [];
            this.rotateInstructors = [];
+           this.rotateExistingRecords = [];
            this.rotateForm.requirement_id = '';
            this.rotateForm.instructor_id = '';
+           this.isEditingRotate = false;
+           this.editingRotateId = null;
            
            if (!divId) return;
            
            this.rotateOptionsLoading = true;
+           this.rotateRecordsLoading = true;
            let reqsDone = false;
            let instsDone = false;
 
            const checkAllDone = () => {
              if (reqsDone && instsDone) {
                this.rotateOptionsLoading = false;
+               this._autoSelectRotateInstructor(divId);
              }
            };
            
@@ -1186,6 +1308,48 @@
                 checkAllDone();
              })
              .studentListInstructorsByDivision(divId);
+
+           // Fetch existing rotate records for this division
+           google.script.run
+             .withSuccessHandler((recs) => {
+                this.rotateExistingRecords = recs || [];
+                this.rotateRecordsLoading = false;
+             })
+             .withFailureHandler((err) => {
+                console.error("Failed to load existing records", err);
+                this.rotateRecordsLoading = false;
+             })
+             .studentGetRotateRecordsByDivision(divId);
+        },
+
+        _autoSelectRotateInstructor(divId) {
+           // Map division code to the student's assigned instructor column
+           const div = this.rotateDivisions.find(d => d.division_id === divId);
+           if (!div || !div.code) return;
+
+           const code = div.code.toUpperCase();
+           const columnMap = {
+             OPER: 'oper_instructor_id',
+             ENDO: 'endo_instructor_id',
+             PERIO: 'perio_instructor_id',
+             PROSTH: 'prosth_instructor_id',
+             DIAG: 'diag_instructor_id',
+             RADIO: 'radio_instructor_id',
+             SUR: 'sur_instructor_id',
+             ORTHO: 'ortho_instructor_id',
+             PEDO: 'pedo_instructor_id',
+           };
+
+           const col = columnMap[code];
+           if (!col) return;
+
+           const autoInstId = this.profile[col];
+           if (!autoInstId) return;
+
+           // Verify the instructor exists in the loaded list before assigning
+           if (this.rotateInstructors.some(i => i.instructor_id === autoInstId)) {
+             this.rotateForm.instructor_id = autoInstId;
+           }
         },
 
         onRotateRequirementChange() {
@@ -1217,8 +1381,119 @@
            }
         },
 
+        filteredRotateRecords() {
+           let recs = this.rotateExistingRecords.filter(r => !r.patient_id);
+           if (this.rotateStatusFilter !== 'all') {
+             recs = recs.filter(r => r.status === this.rotateStatusFilter);
+           }
+           return recs;
+        },
+
+        rotateStatusCounts() {
+           var base = this.rotateExistingRecords.filter(r => !r.patient_id);
+           var counts = { all: base.length };
+           base.forEach(r => {
+              counts[r.status] = (counts[r.status] || 0) + 1;
+           });
+           return counts;
+        },
+
+        editRotateRecord(rec) {
+           this.isEditingRotate = true;
+           this.editingRotateId = rec.record_id;
+           this.rotateForm.requirement_id = rec.requirement_id || '';
+           this.rotateForm.hn = rec.hn || '';
+           this.rotateForm.patient_name = rec.patient_name || '';
+           this.rotateForm.area = rec.area || '';
+           this.rotateForm.rsu_units = rec.rsu_units != null ? rec.rsu_units : 0;
+           this.rotateForm.cda_units = rec.cda_units != null ? rec.cda_units : 0;
+           // Trigger requirement change to load helpers
+           this.onRotateRequirementChange();
+           // Scroll to form top
+           this.$nextTick(() => {
+             this.$el.querySelector('.rotate-form-top')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+           });
+        },
+
+        cancelEditRotate() {
+           this.isEditingRotate = false;
+           this.editingRotateId = null;
+           this.rotateForm.requirement_id = '';
+           this.rotateForm.rsu_units = 0;
+           this.rotateForm.cda_units = 0;
+           this.rotateForm.hn = '';
+           this.rotateForm.patient_name = '';
+           this.rotateForm.area = '';
+        },
+
+        saveEditRotateRecord() {
+           if (!this.editingRotateId) return;
+           this.rotateSubmitting = true;
+           var payload = {
+             record_id: this.editingRotateId,
+             requirement_id: this.rotateForm.requirement_id,
+             division_id: this.rotateForm.division_id,
+             hn: this.rotateForm.hn || null,
+             patient_name: this.rotateForm.patient_name || null,
+             area: this.rotateForm.area || null,
+             instructor_id: this.rotateForm.instructor_id,
+             rsu_units: parseFloat(this.rotateForm.rsu_units) || 0,
+             cda_units: parseFloat(this.rotateForm.cda_units) || 0
+           };
+           google.script.run
+             .withSuccessHandler((res) => {
+                this.rotateSubmitting = false;
+                if (res.success) {
+                   this.cancelEditRotate();
+                   this.onRotateDivisionChange(); // Refresh records
+                   this.rotateSuccessMessage = 'Record updated successfully.';
+                   this.rotateSuccessOpen = true;
+                   setTimeout(() => { this.rotateSuccessOpen = false; }, 4000);
+                } else {
+                   this.showErrorModal(res.error || 'Update failed.');
+                }
+             })
+             .withFailureHandler((err) => {
+                this.rotateSubmitting = false;
+                this.showErrorModal(err.message || 'Update failed.');
+             })
+             .studentUpdateRotateRecord(payload);
+        },
+
+        deleteRotateRecord(recordId) {
+           this.confirmDeleteId = recordId;
+           this.confirmDeleteOpen = true;
+        },
+
+        executeDeleteRotateRecord() {
+           const recordId = this.confirmDeleteId;
+           this.confirmDeleteOpen = false;
+           this.confirmDeleteId = null;
+           google.script.run
+             .withSuccessHandler((res) => {
+                if (res.success) {
+                   this.rotateExistingRecords = this.rotateExistingRecords.filter(r => r.record_id !== recordId);
+                   this.rotateSuccessMessage = 'Record deleted successfully.';
+                   this.rotateSuccessOpen = true;
+                   setTimeout(() => { this.rotateSuccessOpen = false; }, 4000);
+                } else {
+                   this.showErrorModal(res.error || 'Delete failed.');
+                }
+             })
+             .withFailureHandler((err) => {
+                this.showErrorModal(err.message || 'Delete failed.');
+             })
+             .studentDeleteRotateRecord(recordId);
+        },
+
         submitRotateRequirement() {
            if (!this.rotateForm.division_id || !this.rotateForm.requirement_id || !this.rotateForm.instructor_id) {
+              return;
+           }
+
+           // If editing, save instead of creating new
+           if (this.isEditingRotate) {
+              this.saveEditRotateRecord();
               return;
            }
 
