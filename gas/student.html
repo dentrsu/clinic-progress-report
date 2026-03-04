@@ -130,6 +130,7 @@
       <h2 class="text-lg font-semibold text-gray-800 mb-2">Something Went Wrong</h2>
       <p class="text-sm text-gray-500 leading-relaxed mb-4" x-text="errorMessage"></p>
       <button @click="init()"
+              title="Retry loading your profile"
               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-navy text-white text-sm font-medium hover:bg-navy-light transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -201,6 +202,7 @@
           <template x-if="profile.role === 'student'">
             <div class="mt-2 flex justify-center">
               <a href="<?= appUrl ?>?page=vault" target="_blank"
+                 title="View your requirement completion progress across all divisions"
                  class="group inline-flex items-center gap-1.5 bg-gradient-to-r from-gold to-yellow-600 text-white px-4 py-1.5 rounded-full text-base font-semibold shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
                 <svg class="w-3.5 h-3.5 transition-transform group-hover:scale-110 duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                 Requirement Vault
@@ -237,7 +239,8 @@
             
             <!-- Rotate Clinic Button -->
             <div class="mt-4 pt-3 border-t border-gray-100 text-center">
-              <button @click="openRotateModal()" 
+              <button @click="openRotateModal()"
+                      title="Log a requirement completed at a rotate (non-main) clinic — e.g. a division outside your usual treatment plan"
                       class="group relative overflow-hidden inline-flex items-center gap-1.5 bg-gradient-to-r from-navy to-navy-light text-white px-4 py-2 rounded-lg font-medium text-base shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
                 <svg class="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                 <span>Add Requirement ที่ไม่อยู่ใน treatment plan รวม</span>
@@ -273,7 +276,8 @@
         
         <!-- Back to Lobby -->
         <div class="w-full">
-           <a href="<?= appUrl ?>" 
+           <a href="<?= appUrl ?>"
+              title="Return to the main lobby page"
               class="flex items-center justify-center gap-2 w-full py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition shadow-sm">
              <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
              Back to Lobby
@@ -282,7 +286,8 @@
         
         <!-- Admin Link -->
         <div x-show="profile.role === 'admin'" class="w-full">
-           <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin" 
+           <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin"
+              title="Open Admin Console to manage system settings, users, and data"
               class="flex items-center justify-center gap-2 w-full py-2 bg-white border border-gray-200 text-navy text-sm font-medium rounded-lg hover:bg-navy hover:text-white transition shadow-sm">
              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
              Admin Console
@@ -314,7 +319,7 @@
              <h3 class="text-lg font-bold" x-text="editingPatient.name"></h3>
              <p class="text-sm opacity-75 font-mono">HN: <span x-text="editingPatient.hn"></span></p>
            </div>
-           <button @click="editModalOpen = false" class="text-white/70 hover:text-white">
+           <button @click="editModalOpen = false" title="Close" class="text-white/70 hover:text-white">
              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
            </button>
         </div>
@@ -453,13 +458,15 @@
 
         <!-- Modal Footer -->
         <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col gap-3">
-           <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(editingPatient.hn)" 
+           <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(editingPatient.hn)"
               target="_blank"
+              title="Open the full treatment plan for this patient in a new tab"
               class="w-full py-2 bg-white border border-navy text-navy font-semibold rounded-lg shadow-sm hover:bg-navy hover:text-white transition flex justify-center items-center">
               View Treatment Plan
            </a>
-           <button @click="savePatient()" 
+           <button @click="savePatient()"
                    x-show="editingPatient.student_id_1 === profile.student_id"
+                   title="Save changes to this patient's details"
                    class="w-full py-2 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700 transition flex justify-center items-center gap-2" :disabled="saving">
               <span x-show="saving" class="spinner w-4 h-4 border-white/30 border-t-white"></span>
               <span x-text="saving ? 'Saving...' : 'Save Changes'"></span>
@@ -570,7 +577,7 @@
      <div class="min-h-screen p-6">
        <div class="max-w-6xl mx-auto mb-8 flex justify-between items-center">
          <div class="flex items-center gap-4">
-           <button @click="tpModalOpen = false" class="p-2 rounded-full bg-white shadow-sm text-gray-400 hover:text-navy hover:bg-gray-50 transition">
+           <button @click="tpModalOpen = false" title="Close treatment plan view" class="p-2 rounded-full bg-white shadow-sm text-gray-400 hover:text-navy hover:bg-gray-50 transition">
              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
            </button>
            <div>
@@ -656,7 +663,8 @@
         </div>
         <h3 class="text-lg font-bold text-gray-800 mb-2">Error</h3>
         <p class="text-sm text-gray-500 mb-6" x-text="errorModalMessage"></p>
-        <button @click="errorModalOpen = false" 
+        <button @click="errorModalOpen = false"
+                title="Dismiss this error message"
                 class="w-full py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">
           Close
         </button>
@@ -680,11 +688,13 @@
         <h3 class="text-lg font-bold text-gray-800 mb-2">Delete Record?</h3>
         <p class="text-sm text-gray-500 mb-6">Are you sure you want to delete this record? This action cannot be undone.</p>
         <div class="flex gap-3">
-          <button @click="confirmDeleteOpen = false" 
+          <button @click="confirmDeleteOpen = false"
+                  title="Cancel — keep this record"
                   class="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition">
             Cancel
           </button>
-          <button @click="executeDeleteRotateRecord()" 
+          <button @click="executeDeleteRotateRecord()"
+                  title="Permanently delete this record (cannot be undone)"
                   class="flex-1 py-2.5 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition">
             Delete
           </button>
@@ -706,7 +716,7 @@
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
     </svg>
     <span x-text="rotateSuccessMessage" class="flex-1"></span>
-    <button @click="rotateSuccessOpen = false" class="text-white/70 hover:text-white ml-1">
+    <button @click="rotateSuccessOpen = false" title="Dismiss" class="text-white/70 hover:text-white ml-1">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
     </button>
   </div>
@@ -721,8 +731,8 @@
       
       <!-- Header -->
       <div class="bg-navy px-6 py-4 flex justify-between items-center text-white shrink-0">
-        <h3 class="text-lg font-bold">Add Non-Main-Clinic-Patient Requirement</h3>
-        <button @click="rotateModalOpen = false" class="text-white/70 hover:text-white">
+        <h3 class="text-lg font-bold">Add Requirement ที่ไม่ใช่ Treatment Plan รวม</h3>
+        <button @click="rotateModalOpen = false" title="Close without saving" class="text-white/70 hover:text-white">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
       </div>
@@ -848,7 +858,7 @@
                         class="px-2.5 py-1 rounded-full text-[0.6rem] font-semibold transition">
                   All <span x-text="'(' + rotateStatusCounts().all + ')'" class="opacity-75"></span>
                 </button>
-                <template x-for="st in ['pending verification', 'verified', 'rejected', 'planned']" :key="st">
+                <template x-for="st in ['pending verification', 'in_progress', 'verified', 'rejected', 'planned']" :key="st">
                   <button x-show="rotateStatusCounts()[st]"
                           @click="rotateStatusFilter = st"
                           :class="rotateStatusFilter === st ? 'bg-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
@@ -871,6 +881,7 @@
                           <span class="shrink-0 px-1.5 py-0.5 rounded text-[0.55rem] font-bold uppercase"
                                 :class="{
                                   'bg-amber-100 text-amber-700': rec.status === 'pending verification',
+                                  'bg-blue-100 text-blue-700': rec.status === 'in_progress',
                                   'bg-emerald-100 text-emerald-700': rec.status === 'verified',
                                   'bg-red-100 text-red-700': rec.status === 'rejected',
                                   'bg-gray-100 text-gray-500': rec.status === 'planned',
@@ -912,15 +923,25 @@
 
       <!-- Footer -->
       <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
-         <button @click="isEditingRotate ? cancelEditRotate() : (rotateModalOpen = false)" 
+         <button @click="isEditingRotate ? cancelEditRotate() : (rotateModalOpen = false)"
+                 title="Discard changes and close the form"
                  class="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium text-sm"
                  x-text="isEditingRotate ? 'Cancel Edit' : 'Cancel'"></button>
-         <button @click="submitRotateRequirement()" 
-                 :disabled="rotateSubmitting || !rotateForm.division_id || !rotateForm.requirement_id || !rotateForm.instructor_id"
-                 :class="isEditingRotate ? 'bg-amber-600 hover:bg-amber-700' : 'bg-navy hover:bg-navy-light'"
-                 class="px-4 py-2 text-white font-medium rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+         <!-- Save only (no email) -->
+         <button @click="isEditingRotate ? saveEditRotateRecord() : saveRotateOnly()"
+                 :disabled="rotateSaving || rotateSubmitting || !rotateForm.division_id || !rotateForm.requirement_id"
+                 title="Save as in progress — no verification email will be sent to the instructor"
+                 class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            <span x-show="rotateSaving" class="spinner w-4 h-4 border-white/30 border-t-white"></span>
+            <span x-text="rotateSaving ? 'Saving...' : 'Save'"></span>
+         </button>
+         <!-- Save and Request Verification -->
+         <button @click="submitRotateRequirement()"
+                 :disabled="rotateSubmitting || rotateSaving || !rotateForm.division_id || !rotateForm.requirement_id || !rotateForm.instructor_id"
+                 title="Save this record and send a verification request email to the selected instructor"
+                 class="px-4 py-2 bg-navy hover:bg-navy-light text-white font-medium rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
             <span x-show="rotateSubmitting" class="spinner w-4 h-4 border-white/30 border-t-white"></span>
-            <span x-text="rotateSubmitting ? (isEditingRotate ? 'Saving...' : 'Submitting...') : (isEditingRotate ? 'Save Changes' : 'Submit')"></span>
+            <span x-text="rotateSubmitting ? 'Submitting...' : 'Save and Request Verification'"></span>
          </button>
       </div>
 
@@ -1210,6 +1231,7 @@
         rotateLoading: false,
         rotateOptionsLoading: false,
         rotateSubmitting: false,
+        rotateSaving: false,
         rotateDivisions: [],
         rotateRequirements: [],
         rotateInstructors: [],
@@ -1460,6 +1482,40 @@
              .studentUpdateRotateRecord(payload);
         },
 
+        submitEditRotateVerification() {
+           if (!this.editingRotateId) return;
+           this.rotateSubmitting = true;
+           var payload = {
+             record_id: this.editingRotateId,
+             requirement_id: this.rotateForm.requirement_id,
+             division_id: this.rotateForm.division_id,
+             hn: this.rotateForm.hn || null,
+             patient_name: this.rotateForm.patient_name || null,
+             area: this.rotateForm.area || null,
+             instructor_id: this.rotateForm.instructor_id,
+             rsu_units: parseFloat(this.rotateForm.rsu_units) || 0,
+             cda_units: parseFloat(this.rotateForm.cda_units) || 0
+           };
+           google.script.run
+             .withSuccessHandler((res) => {
+                this.rotateSubmitting = false;
+                if (res.success) {
+                   this.cancelEditRotate();
+                   this.onRotateDivisionChange();
+                   this.rotateSuccessMessage = 'Submitted! Verification request sent to instructor.';
+                   this.rotateSuccessOpen = true;
+                   setTimeout(() => { this.rotateSuccessOpen = false; }, 5000);
+                } else {
+                   this.showErrorModal(res.error || 'Submission failed.');
+                }
+             })
+             .withFailureHandler((err) => {
+                this.rotateSubmitting = false;
+                this.showErrorModal(err.message || 'Submission failed.');
+             })
+             .studentUpdateAndRequestRotateVerification(payload);
+        },
+
         deleteRotateRecord(recordId) {
            this.confirmDeleteId = recordId;
            this.confirmDeleteOpen = true;
@@ -1486,14 +1542,39 @@
              .studentDeleteRotateRecord(recordId);
         },
 
+        saveRotateOnly() {
+           if (!this.rotateForm.division_id || !this.rotateForm.requirement_id) {
+              return;
+           }
+           this.rotateSaving = true;
+           google.script.run
+             .withSuccessHandler((res) => {
+                this.rotateSaving = false;
+                if (res.success) {
+                   this.rotateForm = { division_id: this.rotateForm.division_id, requirement_id: '', rsu_units: 0, cda_units: 0, instructor_id: '', area: '', hn: '', patient_name: '', min_rsu: 0, min_cda: 0, rsu_unit: '', cda_unit: '', is_patient_treatment: false };
+                   this.onRotateDivisionChange();
+                   this.rotateSuccessMessage = 'Saved successfully.';
+                   this.rotateSuccessOpen = true;
+                   setTimeout(() => { this.rotateSuccessOpen = false; }, 4000);
+                } else {
+                   this.showErrorModal(res.error || 'Save failed.');
+                }
+             })
+             .withFailureHandler((err) => {
+                this.rotateSaving = false;
+                this.showErrorModal(err.message || 'Save failed.');
+             })
+             .studentSaveRotateRequirement(this.rotateForm);
+        },
+
         submitRotateRequirement() {
            if (!this.rotateForm.division_id || !this.rotateForm.requirement_id || !this.rotateForm.instructor_id) {
               return;
            }
 
-           // If editing, save instead of creating new
+           // If editing, update + request verification instead of creating new
            if (this.isEditingRotate) {
-              this.saveEditRotateRecord();
+              this.submitEditRotateVerification();
               return;
            }
 
@@ -1518,6 +1599,33 @@
         }
       };
     }
+  </script>
+  <script>
+    // Mobile tap tooltip — shows title text as a bottom toast on touch
+    (function () {
+      var tip = document.createElement('div');
+      tip.setAttribute('style', 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(27,42,74,0.93);color:#fff;padding:8px 16px;border-radius:10px;font-size:0.75rem;max-width:80vw;text-align:center;z-index:99999;pointer-events:none;display:none;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,0.25);');
+      document.body.appendChild(tip);
+      var hide;
+      document.addEventListener('touchstart', function (e) {
+        var el = e.target.closest('[title]');
+        if (!el) return;
+        var text = el.getAttribute('title');
+        if (!text) return;
+        clearTimeout(hide);
+        tip.textContent = text;
+        tip.style.display = 'block';
+        hide = setTimeout(function () { tip.style.display = 'none'; }, 2000);
+      }, { passive: true });
+      document.addEventListener('touchmove', function () {
+        clearTimeout(hide);
+        tip.style.display = 'none';
+      }, { passive: true });
+      document.addEventListener('touchend', function () {
+        clearTimeout(hide);
+        hide = setTimeout(function () { tip.style.display = 'none'; }, 1500);
+      }, { passive: true });
+    })();
   </script>
 
 </body>

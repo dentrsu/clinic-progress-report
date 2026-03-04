@@ -41,6 +41,7 @@ A dedicated interface for administrators to manage users.
   - Click-to-expand records for each requirement.
 - **Admin Console**:
   - Manage Users (Students/Instructors).
+  - **System Announcements**: Broadcast messages to specific user roles (Students, Instructors, or Both) with scheduled start/end dates. Users can dismiss announcements so they don't load again.
   - **Academic ID Support**: Manage Real-world Student IDs.
   - **Verify Hash Tab**: Validate student verification proof hashes (SHA-256).
   - System Health Check.

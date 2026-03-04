@@ -37,6 +37,7 @@
   <!-- ─── Admin Floating Button ─── -->
   <div x-show="state === 'authenticated' && profile.role === 'admin'" x-transition class="fixed top-4 right-4 z-50">
     <a href="<?= appUrl ?>?page=admin" target="_blank"
+      title="Open Admin Console to manage system settings, users, and data"
       class="bg-white text-navy px-4 py-2 rounded-lg shadow-md font-medium text-sm hover:bg-gray-50 hover:scale-105 transition-all border border-gray-200 flex items-center gap-2">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -131,6 +132,7 @@
       <h2 class="text-lg font-semibold text-gray-800 mb-2">Something Went Wrong</h2>
       <p class="text-sm text-gray-500 leading-relaxed mb-4" x-text="errorMessage"></p>
       <button @click="init()"
+        title="Retry loading your profile"
         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-navy text-white text-sm font-medium hover:bg-navy-light transition-colors">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -262,6 +264,7 @@
           <!-- Student Portal Route -->
           <template x-if="profile.role === 'student'">
             <a href="<?= appUrl ?>?page=student" target="_blank"
+              title="View your patient list and submit treatment records"
               class="flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-600 border border-transparent text-white text-sm font-semibold rounded-lg shadow-md hover:bg-emerald-700 hover:scale-[1.02] transition-all relative">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -277,6 +280,7 @@
           <!-- Instructor Portal Route (For Instructors AND Admins) -->
           <template x-if="profile.role === 'instructor' || profile.role === 'admin'">
             <a href="<?= appUrl ?>?page=instructor" target="_blank"
+              title="View your team students' profiles and manage treatment verification requests"
               class="flex items-center justify-center gap-2 w-full py-2.5 bg-blue-600 border border-transparent text-white text-sm font-semibold rounded-lg shadow-md hover:bg-blue-700 hover:scale-[1.02] transition-all relative">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -293,6 +297,7 @@
           <!-- Advisor Portal Route -->
           <template x-if="profile.role === 'instructor'">
             <a href="<?= appUrl ?>?page=advisor" target="_blank"
+              title="Monitor your advisees' requirement completion progress"
               class="flex items-center justify-center gap-2 w-full py-2.5 bg-indigo-600 border border-transparent text-white text-sm font-semibold rounded-lg shadow-md hover:bg-indigo-700 hover:scale-[1.02] transition-all relative">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -309,12 +314,13 @@
           <!-- Verification Queue Route -->
           <template x-if="profile.role === 'instructor'">
             <a href="<?= appUrl ?>?page=verification_queue" target="_blank"
+              title="Review and approve or reject pending treatment record verification requests from your students"
               class="flex items-center justify-center gap-2 w-full py-2.5 bg-amber-500 border border-transparent text-white text-sm font-semibold rounded-lg shadow-md hover:bg-amber-600 hover:scale-[1.02] transition-all relative">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Verification Queue
+              Requirement Verification
               <div class="absolute right-3 opacity-50"><svg class="w-4 h-4" fill="none" stroke="currentColor"
                   viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -325,6 +331,7 @@
           <!-- Admin Portal Route -->
           <template x-if="profile.role === 'admin'">
             <a href="<?= appUrl ?>?page=admin" target="_blank"
+              title="Manage system settings, users, requirements, and all configuration"
               class="flex items-center justify-center gap-2 w-full py-2.5 bg-white border border-gray-200 text-navy text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 hover:text-navy hover:scale-[1.02] transition-all">
               <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -339,6 +346,7 @@
           <!-- Division Dashboard Route (Admin) -->
           <template x-if="profile.role === 'admin'">
             <a href="<?= appUrl ?>?page=dashboard" target="_blank"
+              title="View division-wide statistics, student progress, and requirement completion rates"
               class="flex items-center justify-center gap-2 w-full py-2.5 bg-navy border border-transparent text-white text-sm font-semibold rounded-lg shadow-md hover:bg-navy-light hover:scale-[1.02] transition-all relative">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -353,6 +361,7 @@
           </template>
           <!-- Verification Workflow Guide (All roles) -->
           <a href="<?= appUrl ?>?page=guide" target="_blank"
+            title="Read the step-by-step guide explaining how the treatment record verification process works"
             class="flex items-center justify-center gap-2 w-full py-2.5 bg-white border border-gray-200 text-gray-500 text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 hover:text-gray-700 hover:scale-[1.02] transition-all relative">
             <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -368,6 +377,7 @@
           <!-- Verify Email Proof (Admin + Instructor) -->
           <template x-if="profile.role === 'admin' || profile.role === 'instructor'">
             <a href="<?= appUrl ?>?page=verify" target="_blank"
+              title="Verify the cryptographic authenticity of a treatment record proof from a verification email"
               class="flex items-center justify-center gap-2 w-full py-2.5 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg shadow-sm hover:bg-gray-50 hover:scale-[1.02] transition-all relative">
               <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -404,6 +414,9 @@
           profile: {},
           initials: '',
           errorMessage: '',
+          // New state for announcement dismissal
+          doNotShowAgain: false,
+          currentAnnouncementId: null,
 
           init() {
             this.state = 'loading';
@@ -443,6 +456,14 @@
                     this.profile = profile;
                     this.initials = this._getInitials(profile.name);
                     this.state = 'authenticated';
+                    
+                    console.log('[Announcement] profile.announcement from getUserProfile:', profile.announcement);
+                    if (profile.announcement) {
+                      this._showAnnouncement(profile.announcement);
+                    } else {
+                      console.log('[Announcement] No announcement in profile, calling _fetchAnnouncement()');
+                      this._fetchAnnouncement();
+                    }
                   })
                   .withFailureHandler((err) => {
                     this.errorMessage = err.message || 'Failed to load profile.';
@@ -515,10 +536,110 @@
             if (year == 5) return this.profile.team_leader_1_name || '-';
             if (year >= 6) return this.profile.team_leader_2_name || '-';
             return '-';
+          },
+
+          _showAnnouncement(ann) {
+            if (!ann) { console.log('[Announcement] _showAnnouncement called with null/undefined'); return; }
+            console.log('[Announcement] Showing modal for:', ann.id, ann.title);
+            // Populate content directly — no Alpine reactivity needed
+            var el = document.getElementById('ann-modal');
+            if (!el) { console.log('[Announcement] ann-modal element not found in DOM'); return; }
+            document.getElementById('ann-modal-title').textContent = ann.title;
+            document.getElementById('ann-modal-content').textContent = ann.content;
+            this.currentAnnouncementId = ann.id; // Store the announcement ID
+            this.doNotShowAgain = false; // Reset checkbox state
+            el.style.display = 'flex';
+          },
+
+          _fetchAnnouncement() {
+            google.script.run
+              .withSuccessHandler((ann) => {
+                console.log('[Announcement] getActiveAnnouncement returned:', ann);
+                if (ann) { // Only show if an announcement is returned
+                  this._showAnnouncement(ann);
+                }
+              })
+              .withFailureHandler((err) => {
+                console.warn('[Announcement] getActiveAnnouncement error:', err.message);
+              })
+              .getActiveAnnouncement();
+          },
+
+          dismissAnnouncement() {
+            var el = document.getElementById('ann-modal');
+            if (el) {
+              el.style.display = 'none';
+            }
+            // If "Do not show again" is checked, save dismissal
+            if (this.doNotShowAgain && this.currentAnnouncementId) {
+              google.script.run
+                .withFailureHandler((err) => {
+                  console.error('[Announcement] Failed to run backend function:', err.message);
+                })
+                .saveAnnouncementDismissal(this.currentAnnouncementId);
+            }
+            this.currentAnnouncementId = null; // Clear current announcement ID
+            this.doNotShowAgain = false; // Reset checkbox state
           }
         };
       }
     </script>
+
+  <!-- Announcement Modal — shown/hidden via direct DOM (el.style.display), not Alpine x-show.
+       @click bindings work because this element is always in the DOM inside the Alpine <body> scope. -->
+  <div id="ann-modal" class="fixed inset-0 z-100 flex items-center justify-center p-4" style="display:none;">
+    <div class="fixed inset-0 bg-navy/20 backdrop-blur-sm" @click="dismissAnnouncement()"></div>
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative z-10 animate-fade-in">
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gold/10 mb-4">
+          <svg class="w-6 h-6 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.952 9.168-4.883a1 1 0 011 .25v12.266a1 1 0 01-1 .25C16.457 10.952 12.932 9 8.832 9H7a3.988 3.988 0 01-1.564-.317z"/>
+          </svg>
+        </div>
+        <h3 id="ann-modal-title" class="text-lg font-bold text-navy mb-2"></h3>
+        <p id="ann-modal-content" class="text-sm text-gray-500 whitespace-pre-line"></p>
+        <div class="mt-6">
+          <div class="flex items-center justify-center mb-4">
+            <input type="checkbox" id="doNotShowAgain" x-model="doNotShowAgain" class="h-4 w-4 text-navy focus:ring-navy border-gray-300 rounded">
+            <label for="doNotShowAgain" class="ml-2 block text-sm text-gray-900">Do not show again</label>
+          </div>
+          <button @click="dismissAnnouncement()" title="Close and do not show again this session"
+                  class="px-6 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition shadow-sm">
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mobile tap tooltip — shows title text as a bottom toast on touch
+    (function () {
+      var tip = document.createElement('div');
+      tip.setAttribute('style', 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(27,42,74,0.93);color:#fff;padding:8px 16px;border-radius:10px;font-size:0.75rem;max-width:80vw;text-align:center;z-index:99999;pointer-events:none;display:none;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,0.25);');
+      document.body.appendChild(tip);
+      var hide;
+      document.addEventListener('touchstart', function (e) {
+        var el = e.target.closest('[title]');
+        if (!el) return;
+        var text = el.getAttribute('title');
+        if (!text) return;
+        clearTimeout(hide);
+        tip.textContent = text;
+        tip.style.display = 'block';
+        hide = setTimeout(function () { tip.style.display = 'none'; }, 2000);
+      }, { passive: true });
+      document.addEventListener('touchmove', function () {
+        clearTimeout(hide);
+        tip.style.display = 'none';
+      }, { passive: true });
+      document.addEventListener('touchend', function () {
+        clearTimeout(hide);
+        hide = setTimeout(function () { tip.style.display = 'none'; }, 1500);
+      }, { passive: true });
+    })();
+  </script>
 
 </body>
 

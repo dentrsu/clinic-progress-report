@@ -47,7 +47,7 @@
         </div>
         <span class="font-semibold tracking-tight">Admin Console</span>
       </div>
-      <button @click="sidebarOpen = false" class="md:hidden text-gray-400 hover:text-white">
+      <button @click="sidebarOpen = false" title="Close sidebar" class="md:hidden text-gray-400 hover:text-white">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
@@ -126,6 +126,13 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         Verify Hash
       </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition"
+         :class="activeTab === 'announcements' ? 'bg-navy-light text-white' : ''"
+         title="Manage system-wide announcements shown to users after login"
+         @click.prevent="switchTab('announcements')">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.952 9.168-4.883a1 1 0 011 .25v12.266a1 1 0 01-1 .25C16.457 10.952 12.932 9 8.832 9H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+        Announcements
+      </a>
     </nav>
 
     <!-- User Profile -->
@@ -149,6 +156,17 @@
                 <label class="toggle-label block overflow-hidden h-4 rounded-full bg-gray-600 cursor-pointer"></label>
             </div>
           </label>
+          <!-- Dev Mode Toggle -->
+          <label class="flex items-center justify-between cursor-pointer mt-2">
+            <span class="text-xs font-medium" :class="devMode ? 'text-amber-400' : 'text-gray-300'">
+              Dev Mode<template x-if="devMode"><span class="ml-1 text-[0.6rem] font-bold bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded">ON</span></template>
+            </span>
+            <div class="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in">
+              <input type="checkbox" x-model="devMode" @change="toggleDevMode" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer duration-200 ease-in focus:outline-none"/>
+              <label class="toggle-label block overflow-hidden h-4 rounded-full bg-gray-600 cursor-pointer" :class="devMode ? '!bg-amber-500' : ''"></label>
+            </div>
+          </label>
+          <p x-show="devMode" class="mt-1.5 text-[0.6rem] text-amber-400/80 leading-snug">อีเมลทุกฉบับจะมี [ทดสอบระบบ] ในหัวเรื่อง</p>
            
            <!-- System Health Status -->
            <div class="mt-3 pt-3 border-t border-navy-700">
@@ -168,6 +186,23 @@
   <!-- Main Content -->
   <main class="flex-1 max-w-7xl w-full mx-auto p-6">
     
+    <!-- Dev Mode Banner -->
+    <div x-show="devMode" style="display:none;"
+         class="mb-4 flex items-center gap-3 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 shadow-sm">
+      <span class="text-amber-500 shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      </span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-amber-800">Dev Mode เปิดอยู่</p>
+        <p class="text-xs text-amber-600">อีเมลทุกฉบับจะมี <code class="bg-amber-100 px-1 rounded">[ทดสอบระบบ]</code> ในหัวเรื่องและแบนเนอร์เตือนในเนื้อหา</p>
+      </div>
+      <button @click="devMode = false; toggleDevMode()"
+              title="Turn off Dev Mode — emails will no longer have the test warning banner"
+              class="shrink-0 text-xs font-medium text-amber-700 border border-amber-400 rounded-lg px-3 py-1.5 hover:bg-amber-100 transition">
+        ปิด Dev Mode
+      </button>
+    </div>
+
     <!-- Title & Search & Tabs -->
     <div class="flex flex-col gap-6 mb-8">
       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -176,10 +211,19 @@
           <p class="text-sm text-gray-500">Manage system users and configurations.</p>
         </div>
         <div class="flex items-center gap-3 w-full sm:w-auto">
-          <input type="text" x-model="search" placeholder="Search..." 
+          <!-- Dev Mode quick toggle -->
+          <button @click="devMode = !devMode; toggleDevMode()"
+                  :class="devMode ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'"
+                  title="Toggle Dev Mode — when ON, all outgoing emails will include a test warning banner and subject prefix"
+                  class="shrink-0 flex items-center gap-1.5 border rounded-lg px-3 py-2 text-xs font-medium transition whitespace-nowrap">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+            <span x-text="devMode ? 'Dev Mode: ON' : 'Dev Mode: OFF'"></span>
+          </button>
+          <input type="text" x-model="search" placeholder="Search..."
                  class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent w-full sm:w-64">
-          <button @click="openModal('create')" 
-                  x-show="activeTab !== 'patients' && activeTab !== 'verifyHash'"
+          <button @click="openModal('create')"
+                  x-show="activeTab !== 'patients' && activeTab !== 'verifyHash' && activeTab !== 'announcements'"
+                  title="Add a new record to this section"
                   class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 whitespace-nowrap">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
             <span x-text="activeTab === 'users' ? 'Add User' : (activeTab === 'instructors' ? 'Add Instructor' : (activeTab === 'divisions' ? 'Add Division' : (activeTab === 'floors' ? 'Add Floor' : (activeTab === 'phases' ? 'Add Phase' : (activeTab === 'catalog' ? 'Add Treatment' : (activeTab === 'caseTypes' ? 'Add Case Type' : (activeTab === 'steps' ? 'Add Step' : 'Add Requirement')))))))"></span>
@@ -245,10 +289,15 @@
                   :class="activeTab === 'patients' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
             Patients
           </button>
-          <button @click="switchTab('verifyHash')" 
+          <button @click="switchTab('verifyHash')"
                   class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition"
                   :class="activeTab === 'verifyHash' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
             🔒 Verify Hash
+          </button>
+          <button @click="switchTab('announcements')"
+                  class="whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm transition"
+                  :class="activeTab === 'announcements' ? 'border-navy text-navy' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+            Announcements
           </button>
         </nav>
       </div>
@@ -275,7 +324,8 @@
                   :class="syncResult && syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
                 <span x-text="syncResultMessage"></span>
              </div>
-             <button @click="syncInstructors" :disabled="syncing" 
+             <button @click="syncInstructors" :disabled="syncing"
+                     title="Import instructors from the Google Sheet master list (Teacher, Active, Permanent)"
                      class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                <svg class="w-4 h-4" :class="{'animate-spin': syncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                <span x-text="syncing ? 'Syncing...' : 'Sync Instructors'"></span>
@@ -319,7 +369,7 @@
                    <div x-show="inst.floor">Floor: <span class="font-medium" x-text="inst.floor"></span></div>
                 </td>
                 <td class="px-6 py-4 text-right">
-                  <button @click="openModal('edit', { ...inst, role: 'instructor', email: inst.users?.email, name: inst.users?.name })" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                  <button @click="openModal('edit', { ...inst, role: 'instructor', email: inst.users?.email, name: inst.users?.name })" title="Edit this instructor's details" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                 </td>
               </tr>
             </template>
@@ -348,7 +398,8 @@
                   :class="syncResult && syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
                 <span x-text="syncResultMessage"></span>
              </div>
-             <button @click="syncStudents" :disabled="syncing" 
+             <button @click="syncStudents" :disabled="syncing"
+                     title="Import students from the Google Sheet master list (Student, Active)"
                      class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                <svg class="w-4 h-4" :class="{'animate-spin': syncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                <span x-text="syncing ? 'Syncing...' : 'Sync Students'"></span>
@@ -391,7 +442,7 @@
                   </span>
                 </td>
                 <td class="px-6 py-4 text-right">
-                  <button @click="openModal('edit', { ...student, role: 'student', email: student.users?.email, name: student.users?.name })" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                  <button @click="openModal('edit', { ...student, role: 'student', email: student.users?.email, name: student.users?.name })" title="Edit this student's assignment details" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                 </td>
               </tr>
             </template>
@@ -434,7 +485,7 @@
                 </span>
               </td>
               <td class="px-6 py-4 text-right">
-                <button @click="openModal('edit', user)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                <button @click="openModal('edit', user)" title="Edit this user's role and status" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                 <button x-show="user.role !== 'admin'" 
                         @click="deleteUser(user, $event)" 
                         class="text-red-300 hover:text-red-600 transition mx-1"
@@ -486,7 +537,7 @@
                 </span>
               </td>
               <td class="px-6 py-4 text-right">
-                <button @click="openModal('edit', div)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                <button @click="openModal('edit', div)" title="Edit this division's details" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
               </td>
             </tr>
           </template>
@@ -522,7 +573,7 @@
                  <span class="text-sm font-medium text-gray-900" x-text="floor.label"></span>
                </td>
                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                 <button @click="editFloor(floor)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                 <button @click="editFloor(floor)" title="Edit this floor's label" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                </td>
              </tr>
            </template>
@@ -562,7 +613,7 @@
                  <span class="text-sm font-medium text-gray-900" x-text="phase.phase_name"></span>
                </td>
                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                 <button @click="openModal('edit', phase)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                 <button @click="openModal('edit', phase)" title="Edit this treatment phase" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                  <button @click="deleteTreatmentPhase(phase, $event)" 
                          class="text-red-300 hover:text-red-600 transition mx-1"
                          title="Delete Phase">
@@ -607,7 +658,7 @@
                  <span class="text-sm font-medium text-gray-900" x-text="item.treatment_name"></span>
                </td>
                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                 <button @click="openModal('edit', item)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                 <button @click="openModal('edit', item)" title="Edit this treatment catalog entry" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                  <button @click="deleteTreatmentCatalog(item, $event)" 
                          class="text-red-300 hover:text-red-600 transition mx-1"
                          title="Delete Treatment">
@@ -648,7 +699,7 @@
                  <span class="text-sm font-medium text-gray-900" x-text="item.type_of_case"></span>
                </td>
                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                 <button @click="openModal('edit', item)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                 <button @click="openModal('edit', item)" title="Edit this case type" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                  <button @click="deleteTypeOfCase(item, $event)" 
                          class="text-red-300 hover:text-red-600 transition mx-1"
                          title="Delete Case Type">
@@ -719,7 +770,7 @@
                  <span class="text-sm font-medium text-gray-900" x-text="step.step_name"></span>
                </td>
                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                 <button @click="openModal('edit', step)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                 <button @click="openModal('edit', step)" title="Edit this treatment step" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                  <button @click="deleteTreatmentStep(step, $event)" 
                          class="text-red-300 hover:text-red-600 transition mx-1"
                          title="Delete Step">
@@ -838,7 +889,7 @@
                   <span class="text-sm text-gray-500" x-text="req.display_order || 0"></span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                 <button @click="openModal('edit', req)" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
+                 <button @click="openModal('edit', req)" title="Edit this requirement's settings and aggregation rules" class="text-gray-400 hover:text-navy transition mx-1 font-medium text-xs uppercase tracking-wide">Edit</button>
                  <button @click="deleteRequirement(req, $event)" 
                          class="text-red-300 hover:text-red-600 transition mx-1"
                          title="Delete Requirement">
@@ -865,7 +916,7 @@
           </p>
           
           <div class="flex items-center space-x-4">
-             <button @click="syncPatients" :disabled="syncing" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
+             <button @click="syncPatients" :disabled="syncing" title="Import and update patient records from the configured Google Sheet (matches by HN, creates new if not found)" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
                <i class="fas fa-sync-alt mr-2" :class="{'animate-spin': syncing}"></i>
                <span x-text="syncing ? 'Syncing...' : 'Sync Patients Now'"></span>
              </button>
@@ -907,6 +958,7 @@
                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
             </div>
             <button @click="verifyHash()" :disabled="hashVerifying"
+                    title="Validate the cryptographic hash from the verification proof to check if the record has been tampered with"
                     class="bg-navy hover:bg-navy-light text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
               <span x-text="hashVerifying ? 'Verifying...' : 'Verify Hash'"></span>
@@ -926,6 +978,94 @@
         </div>
       </div>
 
+  <!-- Announcements Tab -->
+  <div x-show="!loading && activeTab === 'announcements'" class="space-y-6 animate-fade-in">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div>
+        <h2 class="text-lg font-bold text-navy flex items-center gap-2">
+          <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.952 9.168-4.883a1 1 0 011 .25v12.266a1 1 0 01-1 .25C16.457 10.952 12.932 9 8.832 9H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+          System Announcements
+        </h2>
+        <p class="text-sm text-gray-500 mt-1">Manage announcements displayed to users on the login page after authentication.</p>
+      </div>
+      <button @click="openModal('create')" title="Create a new system announcement"
+              class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2 shadow-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New Announcement
+      </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider font-semibold">
+            <th class="px-4 py-3 w-16">Active</th>
+            <th class="px-4 py-3">Title / Content</th>
+            <th class="px-4 py-3 w-32">Audience</th>
+            <th class="px-4 py-3 w-40">Schedule</th>
+            <th class="px-4 py-3 text-right w-24">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-if="announcements.length === 0">
+            <tr>
+              <td colspan="5" class="px-4 py-12 text-center text-gray-400 text-sm">No announcements yet. Click "New Announcement" to create one.</td>
+            </tr>
+          </template>
+          <template x-for="ann in announcements" :key="ann.id">
+            <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+              <td class="px-4 py-3">
+                <button @click="toggleAnnouncement(ann)"
+                        :title="ann.is_active ? 'Click to deactivate this announcement' : 'Click to activate this announcement'"
+                        class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors focus:outline-none"
+                        :class="ann.is_active ? 'bg-emerald-500' : 'bg-gray-300'">
+                  <span class="inline-block w-3.5 h-3.5 bg-white rounded-full shadow transform transition-transform"
+                        :class="ann.is_active ? 'translate-x-4' : 'translate-x-1'"></span>
+                </button>
+              </td>
+              <td class="px-4 py-3 max-w-xs">
+                <p class="text-sm font-semibold text-gray-800" x-text="ann.title"></p>
+                <p class="text-xs text-gray-500 mt-0.5 line-clamp-2" x-text="ann.content"></p>
+              </td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                      :class="{
+                        'bg-blue-100 text-blue-700': ann.target_audience === 'student',
+                        'bg-purple-100 text-purple-700': ann.target_audience === 'instructor',
+                        'bg-amber-100 text-amber-700': ann.target_audience === 'both'
+                      }"
+                      x-text="ann.target_audience === 'both' ? 'All Users' : (ann.target_audience === 'student' ? 'Students' : 'Instructors')"></span>
+              </td>
+              <td class="px-4 py-3 text-xs text-gray-500 space-y-0.5">
+                <div x-show="ann.start_date" class="flex items-center gap-1">
+                  <span class="text-gray-400">From:</span>
+                  <span x-text="ann.start_date ? new Date(ann.start_date).toLocaleDateString() : ''"></span>
+                </div>
+                <div x-show="ann.end_date" class="flex items-center gap-1">
+                  <span class="text-gray-400">Until:</span>
+                  <span x-text="ann.end_date ? new Date(ann.end_date).toLocaleDateString() : ''"></span>
+                </div>
+                <span x-show="!ann.start_date && !ann.end_date" class="text-gray-400 italic">Always</span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <button @click="openModal('edit', ann)" title="Edit this announcement"
+                          class="p-1.5 rounded-lg text-gray-500 hover:bg-navy/10 hover:text-navy transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                  </button>
+                  <button @click="deleteAnnouncement(ann, $event)" title="Delete this announcement permanently"
+                          class="p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   </main>
 
   <!-- Modal -->
@@ -935,7 +1075,7 @@
     
     <!-- Panel -->
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative z-10 animate-fade-in">
-      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'instructors' ? 'Instructor' : (activeTab === 'students' ? 'Student' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : 'Requirement')))))))))"></h2>
+      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'instructors' ? 'Instructor' : (activeTab === 'students' ? 'Student' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : (activeTab === 'announcements' ? 'Announcement' : 'Requirement'))))))))))"></h2>
       
       <!-- User Form -->
       <div x-show="['users', 'instructors', 'students'].includes(activeTab)" class="space-y-4">
@@ -1380,6 +1520,55 @@
         </div>
       </div>
 
+      <!-- Announcement Form -->
+      <div x-show="activeTab === 'announcements'" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Title <span class="text-red-400 normal-case font-normal">*required</span></label>
+          <input type="text" x-model="announcementForm.title" placeholder="e.g. System Maintenance on Friday"
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Content <span class="text-red-400 normal-case font-normal">*required</span></label>
+          <textarea x-model="announcementForm.content" rows="4" placeholder="Announcement message visible to users..."
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy resize-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Target Audience</label>
+            <select x-model="announcementForm.target_audience"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+              <option value="both">All Users</option>
+              <option value="student">Students Only</option>
+              <option value="instructor">Instructors Only</option>
+            </select>
+          </div>
+          <div class="flex items-end pb-1">
+            <label class="flex items-center gap-3 cursor-pointer select-none">
+              <div class="relative inline-flex items-center h-5 w-9 rounded-full transition-colors cursor-pointer"
+                   :class="announcementForm.is_active ? 'bg-emerald-500' : 'bg-gray-300'"
+                   @click="announcementForm.is_active = !announcementForm.is_active">
+                <span class="inline-block w-3.5 h-3.5 bg-white rounded-full shadow transform transition-transform"
+                      :class="announcementForm.is_active ? 'translate-x-4' : 'translate-x-1'"></span>
+              </div>
+              <span class="text-sm text-gray-700" x-text="announcementForm.is_active ? 'Active' : 'Inactive'"></span>
+            </label>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Start Date <span class="text-gray-400 font-normal normal-case">(optional)</span></label>
+            <input type="datetime-local" x-model="announcementForm.start_date"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">End Date <span class="text-gray-400 font-normal normal-case">(optional)</span></label>
+            <input type="datetime-local" x-model="announcementForm.end_date"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          </div>
+        </div>
+        <p class="text-xs text-gray-400">Leave dates blank to show the announcement always (while active). Set an end date to auto-expire it.</p>
+      </div>
+
       <!-- Error Message -->
       <div x-show="errorMsg" class="text-red-600 text-sm bg-red-50 p-3 rounded-lg flex items-start gap-2 mt-4">
         <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -1388,8 +1577,9 @@
 
       <!-- Actions -->
       <div class="mt-8 flex justify-end gap-3 pt-4 border-t border-gray-100">
-        <button @click="closeModal()" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 font-medium">Cancel</button>
+        <button @click="closeModal()" title="Cancel and close without saving" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 font-medium">Cancel</button>
         <button @click="saveData()" :disabled="saving"
+                title="Save changes to this record"
                 class="px-4 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light disabled:opacity-50 flex items-center gap-2 shadow-sm">
           <span x-show="saving" class="spinner w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
           <span x-text="saving ? 'Saving...' : (mode === 'create' ? 'Create' : 'Save Changes')"></span>
@@ -1417,7 +1607,8 @@
         </div>
       </div>
       <div class="mt-6 flex justify-end">
-        <button @click="warningOpen = false" 
+        <button @click="warningOpen = false"
+                title="Close this notification"
                 class="px-4 py-2 text-white rounded-lg text-sm font-medium transition shadow-sm"
                 :class="warningType === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-navy hover:bg-navy-light'">
           Acknowledge
@@ -1439,10 +1630,10 @@
         <h3 class="text-lg font-bold text-navy mb-2">Confirm Action</h3>
         <p class="text-sm text-gray-500 mb-6" x-text="confirmMessage"></p>
         <div class="flex justify-center gap-3">
-          <button @click="confirmOpen = false" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
+          <button @click="confirmOpen = false" title="Cancel this action" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition">
             Cancel
           </button>
-          <button @click="confirmAction()" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition shadow-sm">
+          <button @click="confirmAction()" title="Confirm and proceed with this action" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition shadow-sm">
             Confirm
           </button>
         </div>
@@ -1509,6 +1700,7 @@
         modalOpen: false,
         sidebarOpen: false, // Fix ReferenceError
         maintenanceMode: false,
+        devMode: false,
         health: { source: '...', healthy: true }, // Added health state
         
         // Warning Modal State
@@ -1643,6 +1835,20 @@
           type_of_case: ''
         },
 
+        // Announcements Data
+        announcements: [],
+
+        // Announcement Form
+        announcementForm: {
+          id: null,
+          title: '',
+          content: '',
+          target_audience: 'both',
+          is_active: true,
+          start_date: '',
+          end_date: ''
+        },
+
         // UI State
         activeTab: 'users',
         syncing: false,
@@ -1652,6 +1858,7 @@
         init() {
           this.loadInitData();
           this.checkMaintenanceMode();
+          this.checkDevMode();
           this.checkSystemHealth();
           
           this.$watch('search', () => {
@@ -1823,6 +2030,18 @@
             .adminSetMaintenanceMode(this.maintenanceMode);
         },
 
+        checkDevMode() {
+          google.script.run
+            .withSuccessHandler(enabled => { this.devMode = enabled; })
+            .adminGetDevMode();
+        },
+
+        toggleDevMode() {
+          google.script.run
+            .withSuccessHandler(res => { if (res.success) this.devMode = res.devMode; })
+            .adminSetDevMode(this.devMode);
+        },
+
         switchTab(tab) {
           this.activeTab = tab;
           this.search = ''; // Reset search logic on tab switch
@@ -1835,6 +2054,7 @@
           else if (tab === 'steps') this.filterSteps();
           else if (tab === 'requirements') this.filterRequirements();
           else if (tab === 'caseTypes') this.filterTypeOfCases();
+          // announcements: no client-side filter needed
         },
 
         // ──────────────────────────────────────────────
@@ -1998,6 +2218,7 @@
               this.catalog = data.catalog || [];
               this.steps = data.steps || [];
               this.caseTypes = data.caseTypes || [];
+              this.announcements = data.announcements || [];
               this.requirements = (data.requirements || []).sort((a, b) => {
                 const divA = (a.divisions ? a.divisions.name : '').toLowerCase();
                 const divB = (b.divisions ? b.divisions.name : '').toLowerCase();
@@ -2266,6 +2487,23 @@
             } else {
               this.reqForm = { ...item, cda_requirement_type: item.cda_requirement_type || '', default_rsu: item.default_rsu != null ? item.default_rsu : '', default_cda: item.default_cda != null ? item.default_cda : '', is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false, is_selectable: item.is_selectable !== false, is_exam: item.is_exam === true, aggregation_config: item.aggregation_config ? JSON.stringify(item.aggregation_config, null, 2) : '' };
             }
+          } else if (this.activeTab === 'announcements') {
+            if (mode === 'create') {
+              this.announcementForm = { id: null, title: '', content: '', target_audience: 'both', is_active: true, start_date: '', end_date: '' };
+            } else {
+              const toLocalDT = (iso) => {
+                if (!iso) return '';
+                const d = new Date(iso);
+                const pad = (n) => String(n).padStart(2, '0');
+                if (isNaN(d.getTime())) return '';
+                return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+              };
+              this.announcementForm = {
+                ...item,
+                start_date: toLocalDT(item.start_date),
+                end_date: toLocalDT(item.end_date)
+              };
+            }
           } else {
             // Floors
              if (mode === 'create') {
@@ -2322,6 +2560,7 @@
           else if (this.activeTab === 'steps') this.saveTreatmentStep();
           else if (this.activeTab === 'requirements') this.saveRequirement();
           else if (this.activeTab === 'caseTypes') this.saveTypeOfCase();
+          else if (this.activeTab === 'announcements') this.saveAnnouncement();
           else this.saveFloor();
         },
 
@@ -2740,6 +2979,94 @@
             .adminDeleteTypeOfCase(item.id);
         },
 
+        // ──────────────────────────────────────────────
+        //  Announcement CRUD
+        // ──────────────────────────────────────────────
+
+        loadAnnouncements() {
+          google.script.run
+            .withSuccessHandler(data => { this.announcements = data || []; })
+            .withFailureHandler(err => { console.error('Failed to load announcements', err); })
+            .adminGetAnnouncements();
+        },
+
+        saveAnnouncement() {
+          this.saving = true;
+          this.errorMsg = '';
+          const formData = JSON.parse(JSON.stringify(this.announcementForm));
+          // Normalize empty strings to null for optional date fields, else convert to ISO UTC explicitly
+          if (!formData.start_date) formData.start_date = null;
+          else formData.start_date = new Date(formData.start_date).toISOString();
+          
+          if (!formData.end_date) formData.end_date = null;
+          else formData.end_date = new Date(formData.end_date).toISOString();
+          const handler = (res) => {
+            this.saving = false;
+            if (res.success) {
+              this.closeModal();
+              this.loadAnnouncements();
+            } else {
+              this.errorMsg = res.error || 'Unknown error occurred.';
+            }
+          };
+          google.script.run
+            .withSuccessHandler(handler)
+            .withFailureHandler(err => { this.saving = false; this.errorMsg = err.message; })
+            .adminSaveAnnouncement(formData);
+        },
+
+        toggleAnnouncement(ann) {
+          const newState = !ann.is_active;
+          ann.is_active = newState; // Optimistic UI
+          google.script.run
+            .withSuccessHandler(res => {
+              if (!res.success) {
+                ann.is_active = !newState; // Revert on failure
+                this.warningType = 'error';
+                this.warningMessage = 'Failed to update announcement status.';
+                this.warningOpen = true;
+              }
+            })
+            .withFailureHandler(err => {
+              ann.is_active = !newState; // Revert
+              this.warningType = 'error';
+              this.warningMessage = 'Error: ' + err.message;
+              this.warningOpen = true;
+            })
+            .adminToggleAnnouncement(ann.id, newState);
+        },
+
+        deleteAnnouncement(ann, event) {
+          this.confirmMessage = 'Are you sure you want to delete the announcement "' + ann.title + '"?\nThis action cannot be undone.';
+          this.confirmOpen = true;
+          const btn = event.currentTarget;
+          this.confirmCallback = () => { this.performDeleteAnnouncement(ann, btn); };
+        },
+
+        performDeleteAnnouncement(ann, btn) {
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '<span class="spinner w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin inline-block"></span>';
+          btn.disabled = true;
+          google.script.run
+            .withSuccessHandler(res => {
+              if (res.success) {
+                this.announcements = this.announcements.filter(a => a.id !== ann.id);
+              } else {
+                this.warningMessage = 'Failed to delete: ' + res.error;
+                this.warningOpen = true;
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+              }
+            })
+            .withFailureHandler(err => {
+              this.warningMessage = 'Error: ' + err.message;
+              this.warningOpen = true;
+              btn.innerHTML = originalText;
+              btn.disabled = false;
+            })
+            .adminDeleteAnnouncement(ann.id);
+        },
+
         // Confirm Modal Action
         confirmAction() {
           if (this.confirmCallback) {
@@ -2787,6 +3114,33 @@
         }
       }
     }
+  </script>
+  <script>
+    // Mobile tap tooltip — shows title text as a bottom toast on touch
+    (function () {
+      var tip = document.createElement('div');
+      tip.setAttribute('style', 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(27,42,74,0.93);color:#fff;padding:8px 16px;border-radius:10px;font-size:0.75rem;max-width:80vw;text-align:center;z-index:99999;pointer-events:none;display:none;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,0.25);');
+      document.body.appendChild(tip);
+      var hide;
+      document.addEventListener('touchstart', function (e) {
+        var el = e.target.closest('[title]');
+        if (!el) return;
+        var text = el.getAttribute('title');
+        if (!text) return;
+        clearTimeout(hide);
+        tip.textContent = text;
+        tip.style.display = 'block';
+        hide = setTimeout(function () { tip.style.display = 'none'; }, 2000);
+      }, { passive: true });
+      document.addEventListener('touchmove', function () {
+        clearTimeout(hide);
+        tip.style.display = 'none';
+      }, { passive: true });
+      document.addEventListener('touchend', function () {
+        clearTimeout(hide);
+        hide = setTimeout(function () { tip.style.display = 'none'; }, 1500);
+      }, { passive: true });
+    })();
   </script>
 </body>
 </html>

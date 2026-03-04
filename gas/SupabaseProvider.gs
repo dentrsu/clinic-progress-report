@@ -1071,6 +1071,102 @@ var SupabaseProvider = (function () {
      * @param {Array<string>} studentIds — UUIDs
      * @returns {Array}
      */
+    // ── Announcements ──────────────────────────────────────────────────────
+
+    /**
+     * List all announcements ordered newest first (admin).
+     */
+    listAnnouncements: function () {
+      return _getCached(
+        "/rest/v1/announcements?select=*&order=created_at.desc",
+        60,
+      );
+    },
+
+    /**
+     * Get the best active announcement for a given role.
+     * Filters date range in JS so no complex PostgREST OR is needed.
+     * @param {string} role — 'student' | 'instructor'
+     * @returns {Object|null}
+     */
+    getActiveAnnouncementForRole: function (role) {
+      var rows = _get(
+        "/rest/v1/announcements?select=*&is_active=eq.true&order=created_at.desc",
+      );
+      if (!rows || rows.length === 0) return null;
+      var now = new Date();
+      return (
+        rows.find(function (a) {
+          if (a.start_date && new Date(a.start_date) > now) return false;
+          if (a.end_date && new Date(a.end_date) < now) return false;
+          return (
+            a.target_audience === "both" ||
+            a.target_audience === role ||
+            role === "admin"
+          );
+        }) || null
+      );
+    },
+
+    /**
+     * Create a new announcement.
+     */
+    createAnnouncement: function (data) {
+      return _post("/rest/v1/announcements", data);
+    },
+
+    /**
+     * Update an announcement by id.
+     */
+    updateAnnouncement: function (id, data) {
+      return _patch(
+        "/rest/v1/announcements?id=eq." + encodeURIComponent(id),
+        data,
+      );
+    },
+
+    /**
+     * Insert a dismissal record for a user and announcement.
+     * Fails silently if table doesn't exist yet to prevent breaking app.
+     */
+    saveDismissal: function (email, annId) {
+      try {
+        var payload = { user_email: email, announcement_id: annId };
+        return _post("/rest/v1/announcement_dismissals", payload);
+      } catch (e) {
+        Logger.log("saveDismissal error: " + e.message);
+        return null;
+      }
+    },
+
+    /**
+     * Check if a user has dismissed a given announcement.
+     * Returns false if table is missing or query fails.
+     */
+    hasDismissed: function (email, annId) {
+      try {
+        var rows = _get(
+          "/rest/v1/announcement_dismissals?user_email=eq." +
+            encodeURIComponent(email) +
+            "&announcement_id=eq." +
+            encodeURIComponent(annId),
+        );
+        return rows && rows.length > 0;
+      } catch (e) {
+        Logger.log("hasDismissed error: " + e.message);
+        return false;
+      }
+    },
+
+    /**
+     * Delete an announcement by id.
+     */
+    deleteAnnouncement: function (id) {
+      return _delete("/rest/v1/announcements?id=eq." + encodeURIComponent(id));
+    },
+
+    // ── Dashboard records ──────────────────────────────────────────────────
+
     listRecordsForDashboard: function (studentIds) {
       if (!studentIds || studentIds.length === 0) return [];
       var BATCH = 40;

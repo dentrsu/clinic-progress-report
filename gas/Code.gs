@@ -613,7 +613,7 @@ function studentRequestEmailVerification(recordId, instructorId) {
       "<p style='margin-top: 30px; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px;'>Note: Clicking these links will securely process the action based on your active Google Workspace login.</p>" +
       "</div>";
 
-    MailApp.sendEmail({
+    _devMailSend({
       to: instEmail,
       subject:
         "Verification Request: " + treatmentName + " for HN " + patientHn,
@@ -636,6 +636,68 @@ function studentRequestEmailVerification(recordId, instructorId) {
 // ──────────────────────────────────────────────
 //  Verification Crypto Helpers
 // ──────────────────────────────────────────────
+
+// ─── Dev Mode ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns true when DEV_MODE Script Property is "true".
+ */
+function _isDevMode() {
+  return (
+    PropertiesService.getScriptProperties().getProperty("DEV_MODE") === "true"
+  );
+}
+
+/**
+ * Wrapper around MailApp.sendEmail that, in dev mode, prefixes the subject
+ * with "[ทดสอบระบบ]" and injects a prominent warning banner at the top of
+ * the HTML body.
+ * @param {{ to: string, subject: string, htmlBody: string }} opts
+ */
+function _devMailSend(opts) {
+  var subject = opts.subject;
+  var htmlBody = opts.htmlBody || "";
+  if (_isDevMode()) {
+    subject = "[ทดสอบระบบ] " + subject;
+    var banner =
+      "<div style='background:#fef3c7;border:2px solid #f59e0b;border-radius:6px;" +
+      "padding:10px 16px;margin-bottom:16px;font-family:Arial,sans-serif;" +
+      "font-size:13px;color:#92400e;'>" +
+      "<strong>⚠ ทดสอบระบบ</strong> — อีเมลนี้ส่งในโหมดทดสอบ กรุณาอย่านำไปใช้จริง" +
+      "</div>";
+    htmlBody = banner + htmlBody;
+  }
+  MailApp.sendEmail({ to: opts.to, subject: subject, htmlBody: htmlBody });
+}
+
+/** Read DEV_MODE setting (admin only). */
+function adminGetDevMode() {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (!profile.found || profile.role !== "admin")
+    throw new Error("Admin only.");
+  return _isDevMode();
+}
+
+/**
+ * Set DEV_MODE setting (admin only).
+ * @param {boolean} enabled
+ */
+function adminSetDevMode(enabled) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (!profile.found || profile.role !== "admin")
+    throw new Error("Admin only.");
+  PropertiesService.getScriptProperties().setProperty(
+    "DEV_MODE",
+    enabled ? "true" : "false",
+  );
+  return { success: true, devMode: enabled };
+}
+
+// ─── Verification Secret ─────────────────────────────────────────────────────
 
 /**
  * Get VERIFICATION_SECRET from Script Properties.
@@ -1346,7 +1408,7 @@ function processEmailVerification(e) {
               "</td></tr>";
           }
 
-          MailApp.sendEmail({
+          _devMailSend({
             to: student.user.email,
             subject:
               "Treatment " +
@@ -3712,7 +3774,7 @@ function instructorBulkUpdateRecordStatus(payload) {
           "</div>";
       }
 
-      MailApp.sendEmail({
+      _devMailSend({
         to: email,
         subject:
           sum.items.length +
@@ -3904,6 +3966,18 @@ function getUserProfile(email) {
       }
     }
 
+    // Fetch active announcement to include in the initial payload
+    try {
+      var ann = SupabaseProvider.getActiveAnnouncementForRole(profile.role);
+      if (ann && !SupabaseProvider.hasDismissed(email, ann.id)) {
+        profile.announcement = ann;
+      }
+    } catch (annErr) {
+      Logger.log(
+        "Error fetching announcement in getUserProfile: " + annErr.message,
+      );
+    }
+
     return profile;
   } catch (e) {
     Logger.log("getUserProfile error: " + e.message);
@@ -4006,7 +4080,96 @@ function adminGetInitData() {
     steps: adminListTreatmentSteps(),
     requirements: adminListRequirements(),
     caseTypes: adminListTypeOfCases(),
+    announcements: adminGetAnnouncements(),
   };
+}
+
+// ──────────────────────────────────────────────
+//  Announcements
+// ──────────────────────────────────────────────
+
+/**
+ * Get the currently active announcement for the logged-in user's role.
+ * Called by landing.html after successful authentication.
+ * Returns null if no matching active announcement exists (errors swallowed).
+ */
+function getActiveAnnouncement() {
+  try {
+    var user = getCurrentUser();
+    if (!user.allowed) return null;
+    var profile = getUserProfile(user.email);
+    if (!profile.found || !profile.active) return null;
+    var ann = SupabaseProvider.getActiveAnnouncementForRole(profile.role);
+    // If user has dismissed this announcement, treat as no active announcement
+    if (ann && SupabaseProvider.hasDismissed(profile.email, ann.id)) {
+      return null;
+    }
+    return ann;
+  } catch (e) {
+    Logger.log("getActiveAnnouncement error: " + e.message);
+    return null;
+  }
+}
+
+/**
+ * List all announcements (Admin only).
+ */
+function adminGetAnnouncements() {
+  _assertAdmin();
+  return SupabaseProvider.listAnnouncements() || [];
+}
+
+/**
+ * Create or update an announcement (Admin only).
+ * Pass { id } in data to update an existing record.
+ */
+function adminSaveAnnouncement(data) {
+  _assertAdmin();
+  var payload = {
+    title: data.title,
+    content: data.content,
+    target_audience: data.target_audience || "both",
+    is_active: !!data.is_active,
+    start_date: data.start_date || null,
+    end_date: data.end_date || null,
+  };
+  if (data.id) {
+    var result = SupabaseProvider.updateAnnouncement(data.id, payload);
+    return { success: true, data: result };
+  } else {
+    var result = SupabaseProvider.createAnnouncement(payload);
+    return { success: true, data: result };
+  }
+}
+
+/** Save dismissal of an announcement for a user */
+function saveAnnouncementDismissal(annId) {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (!email) return false;
+    SupabaseProvider.saveDismissal(email, annId);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Toggle an announcement's active state (Admin only).
+ */
+function adminToggleAnnouncement(id, isActive) {
+  _assertAdmin();
+  SupabaseProvider.updateAnnouncement(id, { is_active: isActive });
+  return { success: true };
+}
+
+/**
+ * Delete an announcement (Admin only).
+ */
+function adminDeleteAnnouncement(id) {
+  _assertAdmin();
+  SupabaseProvider.deleteAnnouncement(id);
+  return { success: true };
 }
 
 /**
@@ -5373,7 +5536,7 @@ function instructorVerifyTreatmentRecord(recordId) {
               "</td></tr>";
           }
 
-          MailApp.sendEmail({
+          _devMailSend({
             to: student.user.email,
             subject: "Treatment Verified: " + treatName + " (HN " + pHn + ")",
             htmlBody:
@@ -5985,7 +6148,7 @@ function studentSubmitRotateRequirement(form) {
       "</div>";
 
     // Send verification email to instructor
-    MailApp.sendEmail({
+    _devMailSend({
       to: instEmail,
       subject:
         "Verification Request: " +
@@ -6037,7 +6200,7 @@ function studentSubmitRotateRequirement(form) {
         "<p style='font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px;'>You will be notified once your instructor reviews the record.</p>" +
         "</div>";
 
-      MailApp.sendEmail({
+      _devMailSend({
         to: studentEmail,
         subject:
           "Confirmation: Verification Requested — " +
@@ -6052,6 +6215,336 @@ function studentSubmitRotateRequirement(form) {
     return { success: true };
   } catch (e) {
     Logger.log("studentSubmitRotateRequirement error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Save a Rotate Clinic Requirement without requesting verification.
+ * Creates the record as 'in_progress' — no email sent.
+ * @param {Object} form
+ * @returns {Object} { success, error? }
+ */
+function studentSaveRotateRequirement(form) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("Student only.");
+  }
+
+  try {
+    var payload = {
+      student_id: profile.student_id,
+      division_id: form.division_id,
+      requirement_id: form.requirement_id,
+      instructor_id: form.instructor_id || null,
+      area: form.area || null,
+      rsu_units: form.rsu_units ? Number(form.rsu_units) : 0,
+      cda_units: form.cda_units ? Number(form.cda_units) : 0,
+      status: "in_progress",
+      hn: form.hn || null,
+      patient_name: form.patient_name || null,
+    };
+
+    var record = SupabaseProvider.createTreatmentRecord(payload);
+    if (!record || !record.record_id) {
+      throw new Error("Failed to create record.");
+    }
+
+    return { success: true };
+  } catch (e) {
+    Logger.log("studentSaveRotateRequirement error: " + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Update an existing rotate record and request instructor verification.
+ * Updates fields, sets status to 'pending verification', and emails instructor + student.
+ * @param {Object} payload — { record_id, requirement_id, division_id, hn, patient_name, area, instructor_id, rsu_units, cda_units }
+ * @returns {{ success: boolean, error?: string }}
+ */
+function studentUpdateAndRequestRotateVerification(payload) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("Student only.");
+  }
+
+  try {
+    // Verify ownership
+    var existing = SupabaseProvider.getTreatmentRecord(payload.record_id);
+    if (!existing) throw new Error("Record not found.");
+    if (existing.student_id !== profile.student_id)
+      throw new Error("You can only edit your own records.");
+    if (existing.status === "verified")
+      throw new Error("Cannot edit a verified record.");
+
+    var updates = {
+      requirement_id: payload.requirement_id || existing.requirement_id,
+      division_id: payload.division_id || existing.division_id,
+      hn: payload.hn || null,
+      patient_name: payload.patient_name || null,
+      area: payload.area || null,
+      instructor_id: payload.instructor_id || existing.instructor_id,
+      rsu_units:
+        payload.rsu_units != null ? payload.rsu_units : existing.rsu_units,
+      cda_units:
+        payload.cda_units != null ? payload.cda_units : existing.cda_units,
+      status: "pending verification",
+    };
+
+    SupabaseProvider.updateTreatmentRecord(payload.record_id, updates);
+
+    // Fetch full record with joins for email content
+    var fullRecord = SupabaseProvider.getTreatmentRecord(payload.record_id);
+    if (!fullRecord) throw new Error("Could not fetch updated record.");
+
+    // Resolve division code for instructor mapping
+    var divId = payload.division_id || existing.division_id;
+    var div = SupabaseProvider.getDivisionById(divId);
+    var divCode = div ? (div.code || "").toUpperCase() : "";
+    var divName = div ? div.name : "Rotate Clinic";
+
+    var divInstColumnMap = {
+      OPER: "oper_instructor_id",
+      ENDO: "endo_instructor_id",
+      PERIO: "perio_instructor_id",
+      PROSTH: "prosth_instructor_id",
+      DIAG: "diag_instructor_id",
+      RADIO: "radio_instructor_id",
+      SUR: "sur_instructor_id",
+      ORTHO: "ortho_instructor_id",
+      PEDO: "pedo_instructor_id",
+    };
+
+    var studentRecord = SupabaseProvider.getStudentById(profile.student_id);
+    var targetInstructorId = null;
+    var instColumn = divInstColumnMap[divCode];
+    if (instColumn && studentRecord && studentRecord[instColumn]) {
+      targetInstructorId = studentRecord[instColumn];
+    }
+    if (!targetInstructorId) {
+      targetInstructorId = payload.instructor_id || existing.instructor_id;
+    }
+
+    var instructor = SupabaseProvider.getInstructorById(targetInstructorId);
+    if (!instructor) throw new Error("Instructor not found.");
+    var instEmail = instructor.users
+      ? instructor.users.email
+      : instructor.user
+        ? instructor.user.email
+        : null;
+    if (!instEmail) throw new Error("Instructor email not found.");
+
+    var patientHn = fullRecord.hn || "-";
+    var patientName = fullRecord.patient_name || "-";
+    var reqType = fullRecord.requirement
+      ? fullRecord.requirement.requirement_type
+      : "";
+    var studentName = profile.name;
+    var studentEmail = profile.email;
+    var appUrl = ScriptApp.getService().getUrl();
+
+    var _tokenFields = {
+      hn: fullRecord.hn || "",
+      rsu_units: fullRecord.rsu_units,
+      cda_units: fullRecord.cda_units,
+      requirement_id: fullRecord.requirement_id || "",
+      requirement_type: reqType,
+      treatment_name: "",
+      step_name: "",
+      area: fullRecord.area,
+      severity: fullRecord.severity,
+      book_number: fullRecord.book_number,
+      page_number: fullRecord.page_number,
+    };
+    var _vTok = _generateActionToken(
+      payload.record_id,
+      "verified",
+      _tokenFields,
+    );
+    var _rTok = _generateActionToken(
+      payload.record_id,
+      "rejected",
+      _tokenFields,
+    );
+    var verifyUrl =
+      appUrl +
+      "?action=verify_record&record_id=" +
+      payload.record_id +
+      "&status=verified&token=" +
+      _vTok.token +
+      "&issued_at=" +
+      encodeURIComponent(_vTok.issuedAt) +
+      "&cd=" +
+      _vTok.cd;
+    var rejectUrl =
+      appUrl +
+      "?action=verify_record&record_id=" +
+      payload.record_id +
+      "&status=rejected&token=" +
+      _rTok.token +
+      "&issued_at=" +
+      encodeURIComponent(_rTok.issuedAt) +
+      "&cd=" +
+      _rTok.cd;
+
+    var td = "padding: 8px; border-bottom: 1px solid #edf2f7;";
+    var divRows = "";
+    if (divName) {
+      divRows +=
+        "<tr><td style='" +
+        td +
+        "'><strong>Clinic:</strong></td><td style='" +
+        td +
+        "'>" +
+        divName +
+        "</td></tr>";
+    }
+    if (reqType) {
+      divRows +=
+        "<tr><td style='" +
+        td +
+        "'><strong>Requirement:</strong></td><td style='" +
+        td +
+        "'>" +
+        reqType +
+        "</td></tr>";
+    }
+    if (fullRecord.rsu_units != null && fullRecord.rsu_units !== "") {
+      divRows +=
+        "<tr><td style='" +
+        td +
+        "'><strong>RSU Units:</strong></td><td style='" +
+        td +
+        "'>" +
+        fullRecord.rsu_units +
+        "</td></tr>";
+    }
+    if (fullRecord.cda_units != null && fullRecord.cda_units !== "") {
+      divRows +=
+        "<tr><td style='" +
+        td +
+        "'><strong>CDA Units:</strong></td><td style='" +
+        td +
+        "'>" +
+        fullRecord.cda_units +
+        "</td></tr>";
+    }
+
+    var htmlBody =
+      "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>" +
+      "<h2 style='color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>Verification Request (Rotate Clinic)</h2>" +
+      "<p><strong>Student:</strong> " +
+      studentName +
+      " has requested verification for a rotate clinic requirement.</p>" +
+      "<table style='width: 100%; border-collapse: collapse; margin: 20px 0;'>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Patient HN:</strong></td><td style='" +
+      td +
+      "'>" +
+      patientHn +
+      "</td></tr>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Patient Name:</strong></td><td style='" +
+      td +
+      "'>" +
+      patientName +
+      "</td></tr>" +
+      "<tr><td style='" +
+      td +
+      "'><strong>Area:</strong></td><td style='" +
+      td +
+      "'>" +
+      (fullRecord.area || "-") +
+      "</td></tr>" +
+      divRows +
+      "</table>" +
+      "<p style='margin-bottom: 30px;'>Please review the work and click one of the actions below:</p>" +
+      "<div style='text-align: center;'>" +
+      "<p style='margin: 0 0 12px 0;'><a href='" +
+      verifyUrl +
+      "' style='background-color: #10b981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Verify Treatment</a></p>" +
+      "<p style='margin: 0;'><a href='" +
+      rejectUrl +
+      "' style='background-color: #ef4444; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>Reject Treatment</a></p>" +
+      "</div>" +
+      "<p style='margin-top: 30px; font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px;'>Note: Clicking these links will securely process the action based on your active Google Workspace login.</p>" +
+      "</div>";
+
+    _devMailSend({
+      to: instEmail,
+      subject:
+        "Verification Request: " +
+        (reqType || divName) +
+        " (" +
+        divCode +
+        ") — " +
+        studentName,
+      htmlBody: htmlBody,
+    });
+
+    if (studentEmail) {
+      var instName = instructor.users
+        ? instructor.users.name
+        : instructor.user
+          ? instructor.user.name
+          : "Instructor";
+      var studentHtmlBody =
+        "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>" +
+        "<h2 style='color: #1a365d; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;'>Verification Request Sent</h2>" +
+        "<p>Your rotate clinic requirement has been updated and a verification request has been sent to <strong>" +
+        instName +
+        "</strong>.</p>" +
+        "<table style='width: 100%; border-collapse: collapse; margin: 20px 0;'>" +
+        "<tr><td style='" +
+        td +
+        "'><strong>Patient HN:</strong></td><td style='" +
+        td +
+        "'>" +
+        patientHn +
+        "</td></tr>" +
+        "<tr><td style='" +
+        td +
+        "'><strong>Patient Name:</strong></td><td style='" +
+        td +
+        "'>" +
+        patientName +
+        "</td></tr>" +
+        "<tr><td style='" +
+        td +
+        "'><strong>Area:</strong></td><td style='" +
+        td +
+        "'>" +
+        (fullRecord.area || "-") +
+        "</td></tr>" +
+        divRows +
+        "</table>" +
+        "<p style='font-size: 12px; color: #718096; border-top: 1px solid #e2e8f0; padding-top: 10px;'>You will be notified once your instructor reviews the record.</p>" +
+        "</div>";
+
+      _devMailSend({
+        to: studentEmail,
+        subject:
+          "Confirmation: Verification Requested — " +
+          (reqType || divName) +
+          " (" +
+          divCode +
+          ")",
+        htmlBody: studentHtmlBody,
+      });
+    }
+
+    return { success: true };
+  } catch (e) {
+    Logger.log("studentUpdateAndRequestRotateVerification error: " + e.message);
     return { success: false, error: e.message };
   }
 }

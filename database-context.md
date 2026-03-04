@@ -69,6 +69,26 @@ create table public.students (
   status public.user_status not null default 'active'
 );
 
+-- 1.2 System Announcements
+create table public.announcements (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  content text not null,
+  target_audience text not null default 'both',
+  is_active boolean not null default false,
+  start_date timestamptz,
+  end_date timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.announcement_dismissals (
+  user_email text not null,
+  announcement_id uuid not null references public.announcements(id) on delete cascade,
+  dismissed_at timestamptz default now(),
+  primary key (user_email, announcement_id)
+);
+
 
 -- 1.1 Divisions
 create type public.clinic_type as enum ('main', 'rotate', 'N/A');
@@ -352,8 +372,8 @@ OPER uses cross-requirement overflow and substitution logic that cannot be expre
 | Class V          | `null` (sum)                                                                                                    | Standard; also source for Exam Class V                                         |
 | Class VI         | `null` (sum)                                                                                                    | Standard                                                                       |
 | PRR              | `null` (sum)                                                                                                    | Bonus source for Class I RSU (max 1 record)                                    |
-| Exam Class II    | `{"type":"count_exam","source_ids":["f75caaa1-ae50-41e3-b9d8-aeebfe63c58a"]}`                                  | `is_selectable=false`; counts Class II records where `is_exam=true`            |
-| Exam Class V     | `{"type":"count_exam","source_ids":["c63b2e7e-6997-4b07-8141-ba2528027dc0"]}`                                  | `is_selectable=false`; counts Class V records where `is_exam=true`             |
+| Exam Class II    | `{"type":"count_exam","source_ids":["f75caaa1-ae50-41e3-b9d8-aeebfe63c58a"]}`                                   | `is_selectable=false`; counts Class II records where `is_exam=true`            |
+| Exam Class V     | `{"type":"count_exam","source_ids":["c63b2e7e-6997-4b07-8141-ba2528027dc0"]}`                                   | `is_selectable=false`; counts Class V records where `is_exam=true`             |
 | Minimum Total R  | `{"type":"derived","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>","<Diastema>"],"operation":"sum_rsu"}` | `is_selectable=false`; pass-2 sums RSU from all class types (minimum_rsu = 60) |
 | Diastema Closure | `null` + `minimum_rsu=0`, `minimum_cda=0`                                                                       | Selectable but has no vault row; absorbed by Class IV                          |
 | Recall (any)     | `{"type":"count_met","source_ids":["<I>","<II>","<III>","<IV>","<V>","<VI>"]}`                                  | `is_selectable=false`; computed in pass-2 from raw counts                      |
@@ -551,23 +571,23 @@ Route: `?page=verify` (accessible to admin and instructor roles). A form-based p
 
 Call `adminVerifyHashFromEmail(params)` with **all 15 fields**:
 
-| Group | Field | Source in email |
-|---|---|---|
-| Proof block | `verified_at` | Green box → "Verified At" |
-| Proof block | `record_id` | Green box → "Record ID" |
-| Proof block | `requirement_id` | Green box → "Requirement ID" |
-| Proof block | `verified_by` | Green box → "Verified By" |
-| Proof block | `hash` | Green box → "Hash" |
-| Email body | `hn` | Table → "Patient HN" |
-| Email body | `requirement_type` | Table → "Requirement" |
-| Email body | `treatment_name` | Table → "Treatment" |
-| Email body | `step_name` | Table → "Step" |
-| Email body | `rsu_units` | Table → "RSU Units" (blank if absent) |
-| Email body | `cda_units` | Table → "CDA Units" (blank if absent) |
-| Email body | `area` | Table → "Area / Teeth" (blank if absent) |
-| Email body | `severity` | Table → "Severity" (blank if absent) |
-| Email body | `book_number` | Table → "Book Number" (blank if absent) |
-| Email body | `page_number` | Table → "Page Number" (blank if absent) |
+| Group       | Field              | Source in email                          |
+| ----------- | ------------------ | ---------------------------------------- |
+| Proof block | `verified_at`      | Green box → "Verified At"                |
+| Proof block | `record_id`        | Green box → "Record ID"                  |
+| Proof block | `requirement_id`   | Green box → "Requirement ID"             |
+| Proof block | `verified_by`      | Green box → "Verified By"                |
+| Proof block | `hash`             | Green box → "Hash"                       |
+| Email body  | `hn`               | Table → "Patient HN"                     |
+| Email body  | `requirement_type` | Table → "Requirement"                    |
+| Email body  | `treatment_name`   | Table → "Treatment"                      |
+| Email body  | `step_name`        | Table → "Step"                           |
+| Email body  | `rsu_units`        | Table → "RSU Units" (blank if absent)    |
+| Email body  | `cda_units`        | Table → "CDA Units" (blank if absent)    |
+| Email body  | `area`             | Table → "Area / Teeth" (blank if absent) |
+| Email body  | `severity`         | Table → "Severity" (blank if absent)     |
+| Email body  | `book_number`      | Table → "Book Number" (blank if absent)  |
+| Email body  | `page_number`      | Table → "Page Number" (blank if absent)  |
 
 Returns `{valid, version, computed}`. Only supports v2 hashes.
 

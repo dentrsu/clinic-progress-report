@@ -1354,5 +1354,32 @@
       }
     }
   </script>
+  <script>
+    // Mobile tap tooltip — shows title text as a bottom toast on touch
+    (function () {
+      var tip = document.createElement('div');
+      tip.setAttribute('style', 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(27,42,74,0.93);color:#fff;padding:8px 16px;border-radius:10px;font-size:0.75rem;max-width:80vw;text-align:center;z-index:99999;pointer-events:none;display:none;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,0.25);');
+      document.body.appendChild(tip);
+      var hide;
+      document.addEventListener('touchstart', function (e) {
+        var el = e.target.closest('[title]');
+        if (!el) return;
+        var text = el.getAttribute('title');
+        if (!text) return;
+        clearTimeout(hide);
+        tip.textContent = text;
+        tip.style.display = 'block';
+        hide = setTimeout(function () { tip.style.display = 'none'; }, 2000);
+      }, { passive: true });
+      document.addEventListener('touchmove', function () {
+        clearTimeout(hide);
+        tip.style.display = 'none';
+      }, { passive: true });
+      document.addEventListener('touchend', function () {
+        clearTimeout(hide);
+        hide = setTimeout(function () { tip.style.display = 'none'; }, 1500);
+      }, { passive: true });
+    })();
+  </script>
 </body>
 </html>
