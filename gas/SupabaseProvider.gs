@@ -46,6 +46,34 @@ var SupabaseProvider = (function () {
   }
 
   /**
+   * GET helper for the oracle schema.
+   * Supabase PostgREST requires Accept-Profile header for non-public schemas.
+   */
+  function _oracleGet(path) {
+    var url = getSupabaseUrl() + path;
+    var hdrs = _headers();
+    hdrs["Accept-Profile"] = "oracle";
+    var response = UrlFetchApp.fetch(url, {
+      method: "get",
+      headers: hdrs,
+      muteHttpExceptions: true,
+    });
+
+    var code = response.getResponseCode();
+    if (code < 200 || code >= 300) {
+      throw new Error(
+        "Supabase GET " +
+          path +
+          " returned " +
+          code +
+          ": " +
+          response.getContentText(),
+      );
+    }
+    return JSON.parse(response.getContentText());
+  }
+
+  /**
    * Cached GET helper using CacheService.
    */
   function _getCached(path, ttlSeconds) {
@@ -1209,9 +1237,11 @@ var SupabaseProvider = (function () {
       if (!studentId) return null;
       var url = getSupabaseUrl() + "/rest/v1/rpc/oracle_refresh_student";
       var payload = { p_student_id: studentId };
+      var hdrs = _headers();
+      hdrs["Content-Profile"] = "oracle";
       var response = UrlFetchApp.fetch(url, {
         method: "post",
-        headers: _headers(),
+        headers: hdrs,
         payload: JSON.stringify(payload),
         muteHttpExceptions: true,
       });
@@ -1231,8 +1261,8 @@ var SupabaseProvider = (function () {
      */
     getOracleStudentSnapshot: function (studentId) {
       if (!studentId) return null;
-      var rows = _get(
-        "/rest/v1/oracle/student_progress_snapshots?student_id=eq." + studentId,
+      var rows = _oracleGet(
+        "/rest/v1/student_progress_snapshots?student_id=eq." + studentId,
       );
       return rows && rows.length > 0 ? rows[0] : null;
     },
@@ -1246,8 +1276,8 @@ var SupabaseProvider = (function () {
       var results = [];
       for (var i = 0; i < studentIds.length; i += BATCH) {
         var batch = studentIds.slice(i, i + BATCH);
-        var rows = _get(
-          "/rest/v1/oracle/student_progress_snapshots?student_id=in.(" +
+        var rows = _oracleGet(
+          "/rest/v1/student_progress_snapshots?student_id=in.(" +
             batch.join(",") +
             ")",
         );
@@ -1261,8 +1291,8 @@ var SupabaseProvider = (function () {
      */
     getOracleStudentExplanations: function (studentId) {
       if (!studentId) return [];
-      return _get(
-        "/rest/v1/oracle/explanation_factors?student_id=eq." +
+      return _oracleGet(
+        "/rest/v1/explanation_factors?student_id=eq." +
           studentId +
           "&order=display_order.asc",
       );
@@ -1273,8 +1303,8 @@ var SupabaseProvider = (function () {
      */
     getOracleStudentRecommendations: function (studentId) {
       if (!studentId) return [];
-      return _get(
-        "/rest/v1/oracle/recommendations?student_id=eq." +
+      return _oracleGet(
+        "/rest/v1/recommendations?student_id=eq." +
           studentId +
           "&order=priority_rank.asc",
       );
