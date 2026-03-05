@@ -1275,7 +1275,24 @@ var SupabaseProvider = (function () {
       var rows = _oracleGet(
         "/rest/v1/student_progress_snapshots?student_id=eq." + studentId,
       );
-      return rows && rows.length > 0 ? rows[0] : null;
+      if (!rows || rows.length === 0) return null;
+      var s = rows[0];
+      return {
+        ...s,
+        progress_score: s.verified_completion_pct
+          ? Math.round(s.verified_completion_pct * 100)
+          : 0,
+        velocity_30d: s.verified_velocity_4w || 0,
+        forecast_completion_date: s.forecast_completion_month,
+        last_calculated_at: s.snapshot_at,
+        risk_level:
+          {
+            green: "On Track",
+            yellow: "At Risk",
+            orange: "High Risk",
+            red: "Critical",
+          }[s.risk_level] || s.risk_level,
+      };
     },
 
     /**
@@ -1292,7 +1309,24 @@ var SupabaseProvider = (function () {
             batch.join(",") +
             ")",
         );
-        results = results.concat(rows || []);
+        (rows || []).forEach(function (s) {
+          results.push({
+            ...s,
+            progress_score: s.verified_completion_pct
+              ? Math.round(s.verified_completion_pct * 100)
+              : 0,
+            velocity_30d: s.verified_velocity_4w || 0,
+            forecast_completion_date: s.forecast_completion_month,
+            last_calculated_at: s.snapshot_at,
+            risk_level:
+              {
+                green: "On Track",
+                yellow: "At Risk",
+                orange: "High Risk",
+                red: "Critical",
+              }[s.risk_level] || s.risk_level,
+          });
+        });
       }
       return results;
     },
@@ -1302,11 +1336,19 @@ var SupabaseProvider = (function () {
      */
     getOracleStudentExplanations: function (studentId) {
       if (!studentId) return [];
-      return _oracleGet(
+      var rows = _oracleGet(
         "/rest/v1/explanation_factors?student_id=eq." +
           studentId +
           "&order=display_order.asc",
       );
+      return (rows || []).map(function (e) {
+        return {
+          ...e,
+          factor_name: e.factor_label,
+          description: e.factor_code,
+          impact_score: e.severity * -1,
+        };
+      });
     },
 
     /**
@@ -1314,11 +1356,18 @@ var SupabaseProvider = (function () {
      */
     getOracleStudentRecommendations: function (studentId) {
       if (!studentId) return [];
-      return _oracleGet(
+      var rows = _oracleGet(
         "/rest/v1/recommendations?student_id=eq." +
           studentId +
           "&order=priority_rank.asc",
       );
+      return (rows || []).map(function (r) {
+        return {
+          ...r,
+          action_type: r.recommendation_type,
+          description: r.message,
+        };
+      });
     },
   };
 })();

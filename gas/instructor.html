@@ -126,11 +126,11 @@
                        <span class="font-black text-navy text-sm px-1.5 py-0.5 bg-gray-50 rounded border border-gray-100" x-text="s.oracle_snapshot.progress_score"></span>
                     </div>
                     <div class="flex justify-between items-center mt-1.5">
-                       <span class="text-[0.65rem] font-bold uppercase tracking-wider text-gray-400">Risk Level</span>
                        <span class="text-[0.65rem] font-bold px-2 py-0.5 rounded-full"
                              :class="{
                                'bg-emerald-50 text-emerald-600 border border-emerald-100': s.oracle_snapshot.risk_level === 'On Track',
                                'bg-amber-50 text-amber-600 border border-amber-100': s.oracle_snapshot.risk_level === 'At Risk',
+                               'bg-orange-50 text-orange-600 border border-orange-100': s.oracle_snapshot.risk_level === 'High Risk',
                                'bg-red-50 text-red-600 border border-red-100': s.oracle_snapshot.risk_level === 'Critical'
                              }" x-text="s.oracle_snapshot.risk_level"></span>
                     </div>

@@ -51,15 +51,17 @@
       <div class="text-right">
          <p class="text-indigo-200 text-xs font-semibold uppercase tracking-wider mb-1 opacity-80">Status</p>
          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ring-inset shadow-inner"
-               :class="{
-                 'bg-emerald-500/20 text-emerald-300 ring-emerald-500/30': oracleData.snapshot.risk_level === 'On Track',
-                 'bg-amber-500/20 text-amber-300 ring-amber-500/30': oracleData.snapshot.risk_level === 'At Risk',
-                 'bg-red-500/20 text-red-300 ring-red-500/30': oracleData.snapshot.risk_level === 'Critical'
-               }">
+                 :class="{
+                   'bg-emerald-500/20 text-emerald-300 ring-emerald-500/30': oracleData.snapshot.risk_level === 'On Track',
+                   'bg-amber-500/10 text-amber-300 ring-amber-500/20': oracleData.snapshot.risk_level === 'At Risk',
+                   'bg-orange-500/20 text-orange-300 ring-orange-500/30': oracleData.snapshot.risk_level === 'High Risk',
+                   'bg-red-500/20 text-red-100 ring-red-500/30': oracleData.snapshot.risk_level === 'Critical'
+                 }">
            <span class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.5)]" 
                  :class="{
                    'bg-emerald-400': oracleData.snapshot.risk_level === 'On Track',
                    'bg-amber-400': oracleData.snapshot.risk_level === 'At Risk',
+                   'bg-orange-400': oracleData.snapshot.risk_level === 'High Risk',
                    'bg-red-400': oracleData.snapshot.risk_level === 'Critical'
                  }"></span>
            <span x-text="oracleData.snapshot.risk_level"></span>
