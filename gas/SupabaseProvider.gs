@@ -1155,6 +1155,17 @@ var SupabaseProvider = (function () {
       return _post("/rest/v1/announcements", data);
     },
 
+    ping: function () {
+      return _get("/rest/v1/users?select=count");
+    },
+
+    /**
+     * List all students in the system.
+     */
+    listStudents: function () {
+      return _get("/rest/v1/students?select=*");
+    },
+
     /**
      * Update an announcement by id.
      */

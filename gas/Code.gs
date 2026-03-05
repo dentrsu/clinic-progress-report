@@ -2492,6 +2492,49 @@ function _applyRequirementAggregation(
   }
 }
 
+function instructorGetOracleTeamRisk() {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active) {
+    throw new Error("User not found or inactive.");
+  }
+
+  // instructors see all students in the system (or filtered by team if we had that logic)
+  // for now, let's get all student IDs
+  var students = SupabaseProvider.listStudents();
+  var ids = students.map(function (s) {
+    return s.student_id;
+  });
+
+  return SupabaseProvider.listOracleSnapshots(ids);
+}
+
+/**
+ * Administrative utility to force-refresh Oracle data for all students.
+ * Useful for catching up existing records.
+ */
+function adminSyncAllOracleSnapshots() {
+  var user = getCurrentUser();
+  var profile = getUserProfile(user.email);
+  if (profile.role !== "admin") throw new Error("Unauthorized: Admin only");
+
+  var students = SupabaseProvider.listStudents();
+  console.log("Syncing " + students.length + " students...");
+
+  var success = 0;
+  students.forEach(function (s) {
+    try {
+      SupabaseProvider.refreshOracleSnapshot(s.student_id);
+      success++;
+    } catch (e) {
+      console.error("Failed for " + s.student_id, e);
+    }
+  });
+
+  return { total: students.length, success: success };
+}
 /**
  * Get student requirement progress for the vault.
  * @param {string} targetStudentId Optional student ID to fetch data for (instructor/admin only)
