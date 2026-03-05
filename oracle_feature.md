@@ -36,3 +36,11 @@ Based on detected risks, the Oracle provides prioritized actions:
 ---
 
 **Summary:** The Oracle rewards consistent, verified progress and identifies risks early to prevent graduation delays.
+
+## FAQ: Starting Fresh
+
+**Q: How many records are needed to start?**
+A: Exactly **one verified record** is enough to generate the first prediction. However, the prediction becomes stable and "accurate" after about **3–5 verified records** are recorded within the same month.
+
+**Q: Do I need to "train" the model?**
+A: No. It uses real-time math. It will calculate results for 1 student or 1,000 students instantly as soon as data is entered.
