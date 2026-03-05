@@ -25,7 +25,8 @@
 </div>
 
 <!-- Populated State -->
-<div x-show="!oracleLoading && oracleData && oracleData.snapshot" class="mt-8 space-y-6 animate-fade-in" style="animation-delay: 200ms">
+<template x-if="oracleData && oracleData.snapshot">
+<div class="mt-8 space-y-6 animate-fade-in" style="animation-delay: 200ms">
   
   <div class="flex items-center gap-2 mb-2 px-1">
      <svg class="w-5 h-5 text-indigo-600 shrink-0 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,6 +147,7 @@
   <div class="text-center pb-2">
     <p class="text-[0.6rem] text-gray-400 font-medium">Oracle snapshot last updated: <span class="font-mono text-gray-500" x-text="formatDate(oracleData.snapshot.last_calculated_at)"></span></p>
   </div>
+</template>
 
 </div>
 
