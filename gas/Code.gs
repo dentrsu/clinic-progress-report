@@ -4929,7 +4929,7 @@ function adminSyncStudents() {
         var userRecord = SupabaseProvider.upsertUser(email, {
           name: name,
           role: "student",
-          status: "active",
+          status: String(statusRaw || "").toLowerCase(),
         });
 
         if (!userRecord || !userRecord.user_id) {

@@ -1,4 +1,7 @@
 <!-- Oracle Analytics Panel (Student View) -->
+<div>
+
+<!-- Loading State -->
 <div x-show="oracleLoading" class="text-center py-6 mt-6">
   <div class="spinner w-6 h-6 border-indigo-400/50 border-t-indigo-500 mx-auto"></div>
   <p class="text-xs text-gray-400 mt-2 font-medium tracking-wide">Connecting to Oracle Analytics...</p>
@@ -143,5 +146,7 @@
   <div class="text-center pb-2">
     <p class="text-[0.6rem] text-gray-400 font-medium">Oracle snapshot last updated: <span class="font-mono text-gray-500" x-text="formatDate(oracleData.snapshot.last_calculated_at)"></span></p>
   </div>
+
+</div>
 
 </div>
