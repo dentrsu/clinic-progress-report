@@ -10,6 +10,13 @@ create extension if not exists pgcrypto;
 -- 1) Create a dedicated schema
 create schema if not exists oracle;
 
+-- 1b) Grant schema access to Supabase roles
+GRANT USAGE ON SCHEMA oracle TO anon, authenticated, service_role;
+GRANT SELECT ON ALL TABLES IN SCHEMA oracle TO anon, authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA oracle TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA oracle
+  GRANT SELECT ON TABLES TO anon, authenticated, service_role;
+
 -- 2) Enums
 do $$
 begin
