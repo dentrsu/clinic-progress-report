@@ -34,6 +34,7 @@ declare
 
   v_risk_score numeric := 0;
   v_risk_level oracle.oracle_risk_level := 'green';
+  v_monthly_velocity numeric := 0;
 
 begin
   -- 1) Cohort info
@@ -62,8 +63,8 @@ begin
 
   -- 4) Verified velocity: total verified units over last 4/8 weeks 
   select
-    coalesce(sum(case when tr.status = 'verified' and tr.created_at >= (v_now - interval '4 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0),
-    coalesce(sum(case when tr.status = 'verified' and tr.created_at >= (v_now - interval '8 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0)
+    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '4 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0),
+    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '8 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0)
   into v_verified_4w, v_verified_8w
   from public.treatment_records tr
   where tr.student_id = p_student_id;
@@ -94,11 +95,13 @@ begin
   into v_verified_pct, v_estimated_pct
   from req, prog;
 
-  -- 6) Forecast months remaining (heuristic)
-  if v_deadline is not null and v_verified_8w > 0 then
-    -- convert 8-week velocity to monthly (approximate)
-    -- estimate remaining workload ratio 
-    v_months_remaining := ceil( greatest(0, (1 - coalesce(v_verified_pct,0)) * 10 ) ); -- scaling placeholder
+  -- 6) Forecast months remaining
+  -- Use 8w velocity (annualised avg) for stability; fall back to 4w if 8w is zero.
+  -- v_monthly_velocity is declared at the top of the function
+  v_monthly_velocity := greatest(v_verified_8w / 2.0, v_verified_4w, 0);
+
+  if v_monthly_velocity > 0 and coalesce(v_verified_pct, 0) < 1 then
+    v_months_remaining := ceil( ( (1 - coalesce(v_verified_pct,0)) * 100 ) / v_monthly_velocity );
     v_forecast_month := date_trunc('month', (v_now::date + (v_months_remaining || ' months')::interval))::date;
   end if;
 

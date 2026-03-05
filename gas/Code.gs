@@ -1310,6 +1310,7 @@ function processEmailVerification(e) {
     }
 
     SupabaseProvider.updateTreatmentRecord(recordId, updates);
+    SupabaseProvider.refreshOracleSnapshot(record.student_id);
 
     // Attempt to notify student
     try {
@@ -1635,6 +1636,18 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Verification Workflow — DentRSU Tracker")
+      .setFaviconUrl(favicon)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
+  if (page === "oracle-guide") {
+    var t = HtmlService.createTemplateFromFile("oracle-guide");
+    t.appUrl = url;
+    t.appDevUrl = devUrl;
+    return t
+      .evaluate()
+      .setTitle("Oracle Analytics Guide — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -2534,6 +2547,38 @@ function adminSyncAllOracleSnapshots() {
   });
 
   return { total: students.length, success: success };
+}
+
+/**
+ * Admin: Get all cohort calendars.
+ */
+function adminGetCohortCalendars() {
+  var user = getCurrentUser();
+  var profile = getUserProfile(user.email);
+  if (profile.role !== "admin") throw new Error("Unauthorized: Admin only");
+  return SupabaseProvider.listCohortCalendars();
+}
+
+/**
+ * Admin: Upsert a cohort calendar.
+ */
+function adminUpsertCohortCalendar(data) {
+  var user = getCurrentUser();
+  var profile = getUserProfile(user.email);
+  if (profile.role !== "admin") throw new Error("Unauthorized: Admin only");
+  if (!data.cohort_year) throw new Error("Cohort Year is required.");
+  return SupabaseProvider.upsertCohortCalendar(data);
+}
+
+/**
+ * Admin: Delete a cohort calendar.
+ */
+function adminDeleteCohort(cohortYear) {
+  var user = getCurrentUser();
+  var profile = getUserProfile(user.email);
+  if (profile.role !== "admin") throw new Error("Unauthorized: Admin only");
+  if (!cohortYear) throw new Error("Cohort Year is required.");
+  return SupabaseProvider.deleteCohort(cohortYear);
 }
 /**
  * Get student requirement progress for the vault.
@@ -3741,6 +3786,19 @@ function instructorBulkUpdateRecordStatus(payload) {
     }
   });
 
+  // Trigger Oracle Refresh for affected students
+  var studentsToRefresh = {};
+  records.forEach(function (r) {
+    if (r.student_id) studentsToRefresh[r.student_id] = true;
+  });
+  Object.keys(studentsToRefresh).forEach(function (sid) {
+    try {
+      SupabaseProvider.refreshOracleSnapshot(sid);
+    } catch (e) {
+      Logger.log("Bulk Oracle refresh failed: " + e.message);
+    }
+  });
+
   // Send one summary email per student
   var statusLabel = action === "verified" ? "Verified ✅" : "Rejected ❌";
   var instructorName = profile.name || "Your instructor";
@@ -4184,6 +4242,7 @@ function adminGetInitData() {
     requirements: adminListRequirements(),
     caseTypes: adminListTypeOfCases(),
     announcements: adminGetAnnouncements(),
+    cohorts: adminGetCohortCalendars(),
   };
 }
 

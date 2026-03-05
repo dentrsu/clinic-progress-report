@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Oracle Analytics Guide — DentRSU Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 13px;
+      color: #1a202c;
+      background: #f8fafc;
+      line-height: 1.55;
+    }
+
+    /* ── Sticky nav ── */
+    .top-nav {
+      position: sticky; top: 0; z-index: 50;
+      background: #1a365d; color: #fff;
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .top-nav a.back {
+      display: flex; align-items: center;
+      color: #fff; text-decoration: none;
+      background: rgba(255,255,255,.12); border-radius: 6px;
+      padding: 5px 10px; font-size: 12px; font-weight: 600;
+      transition: background .15s;
+    }
+    .top-nav a.back:hover { background: rgba(255,255,255,.22); }
+    .top-nav .nav-title {
+      flex: 1; text-align: center;
+      font-size: 13px; font-weight: 700; letter-spacing: .02em;
+    }
+    .top-nav button.pdf-btn {
+      background: #c4972f; color: #fff; border: none;
+      border-radius: 6px; padding: 5px 14px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: background .15s;
+    }
+    .top-nav button.pdf-btn:hover { background: #a87a22; }
+
+    /* ── Page shell ── */
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 32px 44px 48px;
+    }
+
+    /* ── Typography ── */
+    h1 { font-size: 22px; font-weight: 800; color: #1a365d; }
+    h2 { font-size: 15px; font-weight: 700; color: #2d3748; margin-bottom: 10px; }
+    h3 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    p  { margin-bottom: 8px; }
+
+    /* ── Header band ── */
+    .doc-header {
+      display: flex; align-items: flex-start; gap: 16px;
+      border-bottom: 3px solid #6b46c1; padding-bottom: 18px; margin-bottom: 28px;
+    }
+    .doc-header .badge {
+      background: #6b46c1; color: #fff;
+      font-size: 10px; font-weight: 700; letter-spacing: .08em;
+      padding: 3px 8px; border-radius: 4px; white-space: nowrap; margin-top: 4px;
+    }
+    .doc-header p { font-size: 12px; color: #4a5568; margin: 4px 0 0; }
+
+    /* ── Section spacing ── */
+    .section { margin-bottom: 30px; }
+
+    /* ── Part header banner ── */
+    .part-banner {
+      display: flex; align-items: center; gap: 10px;
+      background: linear-gradient(90deg, #f3ebff, #fff);
+      border-left: 4px solid #6b46c1;
+      padding: 9px 14px; border-radius: 0 8px 8px 0;
+      margin-bottom: 14px;
+    }
+    .part-banner .part-num {
+      background: #6b46c1; color: #fff;
+      font-size: 10px; font-weight: 800;
+      padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+    }
+    .part-banner h2 { margin-bottom: 0; color: #44337a; }
+
+    /* ── Metric pills ── */
+    .metric-strip {
+      display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px;
+    }
+    .metric-pill {
+      flex: 1; min-width: 140px;
+      border-radius: 10px; padding: 12px 14px;
+      border: 1.5px solid;
+    }
+    .metric-pill.score   { background:#eff6ff; border-color:#bfdbfe; }
+    .metric-pill.vel     { background:#f0fff4; border-color:#9ae6b4; }
+    .metric-pill.est     { background:#faf5ff; border-color:#d6bcfa; }
+    .metric-pill.risk    { background:#fffbeb; border-color:#fcd34d; }
+    .metric-pill h3      { font-size: 11px; margin-bottom: 4px; }
+    .metric-pill.score h3{ color:#1d4ed8; }
+    .metric-pill.vel h3  { color:#15803d; }
+    .metric-pill.est h3  { color:#7e22ce; }
+    .metric-pill.risk h3 { color:#b45309; }
+    .metric-pill p       { font-size: 11px; color: #4a5568; margin: 0; }
+
+    /* ── Code / formula block ── */
+    .formula-box {
+      background: #1e1e2e; color: #cdd6f4;
+      border-radius: 8px; padding: 14px 18px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 11.5px; line-height: 1.7;
+      margin: 10px 0 14px;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .formula-box .cm  { color: #6c7086; }
+    .formula-box .kw  { color: #89dceb; }
+    .formula-box .val { color: #a6e3a1; }
+    .formula-box .fn  { color: #cba6f7; }
+    .formula-box .op  { color: #89b4fa; }
+
+    /* ── Flowchart for data inputs ── */
+    .flow-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px; margin: 10px 0 14px;
+    }
+    .flow-card {
+      border-radius: 8px; padding: 10px 12px;
+      border: 1.5px solid; font-size: 11px;
+      line-height: 1.45;
+    }
+    .flow-card.input  { background: #eff6ff; border-color: #93c5fd; color: #1e3a8a; }
+    .flow-card.calc   { background: #f0fff4; border-color: #6ee7b7; color: #065f46; }
+    .flow-card.output { background: #f5f3ff; border-color: #c4b5fd; color: #4c1d95; }
+    .flow-card strong { display: block; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+
+    /* ── Risk level table ── */
+    table.qref { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 6px; }
+    table.qref th { background: #edf2f7; color: #4a5568; text-align: left; padding: 6px 10px; font-weight: 700; }
+    table.qref td { padding: 6px 10px; border-bottom: 1px solid #edf2f7; vertical-align: top; }
+    table.qref tr:last-child td { border-bottom: none; }
+
+    /* ── Risk level dots ── */
+    .dot {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; margin-right: 5px; vertical-align: middle;
+    }
+    .dot.green  { background: #22c55e; }
+    .dot.yellow { background: #eab308; }
+    .dot.orange { background: #f97316; }
+    .dot.red    { background: #ef4444; }
+
+    /* ── Caution callouts ── */
+    .callout {
+      border-left: 4px solid; padding: 10px 14px;
+      border-radius: 0 8px 8px 0; font-size: 11px; margin-bottom: 12px;
+    }
+    .callout.info    { background: #eff6ff; border-color: #3b82f6; color: #1e40af; }
+    .callout.warn    { background: #fffbeb; border-color: #f59e0b; color: #92400e; }
+    .callout.danger  { background: #fff1f2; border-color: #f43f5e; color: #9f1239; }
+    .callout.tip     { background: #f0fdf4; border-color: #22c55e; color: #14532d; }
+    .callout strong  { font-weight: 700; }
+
+    /* ── Penalty table ── */
+    .penalty-table {
+      width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px;
+    }
+    .penalty-table th {
+      background: #f3f4f6; color:#374151; font-weight:700;
+      padding:7px 10px; text-align:left;
+    }
+    .penalty-table td {
+      padding: 7px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top;
+    }
+    .penalty-table tr:last-child td { border-bottom: none; }
+    .penalty-badge {
+      display: inline-block; background: #fef2f2; color: #b91c1c;
+      border-radius: 4px; padding: 1px 7px; font-weight: 700; font-size: 11px;
+    }
+
+    /* ── Step walkthrough ── */
+    .step-list { display: flex; flex-direction: column; gap: 0; }
+    .step-item {
+      display: flex; gap: 12px; padding: 10px 0;
+      border-bottom: 1px dashed #e2e8f0;
+    }
+    .step-item:last-child { border-bottom: none; }
+    .step-num-circle {
+      flex-shrink: 0; width: 26px; height: 26px;
+      border-radius: 50%; background: #6b46c1; color: #fff;
+      font-size: 11px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 1px;
+    }
+    .step-item p { margin: 0; font-size: 11px; color: #4a5568; }
+    .step-item strong { display: block; color: #1a202c; font-size: 12px; margin-bottom: 2px; }
+
+    /* ── Trust guide ── */
+    .trust-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;
+    }
+    .trust-card {
+      border-radius: 8px; padding: 11px 13px;
+      border: 1.5px solid; font-size: 11px;
+    }
+    .trust-card.high   { background: #f0fdf4; border-color: #86efac; }
+    .trust-card.medium { background: #fffbeb; border-color: #fcd34d; }
+    .trust-card.low    { background: #fff1f2; border-color: #fca5a5; }
+    .trust-card h3 { font-size: 11px; margin-bottom: 5px; }
+    .trust-card.high h3   { color: #15803d; }
+    .trust-card.medium h3 { color: #b45309; }
+    .trust-card.low h3    { color: #b91c1c; }
+    .trust-card ul { padding-left: 14px; color: #4a5568; }
+    .trust-card ul li { margin-bottom: 2px; }
+
+    /* ── FAQ ── */
+    .faq-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; }
+    .faq-item p:first-child { font-weight: 700; color: #2d3748; margin-bottom: 4px; }
+    .faq-item p:last-child  { font-size: 11px; color: #4a5568; margin: 0; }
+
+    /* ── Print ── */
+    @media print {
+      body { background: #fff; }
+      .top-nav { display: none !important; }
+      .page { padding: 0; max-width: 100%; }
+      .section { page-break-inside: avoid; }
+      h2 { page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Sticky nav bar ── -->
+  <nav class="top-nav">
+    <a href="<?= appUrl ?>" class="back">
+      <svg style="width:14px;height:14px;margin-right:5px;display:inline;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+      </svg>
+      Home
+    </a>
+    <span class="nav-title">Oracle Analytics Guide</span>
+    <button class="pdf-btn" onclick="window.print()">Save as PDF</button>
+  </nav>
+
+  <div class="page">
+
+    <!-- ── Document header ── -->
+    <div class="doc-header">
+      <div>
+        <h1>Oracle Analytics — How It Works</h1>
+        <p>A complete guide to the heuristic model behind progress scoring, velocity, forecasting, and risk detection in DentRSU Tracker.</p>
+      </div>
+      <span class="badge">DentRSU Tracker</span>
+    </div>
+
+    <!-- ── Overview ── -->
+    <div class="section">
+      <h2>What is the Oracle?</h2>
+      <p style="font-size:12px;color:#4a5568;margin-bottom:14px;">
+        The Oracle is a <strong>rule-based analytics engine</strong> (heuristic model) that continuously monitors student treatment records and answers three questions automatically:
+      </p>
+      <div class="metric-strip">
+        <div class="metric-pill score">
+          <h3>Progress Score</h3>
+          <p>Where are you now? (0–100)</p>
+        </div>
+        <div class="metric-pill vel">
+          <h3>30-Day Velocity</h3>
+          <p>How fast are you moving?</p>
+        </div>
+        <div class="metric-pill est">
+          <h3>Est. Completion</h3>
+          <p>When will you finish?</p>
+        </div>
+        <div class="metric-pill risk">
+          <h3>Risk Level</h3>
+          <p>How urgent is attention needed?</p>
+        </div>
+      </div>
+      <div class="callout info">
+        <strong>Heuristic ≠ Machine Learning.</strong> The Oracle uses simplified, human-interpretable rules grounded in clinical domain knowledge. It does not train on historical data or improve over time. Think of it as an expert advisor following a structured checklist.
+      </div>
+    </div>
+
+    <!-- ── Part 1: Progress Score ── -->
+    <div class="section">
+      <div class="part-banner">
+        <span class="part-num">PART 1</span>
+        <h2>Progress Score (0–100)</h2>
+      </div>
+      <p style="font-size:12px;color:#4a5568;">Measures the fraction of total required RSU + CDA units that have been <strong>verified</strong> by an instructor.</p>
+
+      <div class="formula-box"><span class="cm">-- Formula</span>
+<span class="val">progress_score</span> <span class="op">=</span> <span class="fn">ROUND</span>(verified_completion_pct <span class="op">×</span> <span class="val">100</span>)
+
+<span class="val">verified_completion_pct</span> <span class="op">=</span>
+  <span class="fn">SUM</span>(rsu_units + cda_units  <span class="kw">WHERE</span> status <span class="op">=</span> <span class="val">'verified'</span>)
+  <span class="op">÷</span>
+  <span class="fn">SUM</span>(minimum_rsu + minimum_cda  <span class="kw">FROM</span> requirement_list)</div>
+
+      <h3 style="margin-top:4px;">Why only "verified" records?</h3>
+      <p style="font-size:11px;color:#4a5568;margin-bottom:10px;">
+        Only instructor-approved records count. Pending and completed records are excluded because they haven't been officially confirmed — this gives a <strong>conservative, auditable</strong> number that reflects true locked-in progress.
+      </p>
+      <div class="callout warn">
+        <strong>Known Limitation:</strong> The denominator uses <em>all</em> requirements in the system, not just those for the student's current division. Students focusing on one division will see a lower score than their actual division-specific completion rate.
+      </div>
+    </div>
+
+    <!-- ── Part 2: Velocity ── -->
+    <div class="section">
+      <div class="part-banner">
+        <span class="part-num">PART 2</span>
+        <h2>Verified Velocity (30-Day)</h2>
+      </div>
+      <p style="font-size:12px;color:#4a5568;">Measures how many RSU units were officially verified within the last <strong>4 weeks</strong> and <strong>8 weeks</strong>.</p>
+
+      <div class="formula-box"><span class="cm">-- 4-week velocity (used as the displayed "30-Day" figure)</span>
+<span class="val">v_verified_4w</span> <span class="op">=</span> <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(rsu_units), <span class="val">0</span>)
+  <span class="kw">WHERE</span> status <span class="op">=</span> <span class="val">'verified'</span>
+    <span class="kw">AND</span> verified_at <span class="op">>=</span> <span class="fn">NOW</span>() <span class="op">-</span> interval <span class="val">'4 weeks'</span>
+
+<span class="cm">-- 8-week velocity (used for forecast stability)</span>
+<span class="val">v_verified_8w</span> <span class="op">=</span> <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(rsu_units), <span class="val">0</span>)
+  <span class="kw">WHERE</span> status <span class="op">=</span> <span class="val">'verified'</span>
+    <span class="kw">AND</span> verified_at <span class="op">>=</span> <span class="fn">NOW</span>() <span class="op">-</span> interval <span class="val">'8 weeks'</span></div>
+
+      <h3>Why <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">verified_at</code> — not <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">created_at</code>?</h3>
+      <p style="font-size:11px;color:#4a5568;margin-bottom:10px;">
+        A student may submit a record (create it) months before it gets verified. Using creation time would attribute progress to the past, making velocity appear zero even when recent approvals just happened. Verification time correctly marks the moment progress was <strong>officially confirmed</strong>.
+      </p>
+      <div class="callout warn">
+        <strong>Known Limitation:</strong> Velocity tracks RSU units only — CDA units are excluded. Students in CDA-heavy divisions will see a lower velocity figure than their actual clinical output warrants.
+      </div>
+      <div class="callout info">
+        <strong>Two windows explained:</strong> 4 weeks is sensitive — it reflects what's happening right now. 8 weeks is stable — it smooths out brief bursts. Both are measured and the <em>best</em> is used in the forecast (see Part 3).
+      </div>
+    </div>
+
+    <!-- ── Part 3: Forecast ── -->
+    <div class="section">
+      <div class="part-banner">
+        <span class="part-num">PART 3</span>
+        <h2>Estimated Completion Date (Forecast)</h2>
+      </div>
+      <p style="font-size:12px;color:#4a5568;">The Oracle asks: <em>"If you keep moving at your current verified speed, when will you reach 100%?"</em></p>
+
+      <h3 style="margin-top:8px;">Step-by-step calculation</h3>
+      <div class="step-list" style="margin-top:10px;margin-bottom:14px;">
+        <div class="step-item">
+          <div class="step-num-circle">1</div>
+          <div>
+            <strong>Pick the best available monthly velocity</strong>
+            <p>Use the 8-week average (÷2 for monthly rate) or the 4-week rate — whichever is larger. This prevents the forecast collapsing to zero if recent weeks were slow.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num-circle">2</div>
+          <div>
+            <strong>Calculate remaining work as a percentage</strong>
+            <p><code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;">remaining = 1 − verified_completion_pct</code></p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num-circle">3</div>
+          <div>
+            <strong>Estimate months to finish</strong>
+            <p><code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;">months = CEIL( (remaining × 100) ÷ monthly_velocity )</code></p>
+            <p style="margin-top:4px;">The ×100 converts the velocity (raw RSU) to a "percentage-points per month" scale.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-num-circle">4</div>
+          <div>
+            <strong>Project the calendar date</strong>
+            <p><code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;">forecast = date_trunc('month', TODAY + months MONTHS)</code></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="formula-box"><span class="cm">-- Full formula (SQL)</span>
+<span class="val">v_monthly_velocity</span> <span class="op">:=</span> <span class="fn">GREATEST</span>(v_verified_8w <span class="op">/</span> <span class="val">2.0</span>,  <span class="cm">-- annualised 8w avg</span>
+                              v_verified_4w,         <span class="cm">-- direct 4w rate</span>
+                              <span class="val">0</span>);                  <span class="cm">-- floor at zero</span>
+
+<span class="kw">IF</span> v_monthly_velocity <span class="op">></span> <span class="val">0</span> <span class="kw">AND</span> v_verified_pct <span class="op"><</span> <span class="val">1</span> <span class="kw">THEN</span>
+  v_months_remaining <span class="op">:=</span> <span class="fn">CEIL</span>((<span class="val">1</span> <span class="op">-</span> v_verified_pct) <span class="op">*</span> <span class="val">100</span> <span class="op">/</span> v_monthly_velocity);
+  v_forecast_month   <span class="op">:=</span> <span class="fn">date_trunc</span>(<span class="val">'month'</span>, <span class="fn">TODAY</span> <span class="op">+</span> v_months_remaining <span class="val">months</span>);
+<span class="kw">END IF</span>;</div>
+
+      <div style="background:#f8f4ff;border:1.5px solid #c4b5fd;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+        <h3 style="color:#6d28d9;margin-bottom:8px;">📐 Example Walkthrough</h3>
+        <table class="qref">
+          <thead>
+            <tr><th>Input</th><th>Value</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Progress</td><td><strong>18%</strong></td><td>verified_completion_pct = 0.18</td></tr>
+            <tr><td>4-week velocity</td><td><strong>21.25 RSU units</strong></td><td>v_verified_4w</td></tr>
+            <tr><td>8-week velocity</td><td><strong>0 RSU units</strong></td><td>No verifications 5–8 weeks ago</td></tr>
+            <tr><td>Best monthly velocity</td><td><strong>21.25</strong></td><td>GREATEST(0÷2, 21.25, 0)</td></tr>
+            <tr><td>Months remaining</td><td><strong>CEIL(82 ÷ 21.25) = 4</strong></td><td>(1−0.18)×100 = 82</td></tr>
+            <tr><td><strong>Est. Completion</strong></td><td><strong>July 2026 (1/7/2569)</strong></td><td>March 2026 + 4 months</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout danger">
+        <strong>When "Analyzing..." appears:</strong> If no records have been verified in the last 4 or 8 weeks, monthly velocity is 0 and <em>no forecast can be generated</em>. Projecting with zero velocity would give infinity, which is meaningless — so the system stays silent until new data arrives.
+      </div>
+      <div class="callout warn">
+        <strong>Linear Projection Warning:</strong> The model assumes velocity stays constant. Real-world bursts, pauses, illness, or exam periods are not accounted for. The forecast is a planning aid, not a guarantee.
+      </div>
+    </div>
+
+    <!-- ── Part 4: Risk Score ── -->
+    <div class="section">
+      <div class="part-banner">
+        <span class="part-num">PART 4</span>
+        <h2>Risk Level (Green / Yellow / Orange / Red)</h2>
+      </div>
+      <p style="font-size:12px;color:#4a5568;margin-bottom:14px;">A 0–100 <strong>penalty-based score</strong>. Each risk condition adds a fixed number of points. Higher score = higher risk.</p>
+
+      <h3>Penalty Rules</h3>
+      <table class="penalty-table">
+        <thead>
+          <tr>
+            <th style="width:200px;">Condition</th>
+            <th style="width:80px;">Penalty</th>
+            <th>Why this matters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>No activity ≥ 30 days</td>
+            <td><span class="penalty-badge">+25 pts</span></td>
+            <td>Early warning sign of falling behind schedule.</td>
+          </tr>
+          <tr>
+            <td>No activity ≥ 60 days</td>
+            <td><span class="penalty-badge">+15 pts</span> <span style="font-size:10px;color:#6b7280;">(+40 total)</span></td>
+            <td>Prolonged inactivity — urgent intervention likely needed.</td>
+          </tr>
+          <tr>
+            <td>≥ 10 records pending verification</td>
+            <td><span class="penalty-badge">+15 pts</span></td>
+            <td>Large backlog means progress isn't being locked in.</td>
+          </tr>
+          <tr>
+            <td>Zero verified velocity (8-week)</td>
+            <td><span class="penalty-badge">+25 pts</span></td>
+            <td>No momentum — the forecast cannot even run.</td>
+          </tr>
+          <tr>
+            <td>Within 90 days of deadline</td>
+            <td><span class="penalty-badge">+20 pts</span></td>
+            <td>Deadline proximity amplifies all other risks.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="margin-top:16px;">Risk Level Thresholds</h3>
+      <table class="qref" style="margin-top:8px;">
+        <thead>
+          <tr><th style="width:100px;">Score</th><th style="width:160px;">Level</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0 – 24</td>
+            <td><span class="dot green"></span><strong>Green — On Track</strong></td>
+            <td>Progress is healthy. No significant risks detected.</td>
+          </tr>
+          <tr>
+            <td>25 – 49</td>
+            <td><span class="dot yellow"></span><strong>Yellow — At Risk</strong></td>
+            <td>One factor needs attention. Check factors panel.</td>
+          </tr>
+          <tr>
+            <td>50 – 74</td>
+            <td><span class="dot orange"></span><strong>Orange — High Risk</strong></td>
+            <td>Multiple factors active. Instructor conversation recommended.</td>
+          </tr>
+          <tr>
+            <td>75 – 100</td>
+            <td><span class="dot red"></span><strong>Red — Critical</strong></td>
+            <td>Immediate action required to avoid graduation delay.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout info" style="margin-top:14px;">
+        <strong>Why additive penalties?</strong> Each risk factor is independent — multiple risks compound. A student who is inactive AND near graduation AND has zero velocity scores 25+20+25 = 70 points (Orange) from just those three conditions. This intentional escalation catches combined risk patterns that any single threshold would miss.
+      </div>
+      <div class="callout warn">
+        <strong>No Historical Memory:</strong> Risk level reflects the <em>current moment only</em>. A student who has been Red for 2 months but just had a burst of verifications will immediately show Green on the next refresh. The system does not track trends over time.
+      </div>
+    </div>
+
+    <!-- ── Part 5: Explanations & Recommendations ── -->
+    <div class="section">
+      <div class="part-banner">
+        <span class="part-num">PART 5</span>
+        <h2>Explanations &amp; Recommendations</h2>
+      </div>
+      <p style="font-size:12px;color:#4a5568;margin-bottom:12px;">
+        On every refresh, the Oracle deletes all previous explanation and recommendation records for the student and inserts fresh ones based on current conditions. Only triggered factors appear.
+      </p>
+
+      <h3>Key Factor Codes</h3>
+      <table class="qref" style="margin-bottom:14px;">
+        <thead>
+          <tr><th style="width:220px;">Factor Code</th><th style="width:160px;">Trigger</th><th>Display Label</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>INACTIVE_30D</code></td>
+            <td>inactive_days ≥ 30</td>
+            <td>No recorded progress in the last 30 days.</td>
+          </tr>
+          <tr>
+            <td><code>PENDING_VERIFICATION_BACKLOG</code></td>
+            <td>pending count ≥ 10</td>
+            <td>High number of pending verifications.</td>
+          </tr>
+          <tr>
+            <td><code>LOW_VERIFIED_VELOCITY_8W</code></td>
+            <td>v_verified_8w &lt;= 0</td>
+            <td>Low verified completion velocity in last 8 weeks.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Recommendations</h3>
+      <table class="qref">
+        <thead>
+          <tr><th style="width:60px;">Priority</th><th style="width:220px;">Type</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="text-align:center;font-weight:700;">1</td>
+            <td><code>CLEAR_PENDING_VERIFICATION</code></td>
+            <td>Prioritize getting completed work verified to lock in progress.</td>
+          </tr>
+          <tr>
+            <td style="text-align:center;font-weight:700;">2</td>
+            <td><code>RESUME_ACTIVITY</code></td>
+            <td>Plan and start at least 1–2 cases this week to restore momentum.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Part 6: Trust Guide ── -->
+    <div class="section">
+      <div class="part-banner">
+        <span class="part-num">PART 6</span>
+        <h2>When to Trust It — and When to Be Cautious</h2>
+      </div>
+
+      <div class="trust-grid">
+        <div class="trust-card high">
+          <h3>✅ High Trust Scenarios</h3>
+          <ul>
+            <li>Active student with consistent monthly verifications</li>
+            <li>Student within 90 days of graduation deadline</li>
+            <li>Multiple verified records across different divisions</li>
+          </ul>
+        </div>
+        <div class="trust-card medium">
+          <h3>⚠️ Medium Trust — Use with Judgment</h3>
+          <ul>
+            <li>Student returning after a long pause (velocity will recover slowly)</li>
+            <li>3–5 records total — too little data for a stable forecast</li>
+            <li>Burst activity just before a deadline (velocity will spike, then drop)</li>
+          </ul>
+        </div>
+        <div class="trust-card low">
+          <h3>🔴 Low Trust — Consult Instructor</h3>
+          <ul>
+            <li>First 2 weeks with only 1 verified record</li>
+            <li>Student primarily in CDA-heavy divisions (velocity undercounted)</li>
+            <li>Student on approved leave, clinic closure, or exam period</li>
+          </ul>
+        </div>
+        <div class="trust-card medium" style="background:#f0fdf4;border-color:#86efac;">
+          <h3 style="color:#15803d;">📌 Important Reminder</h3>
+          <ul>
+            <li>"Red" does not mean a student will fail</li>
+            <li>"Green" does not guarantee on-time graduation</li>
+            <li>Use Oracle as a <strong>conversation starter</strong>, not a final judgment</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Global cautions ── -->
+    <div class="section">
+      <h2>Overall System Cautions</h2>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="callout danger">
+          <strong>Individual circumstances are invisible to the model.</strong> Medical leave, clinic closures, public holidays, and exam periods are not factored in. The Oracle will show declining metrics during any pause regardless of reason.
+        </div>
+        <div class="callout warn">
+          <strong>Progress Score uses a system-wide denominator.</strong> If not all requirements have minimum RSU/CDA values set, the score may be inflated relative to the actual requirement load for a specific student.
+        </div>
+        <div class="callout info">
+          <strong>All calculations refresh on every record change.</strong> There is no historical trend line, weighted average, or seasonal adjustment. Every refresh is a full recalculation from the current data.
+        </div>
+        <div class="callout tip">
+          <strong>Recalculation is instant and automatic.</strong> Any time a record is created, updated, or verified, the Oracle refreshes for that student automatically in the background.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FAQ ── -->
+    <div class="section">
+      <h2>Frequently Asked Questions</h2>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <div class="faq-item">
+          <p>Why does "Analyzing..." appear even though I have submitted records?</p>
+          <p>Only <strong>verified</strong> records contribute to velocity. If none of your submitted records have been approved by an instructor in the last 4–8 weeks, the Oracle has no verified velocity to work with and cannot compute a forecast. Ask your instructor to verify your pending records.</p>
+        </div>
+
+        <div class="faq-item">
+          <p>My velocity dropped after my instructor approved old records. Is that normal?</p>
+          <p>Yes. Velocity is based on <code>verified_at</code> — the date of approval. Old records approved recently count toward the current window, but only until they fall outside the 4/8-week window. Consistent submission and verification keeps velocity stable.</p>
+        </div>
+
+        <div class="faq-item">
+          <p>My score is 18% but I feel I've done much more work. Why?</p>
+          <p>The Progress Score only counts <strong>verified</strong> records, and the denominator includes all requirements in the system. Submit pending work for verification, and work across multiple requirements to improve the score.</p>
+        </div>
+
+        <div class="faq-item">
+          <p>The forecast date seems too far away. Can I change the model?</p>
+          <p>The forecast is driven entirely by your verified velocity. The fastest way to move the date closer is to get more records verified consistently each month. Administrators can adjust cohort deadlines, but the calculation model itself is fixed.</p>
+        </div>
+
+        <div class="faq-item">
+          <p>How often does the Oracle recalculate?</p>
+          <p>Automatically every time a treatment record is created, updated, deleted, or verified — no manual action required. The student dashboard always shows the most recent snapshot.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Footer ── -->
+    <div style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:12px;font-size:10px;color:#a0aec0;text-align:center;">
+      DentRSU Tracker &mdash; Internal Document &mdash; Rangsit University College of Dental Medicine
+    </div>
+
+  </div>
+</body>
+</html>

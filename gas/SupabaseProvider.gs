@@ -74,6 +74,36 @@ var SupabaseProvider = (function () {
   }
 
   /**
+   * POST helper for the oracle schema.
+   */
+  function _oraclePost(path, payload) {
+    var url = getSupabaseUrl() + path;
+    var hdrs = _headers();
+    hdrs["Content-Profile"] = "oracle";
+    hdrs["Accept-Profile"] = "oracle";
+    hdrs["Prefer"] = "return=representation, resolution=merge-duplicates";
+    var response = UrlFetchApp.fetch(url, {
+      method: "post",
+      headers: hdrs,
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    var code = response.getResponseCode();
+    if (code < 200 || code >= 300) {
+      throw new Error(
+        "Supabase POST " +
+          path +
+          " returned " +
+          code +
+          ": " +
+          response.getContentText(),
+      );
+    }
+    _invalidateCache();
+    return JSON.parse(response.getContentText());
+  }
+
+  /**
    * Cached GET helper using CacheService.
    */
   function _getCached(path, ttlSeconds) {
@@ -1368,6 +1398,49 @@ var SupabaseProvider = (function () {
           description: r.message,
         };
       });
+    },
+
+    /**
+     * List all cohort calendars.
+     */
+    listCohortCalendars: function () {
+      return _oracleGet("/rest/v1/cohort_calendar?order=cohort_year.desc");
+    },
+
+    /**
+     * Upsert a cohort calendar.
+     */
+    upsertCohortCalendar: function (data) {
+      return _oraclePost("/rest/v1/cohort_calendar", data);
+    },
+
+    /**
+     * Delete a cohort calendar.
+     */
+    deleteCohort: function (cohortYear) {
+      var hdrs = _headers();
+      hdrs["Content-Profile"] = "oracle";
+      hdrs["Accept-Profile"] = "oracle";
+      var url =
+        getSupabaseUrl() +
+        "/rest/v1/cohort_calendar?cohort_year=eq." +
+        cohortYear;
+      var response = UrlFetchApp.fetch(url, {
+        method: "delete",
+        headers: hdrs,
+        muteHttpExceptions: true,
+      });
+      var code = response.getResponseCode();
+      if (code < 200 || code >= 300) {
+        throw new Error(
+          "Supabase DELETE cohort_calendar returned " +
+            code +
+            ": " +
+            response.getContentText(),
+        );
+      }
+      _invalidateCache();
+      return true;
     },
   };
 })();
