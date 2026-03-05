@@ -476,6 +476,11 @@
       </div>
     </div>
 
+    <!-- ─── Oracle Progress Dashboard ─── -->
+    <template x-if="profile.role === 'student' && state === 'authenticated'">
+       <?!= include('oracle_student') ?>
+    </template>
+
     <!-- ─── Patient List (Student Only) ─── -->
     <template x-if="profile.role === 'student' && state === 'authenticated'">
       <div class="mt-6 w-full space-y-8 animate-fade-in" style="animation-delay: 100ms">
@@ -1000,6 +1005,7 @@
                   if (profile.role === 'student') {
                      this.loadPatients();
                      this.loadTypeOfCases();
+                     this.loadOracleDashboard();
                   }
                 })
                 .withFailureHandler((err) => {
@@ -1073,6 +1079,24 @@
            if (year == 5) return this.profile.team_leader_1_name || '-';
            if (year >= 6) return this.profile.team_leader_2_name || '-';
            return '-';
+        },
+
+        // --- Oracle Logic ---
+        oracleLoading: false,
+        oracleData: null,
+        
+        loadOracleDashboard() {
+           this.oracleLoading = true;
+           google.script.run
+             .withSuccessHandler((data) => {
+                this.oracleData = data;
+                this.oracleLoading = false;
+             })
+             .withFailureHandler((err) => {
+                console.error("Oracle load failed:", err);
+                this.oracleLoading = false;
+             })
+             .studentGetOracleDashboard();
         },
 
         // --- Patient Logic ---

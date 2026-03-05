@@ -3471,6 +3471,66 @@ function advisorGetDashboardData(viewMode, divisionCode) {
   };
 }
 
+// ─── Oracle Analytics Endpoints ──────────────────────────────────────────────
+
+/**
+ * Get the Oracle dashboard data for a student.
+ * Students can only view their own; Instructors/Admins can view any student.
+ * @param {string} studentId
+ */
+function studentGetOracleDashboard(studentId) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active) {
+    throw new Error("User not found or inactive.");
+  }
+
+  var targetId = studentId || profile.student_id;
+  if (profile.role === "student" && targetId !== profile.student_id) {
+    throw new Error("Access Denied: You can only view your own dashboard.");
+  }
+
+  return {
+    snapshot: SupabaseProvider.getOracleStudentSnapshot(targetId),
+    explanations: SupabaseProvider.getOracleStudentExplanations(targetId),
+    recommendations: SupabaseProvider.getOracleStudentRecommendations(targetId),
+  };
+}
+
+/**
+ * Get the Oracle Team Risk list for a Team Leader.
+ * Fetches the progress snapshot for all students in the instructor's team.
+ */
+function instructorGetOracleTeamRisk() {
+  _assertInstructor();
+
+  var profile = getUserProfile(Session.getActiveUser().getEmail());
+  var instructorId = profile.instructor_id;
+
+  // Reuse existing logic to find the instructor's team students
+  var students = instructorGetTeamStudents();
+  if (!students || students.length === 0) return [];
+
+  var studentIds = students.map(function (s) {
+    return s.student_id;
+  });
+  var snapshots = SupabaseProvider.listOracleSnapshots(studentIds) || [];
+
+  // Attach the snapshot directly to the formatted student object
+  var snapshotMap = {};
+  snapshots.forEach(function (snap) {
+    snapshotMap[snap.student_id] = snap;
+  });
+
+  students.forEach(function (s) {
+    s.oracle_snapshot = snapshotMap[s.student_id] || null;
+  });
+
+  return students;
+}
+
 /**
  * Get all pending-verification treatment records for the instructor's team students.
  * Returns records grouped by student, sorted by year desc then academic_id.

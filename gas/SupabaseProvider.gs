@@ -839,7 +839,11 @@ var SupabaseProvider = (function () {
      */
     createTreatmentRecord: function (payload) {
       var rows = _post("/rest/v1/treatment_records", payload);
-      return rows[0];
+      var rec = rows[0];
+      if (rec && rec.student_id) {
+        this.refreshOracleSnapshot(rec.student_id);
+      }
+      return rec;
     },
 
     /**
@@ -850,14 +854,22 @@ var SupabaseProvider = (function () {
         "/rest/v1/treatment_records?record_id=eq." + recordId,
         updates,
       );
-      return rows && rows.length ? rows[0] : null;
+      var rec = rows && rows.length ? rows[0] : null;
+      if (rec && rec.student_id) {
+        this.refreshOracleSnapshot(rec.student_id);
+      }
+      return rec;
     },
 
     /**
      * Delete treatment record.
      */
     deleteTreatmentRecord: function (recordId) {
+      var existing = this.getTreatmentRecord(recordId);
       var rows = _delete("/rest/v1/treatment_records?record_id=eq." + recordId);
+      if (existing && existing.student_id) {
+        this.refreshOracleSnapshot(existing.student_id);
+      }
       return rows && rows.length ? rows[0] : null;
     },
 
@@ -1185,6 +1197,87 @@ var SupabaseProvider = (function () {
         results = results.concat(rows || []);
       }
       return results;
+    },
+
+    // ── Oracle Analytics Layer ──────────────────────────────────────────────────
+
+    /**
+     * Trigger Oracle computation RPC for a student.
+     * @param {string} studentId
+     */
+    refreshOracleSnapshot: function (studentId) {
+      if (!studentId) return null;
+      var url = getSupabaseUrl() + "/rest/v1/rpc/oracle_refresh_student";
+      var payload = { p_student_id: studentId };
+      var response = UrlFetchApp.fetch(url, {
+        method: "post",
+        headers: _headers(),
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true,
+      });
+
+      var code = response.getResponseCode();
+      if (code < 200 || code >= 300) {
+        console.error(
+          "Supabase RPC oracle_refresh_student failed",
+          response.getContentText(),
+        );
+      }
+      return true;
+    },
+
+    /**
+     * Get the student's primary Oracle snapshot summary.
+     */
+    getOracleStudentSnapshot: function (studentId) {
+      if (!studentId) return null;
+      var rows = _get(
+        "/rest/v1/oracle/student_progress_snapshots?student_id=eq." + studentId,
+      );
+      return rows && rows.length > 0 ? rows[0] : null;
+    },
+
+    /**
+     * List Oracle snapshots for multiple students (e.g. team leader view)
+     */
+    listOracleSnapshots: function (studentIds) {
+      if (!studentIds || studentIds.length === 0) return [];
+      var BATCH = 40;
+      var results = [];
+      for (var i = 0; i < studentIds.length; i += BATCH) {
+        var batch = studentIds.slice(i, i + BATCH);
+        var rows = _get(
+          "/rest/v1/oracle/student_progress_snapshots?student_id=in.(" +
+            batch.join(",") +
+            ")",
+        );
+        results = results.concat(rows || []);
+      }
+      return results;
+    },
+
+    /**
+     * Get Oracle generated explanations for the student risk score.
+     */
+    getOracleStudentExplanations: function (studentId) {
+      if (!studentId) return [];
+      return _get(
+        "/rest/v1/oracle/explanation_factors?student_id=eq." +
+          studentId +
+          "&order=display_order.asc",
+      );
+    },
+
+    /**
+     * Get next-action recommendations.
+     */
+    getOracleStudentRecommendations: function (studentId) {
+      if (!studentId) return [];
+      return _get(
+        "/rest/v1/oracle/recommendations?student_id=eq." +
+          studentId +
+          "&order=priority_rank.asc",
+      );
     },
   };
 })();
