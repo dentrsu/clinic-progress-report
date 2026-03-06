@@ -4716,7 +4716,7 @@ function adminSyncPatients() {
         // Normalize Status
         var rawStatus = String(row[15]).trim();
         var validStatuses = [
-          "Waiting to Be Assigned",
+          "Active",
           "Full Chart",
           "Treatment Plan",
           "First Treatment Plan",

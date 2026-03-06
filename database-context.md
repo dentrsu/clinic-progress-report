@@ -25,6 +25,7 @@ create type public.record_status as enum ('planned', 'in_progress', 'completed',
 -- patient_status: active, inactive, archived
 create type public.patient_status as enum (
   'Waiting to Be Assigned',
+  'Active',
   'Full Chart',
   'Treatment Plan',
   'First Treatment Plan',
@@ -228,7 +229,7 @@ create table public.patients (
   patient_id uuid primary key default gen_random_uuid(),
   hn text not null unique,
   name text not null,
-  status public.patient_status not null default 'Waiting to Be Assigned',
+  status public.patient_status not null default 'Active',
   is_completed_case boolean not null default false,
   complexity text,                      -- Visual grouping: none/1/2/>=2
   type_of_case uuid references public.type_of_case(id),
