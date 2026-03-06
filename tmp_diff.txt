@@ -1,0 +1,271 @@
+﻿diff --git a/gas/Code.gs b/gas/Code.gs
+index e3189d2..1ec29a7 100644
+--- a/gas/Code.gs
++++ b/gas/Code.gs
+@@ -78,6 +78,9 @@ function getStudentPatients(targetStudentId) {
+     // Set type_of_case to the text value for standard dropdown selection in UI
+     p.type_of_case = p.case_type ? p.case_type.type_of_case : "";
+ 
++    // Explicitly pass through complexity level as string/null
++    p.complexity = p.complexity ? String(p.complexity) : null;
++
+     return p;
+   });
+ }
+@@ -122,7 +125,17 @@ function studentUpdatePatient(hn, form) {
+   // Note: Student CAN update assigned student IDs (Handover/Referral)
+ 
+   var payload = {
+-    status: form.status,
++    // Auto-calculate status based on milestones
++    status: (function () {
++      if (form.case_completed_at || !!form.is_completed_case)
++        return "Completed Case";
++      if (form.in_progress_at) return "Treatment in Progress";
++      if (form.tp_approved_at) return "Treatment Plan Approved";
++      if (form.first_tp_at) return "First Treatment Plan";
++      if (form.chart_full_at) return "Full Chart";
++      return "Active";
++    })(),
++
+     birthdate: form.birthdate ? form.birthdate : null, // String YYYY-MM-DD is fine
+     tel: form.tel,
+     note: form.note,
+@@ -134,7 +147,14 @@ function studentUpdatePatient(hn, form) {
+     student_id_4: _resolveStudentId(form.student_4_acad),
+     student_id_5: _resolveStudentId(form.student_5_acad),
+     is_completed_case: !!form.is_completed_case,
+-    complexity: form.complexity || null,
++
++    complexity: form.complexity ? String(form.complexity).trim() : null,
++    chart_full_at: form.chart_full_at || null,
++    first_tp_at: form.first_tp_at || null,
++    tp_approved_at: form.tp_approved_at || null,
++    in_progress_at: form.in_progress_at || null,
++    case_completed_at: form.case_completed_at || null,
++
+     // Resolve text to ID (alignment logic)
+     type_of_case: SupabaseProvider.getTypeOfCaseIdByText(form.type_of_case),
+ 
+@@ -1310,6 +1330,7 @@ function processEmailVerification(e) {
+     }
+ 
+     SupabaseProvider.updateTreatmentRecord(recordId, updates);
++    SupabaseProvider.refreshOracleSnapshot(record.student_id);
+ 
+     // Attempt to notify student
+     try {
+@@ -1640,6 +1661,18 @@ function doGet(e) {
+       .addMetaTag("viewport", "width=device-width, initial-scale=1");
+   }
+ 
++  if (page === "oracle-guide") {
++    var t = HtmlService.createTemplateFromFile("oracle-guide");
++    t.appUrl = url;
++    t.appDevUrl = devUrl;
++    return t
++      .evaluate()
++      .setTitle("Oracle Analytics Guide ΓÇö DentRSU Tracker")
++      .setFaviconUrl(favicon)
++      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
++      .addMetaTag("viewport", "width=device-width, initial-scale=1");
++  }
++
+   if (page === "verify") {
+     var t = HtmlService.createTemplateFromFile("verify");
+     t.appUrl = url;
+@@ -2492,6 +2525,81 @@ function _applyRequirementAggregation(
+   }
+ }
+ 
++function instructorGetOracleTeamRisk() {
++  var user = getCurrentUser();
++  if (!user.allowed) throw new Error("Access Denied");
++
++  var profile = getUserProfile(user.email);
++  if (!profile.found || !profile.active) {
++    throw new Error("User not found or inactive.");
++  }
++
++  // instructors see all students in the system (or filtered by team if we had that logic)
++  // for now, let's get all student IDs
++  var students = SupabaseProvider.listStudents();
++  var ids = students.map(function (s) {
++    return s.student_id;
++  });
++
++  return SupabaseProvider.listOracleSnapshots(ids);
++}
++
++/**
++ * Administrative utility to force-refresh Oracle data for all students.
++ * Useful for catching up existing records.
++ */
++function adminSyncAllOracleSnapshots() {
++  var user = getCurrentUser();
++  var profile = getUserProfile(user.email);
++  if (profile.role !== "admin") throw new Error("Unauthorized: Admin only");
++
++  var students = SupabaseProvider.listStudents();
++  console.log("Syncing " + students.length + " students...");
++
++  var success = 0;
++  students.forEach(function (s) {
++    try {
++      SupabaseProvider.refreshOracleSnapshot(s.student_id);
++      success++;
++    } catch (e) {
++      console.error("Failed for " + s.student_id, e);
++    }
++  });
++
++  return { total: students.length, success: success };
++}
++
++/**
++ * Admin: Get all cohort calendars.
++ */
++function adminGetCohortCalendars() {
++  var user = getCurrentUser();
++  var profile = getUserProfile(user.email);
++  if (profile.role !== "admin") throw new Error("Unauthorized: Admin only");
++  return SupabaseProvider.listCohortCalendars();
++}
++
++/**
++ * Admin: Upsert a cohort calendar.
++ */
++function adminUpsertCohortCalendar(data) {
++  var user = getCurrentUser();
++  var profile = getUserProfile(user.email);
++  if (profile.role !== "admin") throw new Error("Unauthorized: Admin only");
++  if (!data.cohort_year) throw new Error("Cohort Year is required.");
++  return SupabaseProvider.upsertCohortCalendar(data);
++}
++
++/**
++ * Admin: Delete a cohort calendar.
++ */
++function adminDeleteCohort(cohortYear) {
++  var user = getCurrentUser();
++  var profile = getUserProfile(user.email);
++  if (profile.role !== "admin") throw new Error("Unauthorized: Admin only");
++  if (!cohortYear) throw new Error("Cohort Year is required.");
++  return SupabaseProvider.deleteCohort(cohortYear);
++}
+ /**
+  * Get student requirement progress for the vault.
+  * @param {string} targetStudentId Optional student ID to fetch data for (instructor/admin only)
+@@ -3471,6 +3579,66 @@ function advisorGetDashboardData(viewMode, divisionCode) {
+   };
+ }
+ 
++// ΓöÇΓöÇΓöÇ Oracle Analytics Endpoints ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
++
++/**
++ * Get the Oracle dashboard data for a student.
++ * Students can only view their own; Instructors/Admins can view any student.
++ * @param {string} studentId
++ */
++function studentGetOracleDashboard(studentId) {
++  var user = getCurrentUser();
++  if (!user.allowed) throw new Error("Access Denied");
++
++  var profile = getUserProfile(user.email);
++  if (!profile.found || !profile.active) {
++    throw new Error("User not found or inactive.");
++  }
++
++  var targetId = studentId || profile.student_id;
++  if (profile.role === "student" && targetId !== profile.student_id) {
++    throw new Error("Access Denied: You can only view your own dashboard.");
++  }
++
++  return {
++    snapshot: SupabaseProvider.getOracleStudentSnapshot(targetId),
++    explanations: SupabaseProvider.getOracleStudentExplanations(targetId),
++    recommendations: SupabaseProvider.getOracleStudentRecommendations(targetId),
++  };
++}
++
++/**
++ * Get the Oracle Team Risk list for a Team Leader.
++ * Fetches the progress snapshot for all students in the instructor's team.
++ */
++function instructorGetOracleTeamRisk() {
++  _assertInstructor();
++
++  var profile = getUserProfile(Session.getActiveUser().getEmail());
++  var instructorId = profile.instructor_id;
++
++  // Reuse existing logic to find the instructor's team students
++  var students = instructorGetTeamStudents();
++  if (!students || students.length === 0) return [];
++
++  var studentIds = students.map(function (s) {
++    return s.student_id;
++  });
++  var snapshots = SupabaseProvider.listOracleSnapshots(studentIds) || [];
++
++  // Attach the snapshot directly to the formatted student object
++  var snapshotMap = {};
++  snapshots.forEach(function (snap) {
++    snapshotMap[snap.student_id] = snap;
++  });
++
++  students.forEach(function (s) {
++    s.oracle_snapshot = snapshotMap[s.student_id] || null;
++  });
++
++  return students;
++}
++
+ /**
+  * Get all pending-verification treatment records for the instructor's team students.
+  * Returns records grouped by student, sorted by year desc then academic_id.
+@@ -3638,6 +3806,19 @@ function instructorBulkUpdateRecordStatus(payload) {
+     }
+   });
+ 
++  // Trigger Oracle Refresh for affected students
++  var studentsToRefresh = {};
++  records.forEach(function (r) {
++    if (r.student_id) studentsToRefresh[r.student_id] = true;
++  });
++  Object.keys(studentsToRefresh).forEach(function (sid) {
++    try {
++      SupabaseProvider.refreshOracleSnapshot(sid);
++    } catch (e) {
++      Logger.log("Bulk Oracle refresh failed: " + e.message);
++    }
++  });
++
+   // Send one summary email per student
+   var statusLabel = action === "verified" ? "Verified Γ£à" : "Rejected Γ¥î";
+   var instructorName = profile.name || "Your instructor";
+@@ -4081,6 +4262,7 @@ function adminGetInitData() {
+     requirements: adminListRequirements(),
+     caseTypes: adminListTypeOfCases(),
+     announcements: adminGetAnnouncements(),
++    cohorts: adminGetCohortCalendars(),
+   };
+ }
+ 
+@@ -4534,7 +4716,7 @@ function adminSyncPatients() {
+         // Normalize Status
+         var rawStatus = String(row[15]).trim();
+         var validStatuses = [
+-          "Waiting to Be Assigned",
++          "Active",
+           "Full Chart",
+           "Treatment Plan",
+           "First Treatment Plan",
+@@ -4869,7 +5051,7 @@ function adminSyncStudents() {
+         var userRecord = SupabaseProvider.upsertUser(email, {
+           name: name,
+           role: "student",
+-          status: "active",
++          status: String(statusRaw || "").toLowerCase(),
+         });
+ 
+         if (!userRecord || !userRecord.user_id) {

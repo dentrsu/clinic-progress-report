@@ -5543,7 +5543,6 @@ function studentGetTreatmentPlan(hn) {
   var phases = SupabaseProvider.listTreatmentPhases() || [];
   var divisions = SupabaseProvider.listDivisions() || [];
   var catalog = SupabaseProvider.listTreatmentCatalog() || [];
-  var catalog = SupabaseProvider.listTreatmentCatalog() || [];
   var steps = SupabaseProvider.listAllTreatmentSteps() || [];
   var instructors = SupabaseProvider.listInstructors() || [];
   var requirements = SupabaseProvider.listRequirements() || [];

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -145,7 +145,7 @@
                              <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                              <span x-text="formatDate(r.start_date)"></span>
                           </div>
-                          <span class="text-gray-300">→</span>
+                          <span class="text-gray-300">ΓåÆ</span>
                           <div class="flex items-center gap-1.5">
                              <span x-text="formatDate(r.complete_date)" :class="{'text-gray-400': !r.complete_date}"></span>
                           </div>
@@ -237,9 +237,11 @@
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Phase</label>
               <select x-model="form.phase_id" class="w-full" :disabled="phaseLocked">
-                <option value="">— Select Phase —</option>
+                <option value="">ΓÇö Select Phase ΓÇö</option>
                 <template x-for="p in phases" :key="p.phase_id">
                   <option :value="p.phase_id" x-text="p.phase_name"></option>
+                </template>
+              </select>
                 </template>
               </select>
               <div x-show="phaseLocked" class="text-[0.6rem] text-orange-500 mt-1">Locked to current phase group. Use "Add Treatment" button to add to other phases.</div>
@@ -247,9 +249,9 @@
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Division</label>
               <select x-model="form.division_id" @change="onDivisionChange()" class="w-full">
-                <option value="">— Select Division —</option>
+                <option value="">ΓÇö Select Division ΓÇö</option>
                 <template x-for="d in divisions" :key="d.division_id">
-                  <option :value="d.division_id" x-text="d.code + ' — ' + d.name"></option>
+                  <option :value="d.division_id" x-text="d.code + ' ΓÇö ' + d.name"></option>
                 </template>
               </select>
             </div>
@@ -274,7 +276,7 @@
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Treatment</label>
               <select x-model="form.treatment_id" @change="onTreatmentChange()" class="w-full" :disabled="!form.division_id">
-                <option value="">— Select Treatment —</option>
+                <option value="">ΓÇö Select Treatment ΓÇö</option>
                 <template x-for="t in filteredCatalog" :key="t.treatment_id">
                   <option :value="t.treatment_id" x-text="t.treatment_name"></option>
                 </template>
@@ -283,7 +285,7 @@
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Step</label>
               <select x-model="form.step_id" @change="onStepChange()" class="w-full" :disabled="!form.treatment_id">
-                <option value="">— Select Step —</option>
+                <option value="">ΓÇö Select Step ΓÇö</option>
                 <template x-for="s in filteredSteps" :key="s.step_id">
                   <option :value="s.step_id" x-text="s.step_order + '. ' + s.step_name"></option>
                 </template>
@@ -330,7 +332,7 @@
               </div>
 
               <select x-model="form.student_id" class="w-full">
-                <option value="">— Select Student —</option>
+                <option value="">ΓÇö Select Student ΓÇö</option>
                 <template x-for="s in students" :key="s.student_id">
                   <option :value="s.student_id" x-text="s.name + (s.academic_id ? ' (' + s.academic_id + ')' : '')"></option>
                 </template>
@@ -397,7 +399,7 @@
                 <div>
                   <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Advisor</label>
                   <select x-model="form.instructor_id" class="w-full" :disabled="!form.division_id">
-                    <option value="">— Select Advisor —</option>
+                    <option value="">ΓÇö Select Advisor ΓÇö</option>
                     <template x-for="i in filteredInstructors" :key="i.instructor_id">
                       <option :value="i.instructor_id" x-text="i.users && i.users.name ? i.users.name : (i.user && i.user.name ? i.user.name : 'Unknown')"></option>
                     </template>
@@ -406,7 +408,7 @@
                 <div>
                   <label class="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Requirement</label>
                   <select x-model="form.requirement_id" @change="onRequirementChange()" class="w-full" :disabled="!form.division_id">
-                    <option value="">— Select Requirement —</option>
+                    <option value="">ΓÇö Select Requirement ΓÇö</option>
                     <template x-for="r in filteredRequirements" :key="r.requirement_id">
                       <option :value="r.requirement_id" x-text="getRequirementLabel(r)"></option>
                     </template>
@@ -522,7 +524,7 @@
             <span x-text="requestingVerification ? 'Sending...' : 'Request Verification'"></span>
           </button>
 
-          <!-- Save only (no email) — shown when verification is available but user wants to skip -->
+          <!-- Save only (no email) ΓÇö shown when verification is available but user wants to skip -->
           <button x-show="(!currentUser || currentUser.role === 'student') && !perioPendingSplit && (canRequestVerification || verifiedRecordChanged)"
                   @click="saveRecord()"
                   :disabled="saving || requestingVerification"
@@ -593,6 +595,8 @@
         divisions: [],
         catalog: [],
         allSteps: [],
+        catalog: [],
+        allSteps: [],
         students: [],
 
         instructors: [],
@@ -629,9 +633,11 @@
         referralError: '',
         confirming: false,
 
-        phaseLocked: false,
+         // Verify state
+         verifying: false,
+         phaseLocked: false,
 
-        // Computed-like getters
+         // Computed-like getters
         get verifiedRecordChanged() {
           if (!this.originalWasVerified || !this.originalFormSnapshot) return false;
           return this._snapshotForm() !== this.originalFormSnapshot;
@@ -842,6 +848,8 @@
             rsu_units: '',
             cda_units: '',
             severity: '',
+            book_number: '',
+            page_number: '',
             book_number: '',
             page_number: '',
             is_exam: false,
@@ -1092,9 +1100,9 @@
           self.requestingVerification = true;
 
           // Normalise status before saving so the backend check always passes.
-          // • verified→changed records always become 'pending verification' (needs re-approval)
-          // • any other non-qualifying status (in_progress, planned) → 'pending verification'
-          // • completed / pending verification / rejected → left as-is
+          // ΓÇó verifiedΓåÆchanged records always become 'pending verification' (needs re-approval)
+          // ΓÇó any other non-qualifying status (in_progress, planned) ΓåÆ 'pending verification'
+          // ΓÇó completed / pending verification / rejected ΓåÆ left as-is
           if (self.originalWasVerified && self.verifiedRecordChanged) {
             self.form.status = 'pending verification';
           } else if (self.form.status !== 'completed' &&
@@ -1347,7 +1355,7 @@
     }
   </script>
   <script>
-    // Mobile tap tooltip — shows title text as a bottom toast on touch
+    // Mobile tap tooltip ΓÇö shows title text as a bottom toast on touch
     (function () {
       var tip = document.createElement('div');
       tip.setAttribute('style', 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:rgba(27,42,74,0.93);color:#fff;padding:8px 16px;border-radius:10px;font-size:0.75rem;max-width:80vw;text-align:center;z-index:99999;pointer-events:none;display:none;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,0.25);');
