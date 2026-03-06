@@ -1307,7 +1307,7 @@
 
          syncStatus() {
             if (!this.editingPatient) return;
-            let status = 'Waiting to Be Assigned';
+            let status = 'Active';
             if (this.editingPatient.case_completed_at || this.editingPatient.is_completed_case) {
                status = 'Completed Case';
             } else if (this.editingPatient.in_progress_at) {
