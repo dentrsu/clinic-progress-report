@@ -613,7 +613,8 @@ var SupabaseProvider = (function () {
         ",s4:students!student_id_4(academic_id, user:users(name))" +
         ",s5:students!student_id_5(academic_id, user:users(name))" +
         ",case_type:type_of_case(type_of_case)" +
-        ",inst:instructors(user:users(name))";
+        ",inst:instructors(user:users(name))" +
+        ",complexity";
 
       return _get(
         "/rest/v1/patients?or=(" +

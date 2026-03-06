@@ -20,6 +20,12 @@
           },
         },
       },
+      safelist: [
+        'bg-gray-50', 'text-gray-400', 'border-gray-100', 'border-gray-200', 'bg-gray-100',
+        'bg-emerald-50', 'text-emerald-700', 'border-emerald-100', 'border-emerald-200', 'bg-emerald-100',
+        'bg-blue-50', 'text-blue-700', 'border-blue-100', 'border-blue-200', 'bg-blue-100',
+        'bg-amber-50', 'text-amber-700', 'border-amber-100', 'border-amber-200', 'bg-amber-100'
+      ]
     }
   </script>
   <!-- Inter font -->
@@ -328,19 +334,23 @@
         <!-- Modal Body -->
         <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
            
-           <!-- Status (Dropdown) -->
+           <!-- Status (Automated) -->
            <div>
-              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Status</label>
-              <select x-model="editingPatient.status" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-navy focus:ring-navy">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Status (Automated)</label>
+              <select x-model="editingPatient.status" disabled class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 cursor-not-allowed">
                  <option>Waiting to Be Assigned</option>
                  <option>Full Chart</option>
                  <option>Treatment Plan</option>
                  <option>First Treatment Plan</option>
                  <option>Treatment Plan Approved</option>
                  <option>Initial Treatment</option>
+                 <option>Treatment in Progress</option>
+                 <option>Completed Case</option>
                  <option>Inactive</option>
                  <option>Discharged</option>
-                 <option>Orthodontic Treatment</option>
+                 <option>Orthodontic</option>
+                 <option>Recall</option>
+                 <option>Cancelled</option>
                  <option>Waiting in Recall Lists</option>
               </select>
             </div>
@@ -391,11 +401,38 @@
            </div>
 
 
-           <!-- Note -->
-           <div>
-              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Note</label>
-              <textarea x-model="editingPatient.note" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></textarea>
-           </div>
+            <!-- Note -->
+            <div>
+               <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Note</label>
+               <textarea x-model="editingPatient.note" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"></textarea>
+            </div>
+
+            <!-- Case Progress Milestones -->
+            <div class="border-t border-gray-100 pt-4">
+               <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Case Progression Milestones</h4>
+               <div class="space-y-3">
+                  <div class="grid grid-cols-2 items-center gap-4">
+                     <label class="text-xs text-gray-600">Full Chart</label>
+                     <input type="date" x-model="editingPatient.chart_full_at" @change="syncStatus()" class="border border-gray-200 rounded px-2 py-1 text-xs focus:border-navy focus:ring-navy">
+                  </div>
+                  <div class="grid grid-cols-2 items-center gap-4">
+                     <label class="text-xs text-gray-600">First Treatment Plan</label>
+                     <input type="date" x-model="editingPatient.first_tp_at" @change="syncStatus()" class="border border-gray-200 rounded px-2 py-1 text-xs focus:border-navy focus:ring-navy">
+                  </div>
+                  <div class="grid grid-cols-2 items-center gap-4">
+                     <label class="text-xs text-gray-600">Treatment Plan Approved</label>
+                     <input type="date" x-model="editingPatient.tp_approved_at" @change="syncStatus()" class="border border-gray-200 rounded px-2 py-1 text-xs focus:border-navy focus:ring-navy">
+                  </div>
+                  <div class="grid grid-cols-2 items-center gap-4">
+                     <label class="text-xs text-gray-600">Treatment in Progress</label>
+                     <input type="date" x-model="editingPatient.in_progress_at" @change="syncStatus()" class="border border-gray-200 rounded px-2 py-1 text-xs focus:border-navy focus:ring-navy">
+                  </div>
+                  <div class="grid grid-cols-2 items-center gap-4">
+                     <label class="text-xs text-gray-600">Completed Case</label>
+                     <input type="date" x-model="editingPatient.case_completed_at" @change="syncStatus()" class="border border-gray-200 rounded px-2 py-1 text-xs focus:border-navy focus:ring-navy">
+                  </div>
+               </div>
+            </div>
 
            <!-- Operators (Collapsible or just list) -->
            <div class="border-t border-gray-100 pt-4">
@@ -496,23 +533,28 @@
 
         <!-- My Patients Group -->
         <div x-show="myPatients.length > 0">
-           <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">My Patients</h3>
+           <div class="flex items-center justify-between mb-3 px-1">
+             <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">My Patients</h3>
+             <div class="flex items-center gap-2 text-[0.65rem] font-medium uppercase tracking-wide">
+                <span class="text-gray-400">Complexity:</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> 1</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span> 2</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> ≥2</span>
+             </div>
+           </div>
            <div class="space-y-3">
              <template x-for="p in myPatients" :key="p.hn">
-               <div @click="openPatientModal(p)" class="cursor-pointer bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden">
+               <div @click="openPatientModal(p)" 
+                     class="cursor-pointer rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden"
+                     :class="getComplexityCardClass(p.complexity, false)">
                  <div class="absolute top-0 left-0 w-1 h-full bg-navy"></div>
                  <div class="pl-2 flex justify-between items-start mb-2">
                    <div>
                      <h4 class="font-semibold text-navy text-base" x-text="p.name"></h4>
                      <p class="text-xs text-gray-400 font-mono mt-0.5">HN: <span x-text="p.hn"></span></p>
                    </div>
-                   <span class="px-2 py-1 rounded text-[0.65rem] font-bold uppercase tracking-wide border"
-                         :class="{
-                           'bg-emerald-50 text-emerald-600 border-emerald-100': ['Full Chart','Treatment Plan Approved'].includes(p.status),
-                           'bg-blue-50 text-blue-600 border-blue-100': ['Treatment Plan','First Treatment Plan'].includes(p.status),
-                           'bg-gray-50 text-gray-500 border-gray-100': ['Waiting to Be Assigned','Inactive','Discharged'].includes(p.status),
-                           'bg-amber-50 text-amber-600 border-amber-100': !['Full Chart','Treatment Plan Approved','Treatment Plan','First Treatment Plan','Waiting to Be Assigned','Inactive','Discharged'].includes(p.status)
-                         }"
+                   <span class="px-2 py-1 rounded text-[0.65rem] font-bold uppercase tracking-wide border shadow-sm"
+                         :class="getComplexityClass(p.complexity)"
                          x-text="p.status">
                    </span>
                   </div>
@@ -539,17 +581,28 @@
 
         <!-- Referred Patients Group -->
         <div x-show="referredPatients.length > 0">
-           <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">Referred / Co-Treat</h3>
+           <div class="flex items-center justify-between mb-3 px-1">
+             <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Referred / Co-Treat</h3>
+             <div class="flex items-center gap-2 text-[0.65rem] font-medium uppercase tracking-wide hidden sm:flex">
+                <span class="text-gray-400">Complexity:</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> 1</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span> 2</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> ≥2</span>
+             </div>
+           </div>
            <div class="space-y-3">
              <template x-for="p in referredPatients" :key="p.hn">
-               <div @click="openPatientModal(p)" class="cursor-pointer bg-gray-50 rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden">
+               <div @click="openPatientModal(p)" 
+                     class="cursor-pointer rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden"
+                     :class="getComplexityCardClass(p.complexity, true)">
                  <div class="absolute top-0 left-0 w-1 h-full bg-gold"></div>
                  <div class="pl-2 flex justify-between items-start mb-2">
                    <div>
                      <h4 class="font-semibold text-gray-700 text-base" x-text="p.name"></h4>
                      <p class="text-xs text-gray-400 font-mono mt-0.5">HN: <span x-text="p.hn"></span></p>
                    </div>
-                   <span class="px-2 py-1 rounded text-[0.65rem] font-bold uppercase tracking-wide border border-gray-200 bg-white text-gray-500"
+                   <span class="px-2 py-1 rounded text-[0.65rem] font-bold uppercase tracking-wide border shadow-sm"
+                         :class="getComplexityClass(p.complexity)"
                          x-text="p.status">
                    </span>
                  </div>
@@ -570,6 +623,9 @@
 
       </div>
     </template>
+
+    <!-- Tailwind JIT Safelist (Hidden) -->
+    <div class="hidden bg-gray-50 text-gray-500 border-gray-100 bg-emerald-50 text-emerald-600 border-emerald-100 bg-blue-50 text-blue-600 border-blue-100 bg-amber-50 text-amber-600 border-amber-100"></div>
 
   </div>
 
@@ -1059,6 +1115,30 @@
           return initials.toUpperCase();
         },
 
+        getComplexityClass(complexity) {
+           if (!complexity || String(complexity).trim().toLowerCase() === 'none') {
+               return 'bg-gray-100 text-gray-400 border-gray-200';
+           }
+           const cStr = String(complexity).trim();
+           if (cStr === '1') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+           if (cStr === '2') return 'bg-blue-100 text-blue-700 border-blue-200';
+           if (cStr === '>=2' || cStr === '>2' || parseInt(cStr) >= 2) {
+               return 'bg-amber-100 text-amber-700 border-amber-200';
+           }
+           
+           return 'bg-gray-100 text-gray-400 border-gray-200';
+        },
+
+        getComplexityCardClass(complexity, isReferred = false) {
+           const defaultBg = isReferred ? 'bg-gray-50' : 'bg-white';
+           if (!complexity || String(complexity).trim().toLowerCase() === 'none') return defaultBg;
+           const cStr = String(complexity).trim();
+           if (cStr === '1') return 'bg-emerald-50';
+           if (cStr === '2') return 'bg-blue-50';
+           if (cStr === '>=2' || cStr === '>2' || parseInt(cStr) >= 2) return 'bg-amber-50';
+           return defaultBg;
+        },
+
         getStudentYear() {
            if (!this.profile.first_clinic_year) return '-';
            const now = new Date();
@@ -1173,7 +1253,8 @@
               };
               findInList(this.myPatients);
               findInList(this.referredPatients);
-           }
+              this.syncStatus();
+            }
            
            google.script.run
              .withSuccessHandler((res) => {
@@ -1210,12 +1291,36 @@
         openPatientModal(p) {
            // Deep copy to avoid mutating list directly
            this.editingPatient = p ? JSON.parse(JSON.stringify(p)) : {};
-           // Format Date for input[type=date] (YYYY-MM-DD)
-           if(this.editingPatient.birthdate) {
-              this.editingPatient.birthdate = new Date(this.editingPatient.birthdate).toISOString().split('T')[0];
-           }
-           this.editModalOpen = true;
+            // Format Dates for input[type=date] (YYYY-MM-DD)
+            if(this.editingPatient.birthdate) {
+               this.editingPatient.birthdate = new Date(this.editingPatient.birthdate).toISOString().split('T')[0];
+            }
+            // Format milestone dates
+            ['chart_full_at', 'first_tp_at', 'tp_approved_at', 'in_progress_at', 'case_completed_at'].forEach(field => {
+               if(this.editingPatient[field]) {
+                  this.editingPatient[field] = new Date(this.editingPatient[field]).toISOString().split('T')[0];
+               }
+            });
+            this.syncStatus(); // INITIAL SYNC
+            this.editModalOpen = true;
         },
+
+         syncStatus() {
+            if (!this.editingPatient) return;
+            let status = 'Waiting to Be Assigned';
+            if (this.editingPatient.case_completed_at || this.editingPatient.is_completed_case) {
+               status = 'Completed Case';
+            } else if (this.editingPatient.in_progress_at) {
+               status = 'Treatment in Progress';
+            } else if (this.editingPatient.tp_approved_at) {
+               status = 'Treatment Plan Approved';
+            } else if (this.editingPatient.first_tp_at) {
+               status = 'First Treatment Plan';
+            } else if (this.editingPatient.chart_full_at) {
+               status = 'Full Chart';
+            }
+            this.editingPatient.status = status;
+         },
 
         savePatient() {
            this.saving = true;

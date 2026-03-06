@@ -153,5 +153,30 @@ Follow these steps to verify the verification request and status flow.
    - Find the requirement linked to the record you just processed.
    - **Verify**: The record should appear in the expanded list and contribute to the **Estimated** progress totals (amber progress bar).
 
-> [!NOTE]
-> The 'Pending Verification' and 'Rejected' statuses act as "Estimated" progress, while 'Verified' acts as "Verified" progress.
+---
+
+## 7. Patient Complexity Visualization
+
+Follow these steps to verify that patient cards are correctly color-coded based on their complexity levels.
+
+1. **Set Patient Complexity (Student)**:
+   - Log in as a **student**.
+   - Open the **Patient List**.
+   - Click on a patient card to open the **Edit Modal**.
+   - Locate the **Complexity** field and enter a value (e.g., `1`, `2`, or `>=2`).
+   - Click **Save**.
+   - **Verify**: The updated complexity should be saved to the database and persists after refreshing the page.
+
+2. **Visual Verification (Student/Instructor)**:
+   - Refresh the page and view the patient cards.
+   - **Verify** the card background colors:
+     - **Complexity 1**: Subtle Emerald/Green (`bg-emerald-50`)
+     - **Complexity 2**: Subtle Blue (`bg-blue-50`)
+     - **Complexity >= 2**: Subtle Amber/Yellow (`bg-amber-50`)
+     - **None / Default**: White (`bg-white`) for own patients, Light Gray (`bg-gray-50`) for referred patients.
+   - **Verify** the status badge: The text color and border should match the complexity level with higher contrast for readability.
+   - **Verify** the Header Hint: A complexity legend (colored dots) should be visible in the "My Patients" and "Referred / Co-Treat" section headers.
+
+3. **Multi-Column Alignment**:
+   - Log in as an **instructor** and open a student's patient list.
+   - **Verify** that the same color-coding logic is applied correctly in the instructor's view.

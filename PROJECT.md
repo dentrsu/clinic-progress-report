@@ -26,8 +26,8 @@ A dedicated interface for administrators to manage users.
 - **User Management**: Create, Read, Update, Delete (CRUD) for all user roles.
 - **Role Switching**: Seamlessly migrate users between 'Student' and 'Instructor' roles (automatically handles underlying data records).
 - **Student Portal**:
-  - Dashboard with "My Patients" and "Referred Patients".
-  - **Patient Management**: Detail modal to edit patient info and assign students (using Academic ID or Name).
+  - **Patient Management**: Detail modal to edit patient info and complexity (1, 2, >=2).
+  - **Dynamic Card Coloring**: Patient cards change background color (Emerald/Blue/Amber) based on complexity level.
   - **Treatment Plans**: Dedicated page for viewing/managing treatment records.
     - **Verification Workflow**: Students can request email verification for 'Completed' records (automatically shifts to 'Pending Verification'). Supports re-requests if 'Rejected'.
   - **Requirement Vault**: Per-division progress tracking with RSU/CDA tables and radar chart. Tracks both 'Verified' and 'Estimated' status (Completed/Pending/Rejected).
@@ -59,6 +59,9 @@ A dedicated interface for administrators to manage users.
 | Background     | `#F8F7F4`                                        | Page background                   |
 | Card           | `#FFFFFF`                                        | Content cards                     |
 | Font           | [Inter](https://fonts.google.com/specimen/Inter) | All text                          |
+| Complexity 1   | `#ECFDF5` (Emerald-50)                           | Low complexity patient cards      |
+| Complexity 2   | `#EFF6FF` (Blue-50)                              | Moderate complexity patient cards |
+| Complexity >=2 | `#FEF3C7` (Amber-50)                             | High complexity patient cards     |
 
 Style: **clean, minimalist, academic, professional**.
 

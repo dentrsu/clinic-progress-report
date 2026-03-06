@@ -30,9 +30,13 @@ create type public.patient_status as enum (
   'First Treatment Plan',
   'Treatment Plan Approved',
   'Initial Treatment',
+  'Treatment in Progress',
+  'Completed Case',
   'Inactive',
   'Discharged',
-  'Orthodontic Treatment',
+  'Orthodontic',
+  'Recall',
+  'Cancelled',
   'Waiting in Recall Lists'
 );
 
@@ -220,16 +224,21 @@ create table public.requirement_list (
 --   which run after both aggregation passes.
 
 -- 3.6 Patients
--- create table public.patients (
---   patient_id uuid primary key default gen_random_uuid(),
---   hn text not null unique,
---   name text not null,
---   status public.patient_status not null default 'Waiting to Be Assigned',
---   is_completed_case boolean not null default false,
-  complexity text,
+create table public.patients (
+  patient_id uuid primary key default gen_random_uuid(),
+  hn text not null unique,
+  name text not null,
+  status public.patient_status not null default 'Waiting to Be Assigned',
+  is_completed_case boolean not null default false,
+  complexity text,                      -- Visual grouping: none/1/2/>=2
   type_of_case uuid references public.type_of_case(id),
---   ...
--- );
+  birthdate date,
+  tel text,
+  note text,
+  student_id_1 uuid references public.students(student_id), -- Primary operator
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 
 -- 3.7 Case Types
 create table public.type_of_case (

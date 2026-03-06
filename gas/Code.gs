@@ -78,6 +78,9 @@ function getStudentPatients(targetStudentId) {
     // Set type_of_case to the text value for standard dropdown selection in UI
     p.type_of_case = p.case_type ? p.case_type.type_of_case : "";
 
+    // Explicitly pass through complexity level as string/null
+    p.complexity = p.complexity ? String(p.complexity) : null;
+
     return p;
   });
 }
@@ -122,7 +125,17 @@ function studentUpdatePatient(hn, form) {
   // Note: Student CAN update assigned student IDs (Handover/Referral)
 
   var payload = {
-    status: form.status,
+    // Auto-calculate status based on milestones
+    status: (function () {
+      if (form.case_completed_at || !!form.is_completed_case)
+        return "Completed Case";
+      if (form.in_progress_at) return "Treatment in Progress";
+      if (form.tp_approved_at) return "Treatment Plan Approved";
+      if (form.first_tp_at) return "First Treatment Plan";
+      if (form.chart_full_at) return "Full Chart";
+      return "Active";
+    })(),
+
     birthdate: form.birthdate ? form.birthdate : null, // String YYYY-MM-DD is fine
     tel: form.tel,
     note: form.note,
@@ -134,7 +147,14 @@ function studentUpdatePatient(hn, form) {
     student_id_4: _resolveStudentId(form.student_4_acad),
     student_id_5: _resolveStudentId(form.student_5_acad),
     is_completed_case: !!form.is_completed_case,
-    complexity: form.complexity || null,
+
+    complexity: form.complexity ? String(form.complexity).trim() : null,
+    chart_full_at: form.chart_full_at || null,
+    first_tp_at: form.first_tp_at || null,
+    tp_approved_at: form.tp_approved_at || null,
+    in_progress_at: form.in_progress_at || null,
+    case_completed_at: form.case_completed_at || null,
+
     // Resolve text to ID (alignment logic)
     type_of_case: SupabaseProvider.getTypeOfCaseIdByText(form.type_of_case),
 
