@@ -1341,7 +1341,7 @@
 
          formatDate(d) {
             if (!d) return '-';
-            return new Date(d).toLocaleDateString('th-TH');
+            return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
          },
 
         // --- Error Modal Logic ---

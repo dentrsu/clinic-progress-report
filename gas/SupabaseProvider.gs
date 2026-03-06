@@ -444,6 +444,20 @@ var SupabaseProvider = (function () {
     },
 
     /**
+     * Batch-fetch multiple students by their IDs in a single query.
+     * @param {string[]} studentIds
+     * @returns {Array} rows with user:users(name,email) joined
+     */
+    listStudentsByIds: function (studentIds) {
+      if (!studentIds || studentIds.length === 0) return [];
+      return _get(
+        "/rest/v1/students?student_id=in.(" +
+          studentIds.join(",") +
+          ")&select=*,user:users(name,email)",
+      );
+    },
+
+    /**
      * List all students assigned to a specific team leader (as 1 or 2).
      * @param {string} instructorId
      * @returns {Array}

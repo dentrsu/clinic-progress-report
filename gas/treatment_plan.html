@@ -38,7 +38,7 @@
 </head>
 <body class="bg-surface min-h-screen p-6">
 
-  <div x-data="treatmentApp()" x-init="init()">
+  <div x-data="treatmentApp()">
     <!-- Header -->
     <div class="max-w-7xl mx-auto mb-6 flex justify-between items-center">
       <div class="flex items-center gap-4">
@@ -331,7 +331,7 @@
 
               <select x-model="form.student_id" class="w-full">
                 <option value="">— Select Student —</option>
-                <template x-for="s in students" :key="s.student_id">
+                <template x-for="(s, idx) in students" :key="idx">
                   <option :value="s.student_id" x-text="s.name + (s.academic_id ? ' (' + s.academic_id + ')' : '')"></option>
                 </template>
               </select>
@@ -1277,8 +1277,8 @@
                      var exists = self.students.find(function(s) { return s.student_id === res.student.student_id; });
                      if(!exists) {
                          self.students.push(res.student);
-                         // Optional: Sort students by name?
-                         self.students.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+                         // Keep slot order so students[0] remains student_id_1
+                         self.students.sort(function(a, b) { return (a.slot || 99) - (b.slot || 99); });
                      }
                      
                      // Update form selection

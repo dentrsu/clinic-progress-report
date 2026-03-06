@@ -5547,18 +5547,37 @@ function studentGetTreatmentPlan(hn) {
   var instructors = SupabaseProvider.listInstructors() || [];
   var requirements = SupabaseProvider.listRequirements() || [];
 
-  // Build students list from patient's assigned student_id_1..5
-  var students = [];
+  // Build students list from patient's assigned student_id_1..5 (single batch query)
+  var slotMap = {}; // sid -> slot number (first slot wins for duplicates)
+  var seenSids = {}; // dedup: same UUID in multiple slots counts only once
+  var orderedSids = []; // in slot order so students[0] === student_id_1
   for (var i = 1; i <= 5; i++) {
     var sid = patient["student_id_" + i];
-    if (sid) {
-      var s = SupabaseProvider.getStudentById(sid);
+    if (sid && !seenSids[sid]) {
+      seenSids[sid] = true;
+      slotMap[sid] = i;
+      orderedSids.push(sid);
+    }
+  }
+  var students = [];
+  if (orderedSids.length > 0) {
+    var studentRows = SupabaseProvider.listStudentsByIds(orderedSids);
+    // Index fetched rows by student_id for lookup
+    var fetchedMap = {};
+    for (var r = 0; r < studentRows.length; r++) {
+      fetchedMap[studentRows[r].student_id] = studentRows[r];
+    }
+    // Rebuild in slot order so students[0] is always student_id_1
+    for (var j = 0; j < orderedSids.length; j++) {
+      var id = orderedSids[j];
+      var slot = slotMap[id];
+      var s = fetchedMap[id];
       if (s) {
         students.push({
-          student_id: sid,
-          name: s.user && s.user.name ? s.user.name : "Student " + i,
+          student_id: id,
+          name: s.user && s.user.name ? s.user.name : "Student " + slot,
           academic_id: s.academic_id || "",
-          slot: i,
+          slot: slot,
           oper_instructor_id: s.oper_instructor_id,
           endo_instructor_id: s.endo_instructor_id,
           perio_instructor_id: s.perio_instructor_id,
@@ -5571,10 +5590,10 @@ function studentGetTreatmentPlan(hn) {
         });
       } else {
         students.push({
-          student_id: sid,
-          name: "Student " + i,
+          student_id: id,
+          name: "Student " + slot,
           academic_id: "",
-          slot: i,
+          slot: slot,
         });
       }
     }
