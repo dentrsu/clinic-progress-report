@@ -127,8 +127,7 @@ function studentUpdatePatient(hn, form) {
   var payload = {
     // Auto-calculate status based on milestones
     status: (function () {
-      if (form.case_completed_at || !!form.is_completed_case)
-        return "Completed Case";
+      if (form.case_completed_at) return "Completed Case";
       if (form.in_progress_at) return "Treatment in Progress";
       if (form.tp_approved_at) return "Treatment Plan Approved";
       if (form.first_tp_at) return "First Treatment Plan";
@@ -158,6 +157,52 @@ function studentUpdatePatient(hn, form) {
     // Resolve text to ID (alignment logic)
     type_of_case: SupabaseProvider.getTypeOfCaseIdByText(form.type_of_case),
 
+    updated_at: new Date().toISOString(),
+  };
+
+  // 4. Execute Update
+  SupabaseProvider.updatePatient(patient.patient_id, payload);
+
+  return { success: true };
+}
+
+/**
+ * Update patient complexity (Student).
+ * Validates ownership before updating.
+ * @param {string} hn
+ * @param {number|string} complexityValue
+ */
+function studentUpdatePatientComplexity(hn, complexityValue) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+
+  var profile = getUserProfile(user.email);
+  if (!profile.found || !profile.active || profile.role !== "student") {
+    throw new Error("User is not an active student.");
+  }
+
+  // 1. Fetch existing patient to verify ownership
+  var patient = SupabaseProvider.getPatientByHn(hn);
+
+  if (!patient) {
+    throw new Error("Patient not found: " + hn);
+  }
+
+  // 2. Verify Ownership (Must be one of the assigned students)
+  var myId = profile.student_id;
+  var isAssigned =
+    patient.student_id_1 === myId ||
+    patient.student_id_2 === myId ||
+    patient.student_id_3 === myId ||
+    patient.student_id_4 === myId ||
+    patient.student_id_5 === myId;
+
+  if (!isAssigned) {
+    throw new Error("You are not assigned to this patient.");
+  }
+
+  var payload = {
+    complexity: complexityValue != null ? String(complexityValue).trim() : null,
     updated_at: new Date().toISOString(),
   };
 
@@ -2621,10 +2666,42 @@ function getStudentVaultData(targetStudentId) {
     throw new Error("No student specified.");
   }
 
-  // 1. Fetch all requirements and student records
+  // 1. Fetch all requirements, student records, patients, and student status
+  var studentRec = SupabaseProvider.getStudentById(finalStudentId);
+  var studentStatusStr = studentRec ? studentRec.status : "Active";
+  var targetCompleteCases = 5;
+  if (studentStatusStr === "Active+1") targetCompleteCases = 6;
+  if (studentStatusStr === "Active+2") targetCompleteCases = 7;
+
   var requirements = SupabaseProvider.listRequirements() || [];
+  var caseTypes = SupabaseProvider.listTypeOfCases() || [];
   var records =
     SupabaseProvider.listVaultRecordsByStudent(finalStudentId) || [];
+  var patients = SupabaseProvider.listPatientsByStudent(finalStudentId) || [];
+
+  // Filter for completed cases and build a quick lookup map by patient HN
+  var completedCasesMap = {};
+  var completeCasesData = [];
+  var caseTypeMap = {};
+  caseTypes.forEach(function (ct) {
+    caseTypeMap[ct.id] = ct.type_of_case;
+  });
+
+  patients.forEach(function (p) {
+    if (p.is_completed_case) {
+      var caseRec = {
+        hn: p.hn,
+        name: p.name,
+        type_of_case: p.type_of_case || "-", // Usually the UUID
+        type_of_case_name: caseTypeMap[p.type_of_case] || "Uncategorized",
+        complexity: p.complexity || "-",
+        status: p.status || "-",
+        treatmentsByDivision: {}, // Will populate { "OPER": [], "ENDO": [] }
+      };
+      completedCasesMap[p.hn] = caseRec;
+      completeCasesData.push(caseRec);
+    }
+  });
 
   // 2. Build division metadata index: divName -> { name, code, reqs[] }
   var divisionMeta = {};
@@ -2657,6 +2734,39 @@ function getStudentVaultData(targetStudentId) {
     }
     var recHn = rec.hn || (rec.patient && rec.patient.hn) || "-";
     var recName = rec.patient_name || (rec.patient && rec.patient.name) || "-";
+
+    // Check if this record belongs to a completed case, and push it to their group
+    if (completedCasesMap[recHn]) {
+      // Exclude N/A or Other
+      if (divName !== "Other" && divName !== "N/A") {
+        if (!completedCasesMap[recHn].treatmentsByDivision[divName]) {
+          completedCasesMap[recHn].treatmentsByDivision[divName] = [];
+        }
+
+        var reqName =
+          (
+            requirements.find(function (r) {
+              return r.requirement_id === rec.requirement_id;
+            }) || {}
+          ).requirement_type || "Unknown";
+
+        var existingGroup = completedCasesMap[recHn].treatmentsByDivision[
+          divName
+        ].find(function (g) {
+          return g.requirement_name === reqName;
+        });
+
+        if (existingGroup) {
+          existingGroup.count++;
+        } else {
+          completedCasesMap[recHn].treatmentsByDivision[divName].push({
+            requirement_name: reqName,
+            count: 1,
+          });
+        }
+      }
+    }
+
     recordsDetailMap[rec.requirement_id].push({
       record_id: rec.record_id,
       hn: recHn,
@@ -2665,6 +2775,7 @@ function getStudentVaultData(targetStudentId) {
       rsu_units: parseFloat(rec.rsu_units) || 0,
       cda_units: parseFloat(rec.cda_units) || 0,
       status: rec.status,
+      complexity: (rec.patient && rec.patient.complexity) || "-",
       is_exam: rec.is_exam === true,
     });
   });
@@ -3149,9 +3260,39 @@ function getStudentVaultData(targetStudentId) {
         : 0;
   });
 
-  return Object.values(divisions).sort(function (a, b) {
+  // Sort complete cases by type_of_case_name
+  completeCasesData.sort(function (a, b) {
+    return (a.type_of_case_name || "").localeCompare(b.type_of_case_name || "");
+  });
+
+  // Calculate distinct type of cases count
+  var uniqueTypesSet = {};
+  var uniqueTypesCount = 0;
+  completeCasesData.forEach(function (c) {
+    var cTypeName = c.type_of_case_name || "Uncategorized";
+    var isStatusComplete =
+      c.status && c.status.toLowerCase().includes("complete");
+    if (
+      cTypeName !== "Uncategorized" &&
+      isStatusComplete &&
+      !uniqueTypesSet[cTypeName]
+    ) {
+      uniqueTypesSet[cTypeName] = true;
+      uniqueTypesCount++;
+    }
+  });
+
+  var finalDivisions = Object.values(divisions).sort(function (a, b) {
     return a.name.localeCompare(b.name);
   });
+
+  return {
+    divisions: finalDivisions,
+    completeCases: completeCasesData,
+    caseTypes: caseTypes,
+    targetCompleteCases: targetCompleteCases,
+    uniqueCompleteCaseTypes: uniqueTypesCount,
+  };
 }
 
 /**

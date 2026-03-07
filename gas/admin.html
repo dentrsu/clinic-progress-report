@@ -644,12 +644,21 @@
 
     <!-- Treatment Catalog Tab Content -->
     <div x-show="!loading && activeTab === 'catalog'" class="space-y-4 animate-fade-in">
-       <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+       <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
          <h2 class="text-lg font-bold text-gray-800">Treatment Catalog</h2>
-         <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
-           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-           Add Treatment
-         </button>
+         <div class="flex flex-wrap items-center gap-3">
+           <select x-model="catalogFilterDivision" @change="filterCatalog()"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-transparent bg-white">
+             <option value="">All Divisions</option>
+             <template x-for="div in divisions" :key="div.division_id">
+               <option :value="div.division_id" x-text="div.name"></option>
+             </template>
+           </select>
+           <button @click="openModal('create')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-navy-light transition flex items-center gap-2">
+             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+             Add Treatment
+           </button>
+         </div>
        </div>
        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
        <table class="w-full text-left border-collapse">
@@ -1777,6 +1786,7 @@
         // Treatment Steps Data
         steps: [],
         filteredSteps: [],
+        catalogFilterDivision: '',
         stepsFilterDivision: '',
         stepsFilterTreatment: '',
 
@@ -2222,15 +2232,18 @@
 
         filterCatalog() {
           if (!this.catalog) return;
-          if (!this.search) {
-            this.filteredCatalog = this.catalog;
-            return;
+          let result = this.catalog;
+          if (this.catalogFilterDivision) {
+            result = result.filter(c => c.division_id === this.catalogFilterDivision);
           }
-          const q = this.search.toLowerCase();
-          this.filteredCatalog = this.catalog.filter(c => 
-            (c.treatment_name && c.treatment_name.toLowerCase().includes(q)) || 
-            (c.divisions && c.divisions.name && c.divisions.name.toLowerCase().includes(q))
-          );
+          if (this.search) {
+            const q = this.search.toLowerCase();
+            result = result.filter(c =>
+              (c.treatment_name && c.treatment_name.toLowerCase().includes(q)) ||
+              (c.divisions && c.divisions.name && c.divisions.name.toLowerCase().includes(q))
+            );
+          }
+          this.filteredCatalog = result;
         },
 
         filterTypeOfCases() {

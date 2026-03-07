@@ -19,13 +19,55 @@ var SupabaseProvider = (function () {
   }
 
   /**
+   * Helper for robust network calls with exponential backoff.
+   */
+  function _fetchWithRetry(url, options) {
+    var maxRetries = 3;
+    var lastError;
+
+    for (var i = 0; i < maxRetries; i++) {
+      try {
+        var response = UrlFetchApp.fetch(url, options);
+        // If it returns a 5xx, we might want to retry as well if they are transient
+        if (response.getResponseCode() >= 500 && i < maxRetries - 1) {
+          throw new Error(
+            "Transient server error: " + response.getResponseCode(),
+          );
+        }
+        return response;
+      } catch (e) {
+        lastError = e;
+        // Check if error is transient (e.g. Address unavailable, Timeout, etc.)
+        var msg = e.toString();
+        if (
+          msg.includes("Address unavailable") ||
+          msg.includes("Timeout") ||
+          msg.includes("limit exceeded") ||
+          msg.includes("Transient")
+        ) {
+          if (i < maxRetries - 1) {
+            var sleepTime = Math.pow(2, i) * 1000 + Math.random() * 500;
+            console.warn(
+              "Retrying fetch due to error: " + msg + " in " + sleepTime + "ms",
+            );
+            Utilities.sleep(sleepTime);
+            continue;
+          }
+        }
+        throw e;
+      }
+    }
+    throw lastError;
+  }
+
+  /**
    * Generic GET helper.
    * @param {string} path  — REST path, e.g. '/rest/v1/users?email=eq.foo'
    * @returns {Array|Object}
    */
   function _get(path) {
     var url = getSupabaseUrl() + path;
-    var response = UrlFetchApp.fetch(url, {
+    var response = _fetchWithRetry(url, {
       method: "get",
       headers: _headers(),
       muteHttpExceptions: true,
@@ -53,7 +95,7 @@ var SupabaseProvider = (function () {
     var url = getSupabaseUrl() + path;
     var hdrs = _headers();
     hdrs["Accept-Profile"] = "oracle";
-    var response = UrlFetchApp.fetch(url, {
+    var response = _fetchWithRetry(url, {
       method: "get",
       headers: hdrs,
       muteHttpExceptions: true,
@@ -82,7 +124,7 @@ var SupabaseProvider = (function () {
     hdrs["Content-Profile"] = "oracle";
     hdrs["Accept-Profile"] = "oracle";
     hdrs["Prefer"] = "return=representation, resolution=merge-duplicates";
-    var response = UrlFetchApp.fetch(url, {
+    var response = _fetchWithRetry(url, {
       method: "post",
       headers: hdrs,
       payload: JSON.stringify(payload),
@@ -147,7 +189,7 @@ var SupabaseProvider = (function () {
    */
   function _post(path, payload) {
     var url = getSupabaseUrl() + path;
-    var response = UrlFetchApp.fetch(url, {
+    var response = _fetchWithRetry(url, {
       method: "post",
       headers: _headers(),
       payload: JSON.stringify(payload),
@@ -173,7 +215,7 @@ var SupabaseProvider = (function () {
    */
   function _patch(path, payload) {
     var url = getSupabaseUrl() + path;
-    var response = UrlFetchApp.fetch(url, {
+    var response = _fetchWithRetry(url, {
       method: "patch",
       headers: _headers(),
       payload: JSON.stringify(payload),
@@ -873,7 +915,7 @@ var SupabaseProvider = (function () {
         "/rest/v1/treatment_records?student_id=eq." +
           studentId +
           "&status=in.(verified,completed,pending verification,rejected)" +
-          "&select=record_id,requirement_id,rsu_units,cda_units,status,is_exam,perio_exams,hn,patient_name,area,patient:patients(hn,name)",
+          "&select=record_id,requirement_id,rsu_units,cda_units,status,is_exam,perio_exams,hn,patient_name,area,patient:patients(hn,name,complexity)",
       );
     },
 

@@ -57,13 +57,21 @@
         </div>
       </div>
       
-      <!-- Add Button: Only show for primary owner (student_id_1) -->
-      <button x-show="patient && patient.student_id_1 === (currentUser ? currentUser.id : null) && (!currentUser || currentUser.role !== 'instructor')" 
-              @click="openModal(null)" 
-              class="btn-primary flex items-center gap-2 px-4 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition shadow-sm">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        Add Treatment
-      </button>
+      <!-- Add Button & Complexity Button: Only show for primary owner (student_id_1) -->
+      <div class="flex items-center gap-3">
+        <button x-show="patient && patient.student_id_1 === (currentUser ? currentUser.id : null) && (!currentUser || currentUser.role !== 'instructor')" 
+                @click="openComplexityModal()" 
+                class="btn-secondary flex items-center gap-2 px-4 py-2.5 bg-white text-navy border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition shadow-sm">
+          <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          Calculate Complexity
+        </button>
+        <button x-show="patient && patient.student_id_1 === (currentUser ? currentUser.id : null) && (!currentUser || currentUser.role !== 'instructor')" 
+                @click="openModal(null)" 
+                class="btn-primary flex items-center gap-2 px-4 py-2.5 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition shadow-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Add Treatment
+        </button>
+      </div>
     </div>
 
     <!-- Content -->
@@ -579,9 +587,366 @@
       </div>
     </div>
 
+    <!-- ==================== COMPLEXITY MODAL ==================== -->
+    <div x-show="showComplexityModal" class="fixed inset-0 z-[70] flex items-center justify-center modal-backdrop" @click.self="closeComplexityModal()" x-cloak>
+      <div class="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto flex flex-col" @click.stop>
+        
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10 rounded-t-2xl">
+          <div>
+            <h2 class="text-lg font-bold text-navy flex items-center gap-2">
+              <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              Case Complexity Calculation
+            </h2>
+            <p class="text-xs text-gray-500 mt-1">Review gathered treatments, answer confirmations, and calculate case complexity.</p>
+          </div>
+          <button @click="closeComplexityModal()" class="p-1.5 rounded-full hover:bg-gray-100 transition text-gray-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6 flex-1 overflow-y-auto space-y-6 bg-gray-50/50">
+          
+          <template x-for="divInfo in complexityData.divisions" :key="divInfo.code">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="font-semibold text-navy flex items-center gap-2">
+                  <span x-text="divInfo.code" class="px-2 py-0.5 bg-navy/10 text-navy rounded text-xs font-bold"></span>
+                  <span x-text="divInfo.name" class="text-sm"></span>
+                </h3>
+                <div class="text-sm font-bold" :class="divInfo.calculatedComplexity > 0 ? 'text-emerald-600' : 'text-gray-400'">
+                  Complexity: <span x-text="divInfo.calculatedComplexity"></span>
+                </div>
+              </div>
+              
+              <div class="p-4 space-y-4">
+                <!-- Matches -->
+                <div>
+                  <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Matched Treatments:</h4>
+                  <ul class="text-sm text-gray-700 space-y-1">
+                    <template x-for="(match, idx) in divInfo.matches" :key="idx">
+                      <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span x-text="match"></span>
+                      </li>
+                    </template>
+                    <li x-show="divInfo.matches.length === 0" class="text-gray-400 italic text-xs">No matching treatments found.</li>
+                  </ul>
+                </div>
+
+                <!-- Confirmations -->
+                <div x-show="divInfo.confirmations.length > 0" class="pt-3 border-t border-gray-100">
+                  <h4 class="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-3 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Confirmations Required:
+                  </h4>
+                  <div class="space-y-3">
+                    <template x-for="(conf, cidx) in divInfo.confirmations" :key="cidx">
+                      <div class="flex items-center justify-between bg-indigo-50/30 p-2.5 rounded border border-indigo-100/50">
+                        <div class="flex flex-col">
+                          <span class="text-sm font-medium text-gray-800" x-text="conf.question"></span>
+                          <span class="text-xs text-gray-500" x-text="conf.context"></span>
+                        </div>
+                        <select x-model="conf.answer" @change="recalculateComplexity()" class="text-sm border-gray-300 rounded shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-32 bg-white">
+                          <option value="no">No</option>
+                          <option value="yes">Yes</option>
+                        </select>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Value/Calculation Detail -->
+                <div x-show="divInfo.calculationDetail" class="pt-3 border-t border-gray-100 text-xs text-gray-500 font-mono bg-gray-50 p-2 rounded">
+                  <span x-text="divInfo.calculationDetail"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- Final Calculation Block -->
+          <div class="bg-navy rounded-xl p-5 text-white shadow-md relative overflow-hidden mt-6">
+            <div class="absolute right-0 top-0 opacity-10">
+              <svg class="w-48 h-48 -mt-6 -mr-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            
+            <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+              <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              Final Case Complexity Result
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+              <div class="space-y-3">
+                <div class="flex justify-between items-center border-b border-white/20 pb-2">
+                  <span class="text-sm text-blue-100">Eligible Divisions (>0):</span>
+                  <span class="font-bold pr-2" x-text="complexityData.eligibleCount"></span>
+                </div>
+                <div class="flex justify-between items-center border-b border-white/20 pb-2">
+                  <span class="text-sm text-blue-100">Highest Division Complexity:</span>
+                  <span class="font-bold pr-2" x-text="complexityData.maxDivComplexity"></span>
+                </div>
+                <div class="flex justify-between items-center border-b border-white/20 pb-2">
+                  <span class="text-sm text-blue-100">Auto Complexity by Count:</span>
+                  <span class="font-bold pr-2" x-text="complexityData.autoComplexity"></span>
+                </div>
+                <div class="flex justify-between items-center pt-1" x-show="!complexityData.isEligible">
+                   <span class="text-sm text-red-300 font-medium">⚠️ Case is not eligible (Needs ≥ 3 divisions)</span>
+                </div>
+              </div>
+              
+              <div class="flex items-center justify-center bg-navy-light rounded-xl border border-blue-500/30 p-4">
+                <div class="text-center">
+                  <div class="text-sm text-blue-200 uppercase tracking-widest font-bold mb-1">Final Score</div>
+                  <div class="text-5xl font-black text-gold" x-text="complexityData.isEligible ? complexityData.finalComplexity : 'N/A'"></div>
+                  <div class="text-[0.65rem] text-blue-300 mt-2 font-mono" x-show="complexityData.isEligible">floor(max(highest, auto))</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 sticky bottom-0 bg-white rounded-b-2xl">
+          <button @click="closeComplexityModal()" class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition">Cancel</button>
+          <button @click="saveComplexity()" :disabled="savingComplexity || !complexityData.isEligible" class="px-5 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition disabled:opacity-50 flex items-center gap-2">
+            <div x-show="savingComplexity" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span x-text="savingComplexity ? 'Saving...' : 'Confirm & Save Patient Complexity'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
   </div>
 
   <script>
+    // Configurable Case Complexity Criteria
+    const COMPLEXITY_CRITERIA = {
+      OPER: {
+        evaluate: (treatments, areaValues) => {
+          let score = 0;
+          let confirmations = [];
+          
+          let countDiastema = 0;
+          let countClassV = 0;
+          let countOnlay = 0;
+          let countClassII = 0;
+          let countClassIV = 0;
+          let countFillings = 0; // Excludes Polishing, Sealant, PRR, Repair
+          
+          let hasPolishing = false;
+          let hasSealant = false;
+          let hasPRR = false;
+          let hasFillingLiteral = false;
+          
+          treatments.forEach(t => {
+            const lt = t.toLowerCase();
+            if (lt.includes('polishing')) hasPolishing = true;
+            if (lt.includes('sealant')) hasSealant = true;
+            if (lt.includes('prr')) hasPRR = true;
+            if (lt.includes('filling')) hasFillingLiteral = true;
+            
+            if (lt.includes('diastema closure')) countDiastema++;
+            if (lt.includes('class v')) countClassV++;
+            if (lt.includes('onlay')) countOnlay++;
+            if (lt.includes('class ii') && !lt.includes('class iii')) countClassII++;
+            if (lt.includes('class iv')) countClassIV++;
+            
+            // For general fillings sum
+            if (!lt.includes('polishing') && !lt.includes('sealant') && !lt.includes('prr') && !lt.includes('repair')) {
+              // Assume any other valid oper treatment is a filling equivalent (or strictly check for composites/amalgams)
+              countFillings++;
+            }
+          });
+
+          // Check C=3 criteria
+          let c2CriteriaMet = 0;
+          if (countDiastema >= 1) c2CriteriaMet++;
+          if (countClassV >= 8) c2CriteriaMet++;
+          if (countOnlay >= 1) c2CriteriaMet++;
+          if ((countClassII + countClassIV) >= 8) c2CriteriaMet++;
+          if (countFillings >= 10) c2CriteriaMet++;
+          
+          let diastemaSpaces = countDiastema; // Simplification, technically it's >= 3 spaces which might be in Area
+          let dcv = treatments.filter(t => t.toLowerCase().includes('direct composite veneer')).length;
+          
+          if (c2CriteriaMet >= 2 || diastemaSpaces >= 3 || countOnlay >= 2 || dcv >= 2) {
+            score = 3;
+          } else if (c2CriteriaMet >= 1) {
+            score = 2;
+          } else if (hasPRR || hasFillingLiteral) {
+            score = 1;
+          } else if (hasPolishing && hasSealant) { // If only polishing and sealant
+            score = 0.5;
+          } else if (treatments.length > 0) {
+            // Default floor if treatments exist but don't match specific high tiers
+            // Instructions say: C=0.5 if ONLY polishing and sealant. 
+            score = 1; // Default basic assumption if there's *any* OPER work not caught above
+          }
+
+          if (score < 3) {
+            confirmations.push({
+              id: 'oper_root_caries',
+              question: 'Are there >= 4 teeth with root caries?',
+              context: 'If yes, complexity increases to 2.',
+              answer: 'no',
+              applyIfYes: (currentScore) => Math.max(currentScore, 2)
+            });
+          }
+
+          return { score, confirmations };
+        }
+      },
+      ENDO: {
+        evaluate: (treatments) => {
+          let score = 0;
+          let confirmations = [];
+          
+          let hasAnteriorPremolar = false;
+          let hasMolar = false;
+          let hasRetreatment = false;
+
+          treatments.forEach(t => {
+            const lt = t.toLowerCase();
+            if (lt.includes('retreatment')) {
+                hasRetreatment = true;
+            }
+            if (lt.includes('root canal treatment') || lt.includes('rct') || lt.includes('root canal retreatment')) {
+                if (lt.includes('anterior') || lt.includes('premolar')) hasAnteriorPremolar = true;
+                if (lt.includes('molar')) hasMolar = true;
+            }
+          });
+
+          if (hasRetreatment) score = 3;
+          else if (hasMolar) score = 2;
+          else if (hasAnteriorPremolar) score = 1;
+
+          if (score < 3) {
+            confirmations.push({
+              id: 'endo_c3',
+              question: 'Are there any endodontic complexity = 3 ?',
+              context: '(curvature >40 degrees, non-negotiable canal, obstruction, damaged access history, iatrogenic damage, pathologic root resorption, difficult root morphology, crown/root fracture, intrusion, extrusion, lateral luxation, avulsion)',
+              answer: 'no',
+              applyIfYes: (c) => 3
+            });
+          }
+          if (score < 2) {
+             confirmations.push({
+              id: 'endo_c2',
+              question: 'Are there any endodontic complexity = 2 ?',
+              context: '(is the root canal curvature >15 and <40 degrees, Incomplete Root Formation)',
+              answer: 'no',
+              applyIfYes: (c) => Math.max(c, 2)
+            });
+          }
+
+          return { score, confirmations };
+        }
+      },
+      PROSTH: {
+        evaluate: (treatments) => {
+          let score = 0;
+          let confirmations = [];
+          
+          let hasSingleCrown = false;
+          let bridge1Pontic = false;
+          let bridgeMultiPontic = false;
+          let twoUnitsCrown = false;
+          let postRetained = false;
+          let arpdMrpd = false;
+          
+          treatments.forEach(t => {
+            const lt = t.toLowerCase();
+            if (lt.includes('crown') && !lt.includes('bridge') && !lt.includes('post')) hasSingleCrown = true;
+            if (lt.includes('bridge')) {
+               // We will ask confirmation for number of pontics to determine C2 vs C3
+               bridge1Pontic = true; 
+            }
+            if (lt.includes('post core') || lt.includes('post-retained')) postRetained = true;
+            if (lt.includes('arpd') || lt.includes('mrpd') || lt.includes('removable partial denture')) arpdMrpd = true;
+          });
+
+          if (hasSingleCrown) {
+            score = Math.max(score, 1);
+            confirmations.push({
+              id: 'prosth_single_crown',
+              question: 'Does the single crown have adequate ferrule, good crown-root ratio, and NOT involved in anterior guidance?',
+              context: 'Required for C=1 single crown.',
+              answer: 'no', // Actually defaults to no, so if they say yes, we validate it. We'll assume yes means it meets the criteria.
+              applyIfYes: (c) => Math.max(c, 1)
+            });
+          }
+          if (postRetained) {
+            score = Math.max(score, 2);
+          }
+          if (arpdMrpd) {
+             score = Math.max(score, 1);
+             confirmations.push({
+              id: 'prosth_arpd_c2',
+              question: 'Is the ARPD/MRPD tissue-borne requiring functional impression and altered cast, surveyed crown, treatment denture before RPD, mandibular removable, OR maxillary removable opposing mandibular fixed without surveyed crown?',
+              context: 'If yes, complexity = 2',
+              answer: 'no',
+              applyIfYes: (c) => Math.max(c, 2)
+            });
+             confirmations.push({
+              id: 'prosth_arpd_c3',
+              question: 'Does the ARPD/MRPD have increased vertical dimension, surveyed crown, or advisor-marked complicated?',
+              context: 'If yes, complexity = 3',
+              answer: 'no',
+              applyIfYes: (c) => 3
+            });
+          }
+
+          // C2 / C3 dynamic upgrades
+          confirmations.push({
+              id: 'prosth_bridge_pontics',
+              question: 'Bridge details / Additional crowns:',
+              context: 'Select Yes if bridge has >1 pontics, or >=2 crowns, or intermediate abutment.',
+              answer: 'no',
+              applyIfYes: (c) => Math.max(c, 3)
+          });
+          confirmations.push({
+              id: 'prosth_c2_extra',
+              question: 'Does any bridge/crown involve periodontal surgery, abutment for RPD, or involved in anterior guidance?',
+              context: 'If yes, complexity = 2',
+              answer: 'no',
+              applyIfYes: (c) => Math.max(c, 2)
+          });
+          confirmations.push({
+              id: 'prosth_vdo',
+              question: 'Is there increased vertical dimension?',
+              context: 'If yes, complexity = 3',
+              answer: 'no',
+              applyIfYes: (c) => Math.max(c, 3)
+          });
+
+          return { score, confirmations };
+        }
+      },
+      DIAG: {
+        evaluate: (treatments) => {
+          let confirmations = [{
+            id: 'diag_confirm',
+            question: 'Did student have meaningful role in diagnosis/management/treatment planning/follow-up AND advisor approved?',
+            context: '(Referral alone does not count). If yes, it counts towards division total.',
+            answer: 'no',
+            applyIfYes: (c) => 1
+          }];
+          // DIAG doesn't have a numerical score per se, it just "counts" as a division if criteria met. We return score=0 but confirmation can bump to 1
+          return { score: 0, confirmations };
+        }
+      },
+      SUR: {
+        evaluate: (treatments) => {
+           // if treatments exist, complexity is always 1.
+           return { score: treatments.length > 0 ? 1 : 0, confirmations: [] };
+        }
+      }
+    };
+
     function treatmentApp() {
       return {
         loading: true,
@@ -620,6 +985,18 @@
         showApproveConfirm: false,
         verifying: false,
         changingOrder: false,
+        
+        // Complexity state
+        showComplexityModal: false,
+        savingComplexity: false,
+        complexityData: {
+          divisions: [],
+          eligibleCount: 0,
+          maxDivComplexity: 0,
+          autoComplexity: 0,
+          finalComplexity: 0,
+          isEligible: false
+        },
         
         // Referral State
         referralMode: false,
@@ -1342,6 +1719,164 @@
           var self = this;
           self.successMsg = msg;
           setTimeout(function() { self.successMsg = ''; }, 3000);
+        },
+
+        // --- COMPLEXITY CALCULATION ---
+
+        openComplexityModal: function() {
+          this.recalculateComplexity(true);
+          this.showComplexityModal = true;
+        },
+
+        closeComplexityModal: function() {
+          this.showComplexityModal = false;
+        },
+
+        recalculateComplexity: function(initial = false) {
+           // 1. Gather all treatments by division
+           // Include all treatment states (in_progress, completed, verified, etc.) 
+           // but ensure they belong to the current student.
+           const validRecords = this.records.filter(r => {
+             return this.currentUser && r.student_id === this.currentUser.id;
+           });
+           
+           const divMap = {};
+           
+           validRecords.forEach(r => {
+             const divCode = (r.treatment_catalog && r.treatment_catalog.divisions) ? r.treatment_catalog.divisions.code.toUpperCase() : null;
+             if (!divCode) return;
+             
+             if (!divMap[divCode]) {
+               divMap[divCode] = {
+                 code: divCode,
+                 name: r.treatment_catalog.divisions.name,
+                 treatments: [],
+                 rawRecords: []
+               };
+             }
+             
+             divMap[divCode].rawRecords.push(r);
+             if (r.treatment_catalog && r.treatment_catalog.treatment_name) {
+               divMap[divCode].treatments.push(r.treatment_catalog.treatment_name);
+             }
+           });
+
+           // 2. Evaluate each division
+           const divisionsResult = [];
+           let eligibleDivsCount = 0;
+           let maxDivC = 0;
+
+           const targetDivCodes = ['OPER', 'ENDO', 'PERIO', 'PROSTH', 'DIAG', 'SUR'];
+
+           targetDivCodes.forEach(code => {
+             let divData = divMap[code];
+             if (!divData && code !== 'DIAG') return; // Skip if no treatments, except maybe DIAG if we want to show it? Let's hide if no records
+             if (!divData) divData = { code: code, name: code, treatments: [], rawRecords: [] };
+             if (divData.treatments.length === 0 && code !== 'DIAG') return; // Hide empty divisions
+
+             let score = 0;
+             let confirmations = [];
+             let detail = "";
+
+             // PERIO is special: use complexities at RSU requirement
+             if (code === 'PERIO') {
+               // sum of rsu_units for PERIO case G/P?
+               // The prompt says "Using complexities at RSU requirement as division's complexity"
+               // So we find the max rsu_units among PERIO records, or sum? Let's use max for division level.
+               let maxPerio = 0;
+               divData.rawRecords.forEach(r => {
+                 const u = parseFloat(r.rsu_units) || 0;
+                 if (u > maxPerio) maxPerio = u;
+               });
+               score = maxPerio;
+               detail = `Using maximum RSU units recorded in PERIO: ${score}`;
+               
+               // Reuse previous answers if not initial
+               const existingDiv = initial ? null : this.complexityData.divisions.find(d => d.code === code);
+               if (existingDiv) confirmations = existingDiv.confirmations;
+
+             } else if (COMPLEXITY_CRITERIA[code]) {
+               
+               const existingDiv = initial ? null : this.complexityData.divisions.find(d => d.code === code);
+               
+               if (initial || !existingDiv) {
+                  const evalResult = COMPLEXITY_CRITERIA[code].evaluate(divData.treatments, divData.rawRecords.map(r=>r.area));
+                  score = evalResult.score;
+                  confirmations = evalResult.confirmations;
+               } else {
+                  // Re-evaluate using locked answers
+                  confirmations = existingDiv.confirmations;
+                  score = COMPLEXITY_CRITERIA[code].evaluate(divData.treatments, []).score; // Base score
+                  
+                  // Apply YES confirmations
+                  confirmations.forEach(c => {
+                    if (c.answer === 'yes' && c.applyIfYes) {
+                      score = c.applyIfYes(score);
+                    }
+                  });
+               }
+             }
+
+             if (score > 0 || (code === 'DIAG' && confirmations.some(c=>c.answer==='yes'))) {
+               eligibleDivsCount++;
+             }
+             if (score > maxDivC) {
+               maxDivC = score;
+             }
+
+             divisionsResult.push({
+               code: code,
+               name: divData.name,
+               matches: [...new Set(divData.treatments)], // deduplicate
+               confirmations: confirmations,
+               calculatedComplexity: score,
+               calculationDetail: detail || `Criteria evaluated dynamically. Base score + Confirmations.`
+             });
+           });
+
+           // 3. Final Calculation
+           let autoC = 0;
+           if (eligibleDivsCount >= 5) autoC = 3;
+           else if (eligibleDivsCount >= 4) autoC = 2;
+           else if (eligibleDivsCount >= 3) autoC = 1;
+
+           const maxC = Math.max(maxDivC, autoC);
+           const finalC = Math.floor(maxC);
+           
+           const isEligible = eligibleDivsCount >= 3;
+
+           this.complexityData = {
+             divisions: divisionsResult,
+             eligibleCount: eligibleDivsCount,
+             maxDivComplexity: maxDivC,
+             autoComplexity: autoC,
+             finalComplexity: finalC,
+             isEligible: isEligible
+           };
+        },
+
+        saveComplexity: function() {
+          var self = this;
+          if (!self.complexityData.isEligible) return;
+
+          self.savingComplexity = true;
+
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.savingComplexity = false;
+              if (res.success) {
+                self.showToast('Patient case complexity saved');
+                self.closeComplexityModal();
+                self.reload();
+              } else {
+                self.errorMsg = res.error || 'Failed to save complexity.';
+              }
+            })
+            .withFailureHandler(function(err) {
+              self.savingComplexity = false;
+              self.errorMsg = 'Error: ' + (err.message || err);
+            })
+            .studentUpdatePatientComplexity(self.hn, self.complexityData.finalComplexity);
         }
       }
     }

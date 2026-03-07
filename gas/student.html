@@ -547,7 +547,7 @@
              <template x-for="p in myPatients" :key="p.hn">
                <div @click="openPatientModal(p)" 
                      class="cursor-pointer rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden"
-                     :class="getComplexityCardClass(p.complexity, false)">
+                     :class="getComplexityCardClass(p.complexity, p.status, false)">
                  <div class="absolute top-0 left-0 w-1 h-full bg-navy"></div>
                  <div class="pl-2 flex justify-between items-start mb-2">
                    <div>
@@ -555,7 +555,7 @@
                      <p class="text-xs text-gray-400 font-mono mt-0.5">HN: <span x-text="p.hn"></span></p>
                    </div>
                    <span class="px-2 py-1 rounded text-[0.65rem] font-bold uppercase tracking-wide border shadow-sm"
-                         :class="getComplexityClass(p.complexity)"
+                         :class="getStatusClass(p.status)"
                          x-text="p.status">
                    </span>
                   </div>
@@ -595,7 +595,7 @@
              <template x-for="p in referredPatients" :key="p.hn">
                <div @click="openPatientModal(p)" 
                      class="cursor-pointer rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow relative overflow-hidden"
-                     :class="getComplexityCardClass(p.complexity, true)">
+                     :class="getComplexityCardClass(p.complexity, p.status, true)">
                  <div class="absolute top-0 left-0 w-1 h-full bg-gold"></div>
                  <div class="pl-2 flex justify-between items-start mb-2">
                    <div>
@@ -603,7 +603,7 @@
                      <p class="text-xs text-gray-400 font-mono mt-0.5">HN: <span x-text="p.hn"></span></p>
                    </div>
                    <span class="px-2 py-1 rounded text-[0.65rem] font-bold uppercase tracking-wide border shadow-sm"
-                         :class="getComplexityClass(p.complexity)"
+                         :class="getStatusClass(p.status)"
                          x-text="p.status">
                    </span>
                  </div>
@@ -1116,6 +1116,15 @@
           return initials.toUpperCase();
         },
 
+        getStatusClass(status) {
+           if (!status) return 'bg-gray-50 text-gray-400 border-gray-100';
+           const s = status.toLowerCase();
+           if (s.includes('completed')) return 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-emerald-100/20';
+           if (s.includes('progress') || s.includes('approved')) return 'bg-blue-50 text-blue-700 border-blue-100 shadow-blue-100/20';
+           if (s.includes('active') || s.includes('plan') || s.includes('chart')) return 'bg-indigo-50 text-indigo-700 border-indigo-100 shadow-indigo-100/20';
+           return 'bg-gray-50 text-gray-400 border-gray-100';
+        },
+
         getComplexityClass(complexity) {
            if (!complexity || String(complexity).trim().toLowerCase() === 'none') {
                return 'bg-gray-100 text-gray-400 border-gray-200';
@@ -1130,7 +1139,8 @@
            return 'bg-gray-100 text-gray-400 border-gray-200';
         },
 
-        getComplexityCardClass(complexity, isReferred = false) {
+        getComplexityCardClass(complexity, status, isReferred = false) {
+           if (status && status.toLowerCase().includes('complete')) return 'bg-emerald-50';
            const defaultBg = isReferred ? 'bg-gray-50' : 'bg-white';
            if (!complexity || String(complexity).trim().toLowerCase() === 'none') return defaultBg;
            const cStr = String(complexity).trim();
@@ -1309,7 +1319,7 @@
          syncStatus() {
             if (!this.editingPatient) return;
             let status = 'Active';
-            if (this.editingPatient.case_completed_at || this.editingPatient.is_completed_case) {
+            if (this.editingPatient.case_completed_at) {
                status = 'Completed Case';
             } else if (this.editingPatient.in_progress_at) {
                status = 'Treatment in Progress';
