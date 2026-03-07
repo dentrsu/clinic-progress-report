@@ -33,9 +33,9 @@
                 radarChart: null,
 
                 get filteredDivisions() {
-                    return this.selectedDivision === 'All'
-                        ? this.divisions
-                        : this.divisions.filter(d => d.name === this.selectedDivision);
+                    if (this.selectedDivision === 'All') return this.divisions;
+                    if (this.selectedDivision === 'AllCompleteCases') return [];
+                    return this.divisions.filter(d => d.name === this.selectedDivision);
                 },
 
                 init() {
@@ -227,6 +227,7 @@
                 <div class="relative">
                     <select x-model="selectedDivision" class="appearance-none bg-gray-50 border border-gray-200 text-gray-700 py-2 pl-4 pr-10 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-navy/20 focus:border-navy transition-colors font-medium text-sm cursor-pointer w-48 sm:w-64">
                         <option value="All">All Divisions</option>
+                        <option value="AllCompleteCases">All Complete Cases</option>
                         <template x-for="div in divisions" :key="div.name">
                             <option :value="div.name" x-text="div.name"></option>
                         </template>
@@ -238,7 +239,7 @@
             </div>
 
             <!-- Radar Chart -->
-            <section x-show="divisions.length > 0 && selectedDivision === 'All'" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <section x-show="selectedDivision === 'All'" class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                     <h2 class="text-lg font-bold text-navy flex items-center gap-2">
                         <span class="w-2 h-6 bg-navy rounded-full"></span>
@@ -257,7 +258,7 @@
             </section>
 
             <!-- All Complete Cases Section -->
-            <section x-show="selectedDivision === 'All' && completeCases.length > 0" class="mt-8">
+            <section x-show="(selectedDivision === 'All' || selectedDivision === 'AllCompleteCases') && completeCases.length > 0" class="mt-8">
                 <div class="mb-6 flex items-center justify-between">
                     <h2 class="text-xl font-bold text-navy flex items-center gap-3">
                         <div class="flex items-center gap-2">
