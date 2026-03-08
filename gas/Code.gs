@@ -2669,9 +2669,13 @@ function getStudentVaultData(targetStudentId) {
   // 1. Fetch all requirements, student records, patients, and student status
   var studentRec = SupabaseProvider.getStudentById(finalStudentId);
   var studentStatusStr = studentRec ? studentRec.status : "Active";
+  var normalizedStatus = (studentStatusStr || "")
+    .toLowerCase()
+    .replace(/\s+/g, "");
+
   var targetCompleteCases = 5;
-  if (studentStatusStr === "Active+1") targetCompleteCases = 6;
-  if (studentStatusStr === "Active+2") targetCompleteCases = 7;
+  if (normalizedStatus === "active+1") targetCompleteCases = 6;
+  if (normalizedStatus === "active+2") targetCompleteCases = 7;
 
   var requirements = SupabaseProvider.listRequirements() || [];
   var caseTypes = SupabaseProvider.listTypeOfCases() || [];
@@ -3292,6 +3296,7 @@ function getStudentVaultData(targetStudentId) {
     caseTypes: caseTypes,
     targetCompleteCases: targetCompleteCases,
     uniqueCompleteCaseTypes: uniqueTypesCount,
+    studentStatus: studentStatusStr,
   };
 }
 
