@@ -1,14 +1,6 @@
--- =========================================================
--- ORACLE REFRESH FUNCTION (RPC)
--- =========================================================
+-- Migration: Update Oracle RPC for duration-based prediction
+-- Date: 2026-03-08
 
--- Helper: month diff
-create or replace function oracle.months_between(a date, b date)
-returns int language sql immutable as $$
-  select (date_part('year', age(b, a))::int * 12) + date_part('month', age(b, a))::int;
-$$;
-
--- Main RPC: recompute student oracle snapshot + explanations + recommendations
 create or replace function oracle.oracle_refresh_student(p_student_id uuid)
 returns json
 language plpgsql
@@ -22,12 +14,15 @@ declare
 
   v_pending int := 0;
   v_inactive_days int := 0;
+  v_stagnant_patients int := 0;
 
   v_verified_4w numeric := 0;
   v_verified_8w numeric := 0;
 
   v_verified_pct numeric := null;
   v_estimated_pct numeric := null;
+  v_req_total numeric := 0;
+  v_ver_total numeric := 0;
 
   v_months_remaining int := null;
   v_forecast_month date := null;
@@ -61,51 +56,57 @@ begin
   from public.treatment_records tr
   where tr.student_id = p_student_id;
 
-  -- 4) Verified velocity: total verified units over last 4/8 weeks 
+  -- 4) Stagnant Patients count
+  select count(*) into v_stagnant_patients
+  from public.patients p
+  where p.student_id_1 = p_student_id
+    and p.is_completed_case = false
+    and p.status not in ('Inactive', 'Discharged', 'Completed Case')
+    and (
+      (p.chart_full_at is null and (v_now::date - p.created_at::date) > 14) OR
+      (p.tp_approved_at is null and p.chart_full_at is not null and (v_now::date - p.chart_full_at::date) > 30)
+    );
+
+  -- 5) Verified velocity: total verified duration over last 4/8 weeks 
   select
-    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '4 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0),
-    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '8 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0)
+    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '4 weeks') then (coalesce(tr.rsu_units, 0) + coalesce(tr.cda_units, 0)) * coalesce(r.est_work_duration, 1.0) else 0 end), 0),
+    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '8 weeks') then (coalesce(tr.rsu_units, 0) + coalesce(tr.cda_units, 0)) * coalesce(r.est_work_duration, 1.0) else 0 end), 0)
   into v_verified_4w, v_verified_8w
   from public.treatment_records tr
+  left join public.requirement_list r on tr.requirement_id = r.requirement_id
   where tr.student_id = p_student_id;
 
-  -- 5) Overall completion pct 
-  -- MVP approach: student verified totals vs required totals (RSU/CDA).
+  -- 6) Overall completion pct (Duration-weighted)
   with req as (
     select
-      coalesce(sum(coalesce(r.minimum_rsu,0)),0) as req_rsu,
-      coalesce(sum(coalesce(r.minimum_cda,0)),0) as req_cda
+      coalesce(sum((coalesce(r.minimum_rsu,0) + coalesce(r.minimum_cda,0)) * coalesce(r.est_work_duration, 1.0)),0) as req_total
     from public.requirement_list r
   ),
   prog as (
     select
-      coalesce(sum(case when tr.status='verified' then coalesce(tr.rsu_units,0) else 0 end),0) as ver_rsu,
-      -- Note: using 'pending verification' properly
-      coalesce(sum(case when tr.status in ('verified','pending verification','completed') then coalesce(tr.rsu_units,0) else 0 end),0) as est_rsu,
-      coalesce(sum(case when tr.status='verified' then coalesce(tr.cda_units,0) else 0 end),0) as ver_cda,
-      coalesce(sum(case when tr.status in ('verified','pending verification','completed') then coalesce(tr.cda_units,0) else 0 end),0) as est_cda
+      coalesce(sum(case when tr.status='verified' then (coalesce(tr.rsu_units,0) + coalesce(tr.cda_units,0)) * coalesce(r.est_work_duration, 1.0) else 0 end),0) as ver_total,
+      coalesce(sum(case when tr.status in ('verified','pending verification','completed') then (coalesce(tr.rsu_units,0) + coalesce(tr.cda_units,0)) * coalesce(r.est_work_duration, 1.0) else 0 end),0) as est_total
     from public.treatment_records tr
+    left join public.requirement_list r on tr.requirement_id = r.requirement_id
     where tr.student_id = p_student_id
   )
   select
-    case when (req.req_rsu + req.req_cda) = 0 then null
-         else (prog.ver_rsu + prog.ver_cda) / (req.req_rsu + req.req_cda) end,
-    case when (req.req_rsu + req.req_cda) = 0 then null
-         else (prog.est_rsu + prog.est_cda) / (req.req_rsu + req.req_cda) end
-  into v_verified_pct, v_estimated_pct
+    case when req.req_total = 0 then null else prog.ver_total / req.req_total end,
+    case when req.req_total = 0 then null else prog.est_total / req.req_total end,
+    req.req_total,
+    prog.ver_total
+  into v_verified_pct, v_estimated_pct, v_req_total, v_ver_total
   from req, prog;
 
-  -- 6) Forecast months remaining
-  -- Use 8w velocity (annualised avg) for stability; fall back to 4w if 8w is zero.
-  -- v_monthly_velocity is declared at the top of the function
+  -- 7) Forecast
   v_monthly_velocity := greatest(v_verified_8w / 2.0, v_verified_4w, 0);
 
-  if v_monthly_velocity > 0 and coalesce(v_verified_pct, 0) < 1 then
-    v_months_remaining := ceil( ( (1 - coalesce(v_verified_pct,0)) * 100 ) / v_monthly_velocity );
+  if v_monthly_velocity > 0 and coalesce(v_req_total, 0) > coalesce(v_ver_total, 0) then
+    v_months_remaining := ceil( (v_req_total - v_ver_total) / v_monthly_velocity );
     v_forecast_month := date_trunc('month', (v_now::date + (v_months_remaining || ' months')::interval))::date;
   end if;
 
-  -- 7) Risk score rules (MVP)
+  -- 8) Risk score rules
   v_risk_score := 0;
 
   -- inactivity penalty
@@ -122,6 +123,11 @@ begin
   if v_deadline is not null then
     if (v_deadline - v_now::date) <= 90 then v_risk_score := v_risk_score + 20; end if;
   end if;
+  
+  -- Milestone Stagnation Penalty
+  if v_stagnant_patients > 0 then
+    v_risk_score := v_risk_score + (v_stagnant_patients * 10);
+  end if;
 
   v_risk_score := least(100, greatest(0, v_risk_score));
 
@@ -132,7 +138,7 @@ begin
   else v_risk_level := 'green';
   end if;
 
-  -- 8) Upsert Snapshot 
+  -- 9) Upsert Snapshot 
   insert into oracle.student_progress_snapshots(
     student_id, cohort_year, snapshot_at,
     risk_level, risk_score,
@@ -163,13 +169,7 @@ begin
     verified_velocity_4w = excluded.verified_velocity_4w,
     verified_velocity_8w = excluded.verified_velocity_8w;
 
-  -- 8.5) Update students table with forecast
-  update public.students
-  set forecast_completion_date = v_forecast_month,
-      forecast_at = v_now
-  where student_id = p_student_id;
-
-  -- 9) Explanations Update
+  -- 10) Explanations Update
   delete from oracle.explanation_factors where student_id = p_student_id;
 
   if v_inactive_days >= 30 then
@@ -187,7 +187,12 @@ begin
     values (p_student_id, v_now, 'LOW_VERIFIED_VELOCITY_8W', 'Low verified completion velocity in last 8 weeks', v_verified_8w, 5, 3);
   end if;
 
-  -- 10) Recommendations Update
+  if v_stagnant_patients > 0 then
+    insert into oracle.explanation_factors(student_id, snapshot_at, factor_code, factor_label, factor_value, severity, display_order)
+    values (p_student_id, v_now, 'PATIENT_STAGNATION', 'Delayed progress on ' || v_stagnant_patients || ' patient(s)', v_stagnant_patients, 3, 4);
+  end if;
+
+  -- 11) Recommendations Update
   delete from oracle.recommendations where student_id = p_student_id;
 
   if v_pending > 0 then
@@ -203,6 +208,20 @@ begin
             'Plan and start at least 1–2 cases this week to restore momentum.',
             'INACTIVE_30D');
   end if;
+  
+  if v_stagnant_patients > 0 then
+    insert into oracle.recommendations(student_id, snapshot_at, priority_rank, recommendation_type, message, reason_code)
+    values (p_student_id, v_now, 3, 'PROGRESS_STAGNANT_PATIENTS',
+            'Review stagnant cases and finalize treatment plans to begin procedures.',
+            'PATIENT_STAGNATION');
+  end if;
+
+  -- 12) Update the students table directly with the forecast date
+  update public.students
+  set
+    forecast_completion_date = v_forecast_month,
+    forecast_at = v_now
+  where student_id = p_student_id;
 
   return json_build_object(
     'student_id', p_student_id,
@@ -215,6 +234,3 @@ begin
 
 end;
 $$;
-
--- Make the RPC callable via REST
-grant execute on function oracle.oracle_refresh_student(uuid) to anon, authenticated;

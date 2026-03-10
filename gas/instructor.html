@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -8,9 +9,9 @@
       theme: {
         extend: {
           colors: {
-            navy:      { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
-            gold:      { DEFAULT: '#C4972F', light: '#D4AD4E' },
-            surface:   '#F8F7F4',
+            navy: { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
+            gold: { DEFAULT: '#C4972F', light: '#D4AD4E' },
+            surface: '#F8F7F4',
             cardwhite: '#FFFFFF',
           },
           animation: {
@@ -43,74 +44,95 @@
       border-right-color: transparent !important;
       animation: spin 1s linear infinite;
     }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <?!= include('styles') ?>
 </head>
-<body class="min-h-screen bg-surface flex flex-col p-4 md:p-8"
-      x-data="instructorApp()"
-      x-init="init()">
-    
+
+<body class="min-h-screen bg-surface flex flex-col p-4 md:p-8" x-data="instructorApp()" x-init="init()">
+
   <!-- Loading state -->
   <div x-show="state === 'loading'" class="flex-grow flex flex-col items-center justify-center animate-fade-in">
     <div class="w-16 h-16 rounded-full bg-white flex items-center justify-center p-1 shadow-lg mb-5 overflow-hidden">
-        <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain" />
+      <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest"
+        class="w-full h-full object-contain" />
     </div>
     <div class="spinner border-4 border-navy/20 border-t-navy w-10 h-10 rounded-full animate-spin mb-4"></div>
     <p class="text-sm text-gray-500 font-medium">Loading Team Leader Portal...</p>
   </div>
 
   <!-- Error state -->
-  <div x-show="state === 'error'" style="display: none;" class="flex-grow flex items-center justify-center animate-fade-in">
+  <div x-show="state === 'error'" style="display: none;"
+    class="flex-grow flex items-center justify-center animate-fade-in">
     <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm">
       <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
       </div>
       <h3 class="text-lg font-bold text-gray-800 mb-2">Access Error</h3>
       <p class="text-sm text-gray-500 mb-6" x-text="errorMessage"></p>
-      <a href="<?= appUrl ?>" class="block w-full py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition">Back to Lobby</a>
+      <a href="<?= appUrl ?>"
+        class="block w-full py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition">Back to
+        Lobby</a>
     </div>
   </div>
 
   <!-- Main Portal -->
   <div x-show="state === 'loaded'" style="display: none;" class="w-full max-w-6xl mx-auto space-y-8 animate-fade-in">
     <!-- Header -->
-    <div class="bg-navy rounded-2xl p-6 md:px-8 md:py-6 text-white flex flex-col md:flex-row justify-between items-center shadow-lg gap-4">
+    <div
+      class="bg-navy rounded-2xl p-6 md:px-8 md:py-6 text-white flex flex-col md:flex-row justify-between items-center shadow-lg gap-4">
       <div class="flex items-center gap-5">
-        <div class="w-14 h-14 rounded-full bg-white flex items-center justify-center border border-white/5 overflow-hidden">
-            <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-0.5" />
+        <div
+          class="w-14 h-14 rounded-full bg-white flex items-center justify-center border border-white/5 overflow-hidden">
+          <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest"
+            class="w-full h-full object-contain p-0.5" />
         </div>
         <div>
           <h1 class="text-2xl font-bold tracking-tight">Team Leader Portal</h1>
           <p class="text-white/70 text-sm mt-0.5">My Team Students</p>
         </div>
       </div>
-      <a href="<?= appUrl ?>" class="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition text-white border border-white/20">
-         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-         Lobby
+      <a href="<?= appUrl ?>"
+        class="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition text-white border border-white/20">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Lobby
       </a>
     </div>
 
     <!-- Students Grid -->
     <div>
-      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 px-1">Active Team (Filtered by Year & Assignments)</h2>
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 px-1">Active Team (Filtered by Year &
+        Assignments)</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         <template x-for="s in students" :key="s.student_id">
-          <div @click="openModal(s)" class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:border-navy/30 hover:shadow-md transition-all cursor-pointer flex flex-col group relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-1 h-full bg-navy opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            
-            <div class="flex items-start gap-4 mb-5">
-               <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-lg uppercase shadow-sm border border-emerald-100 shrink-0">
-                  <span x-text="getInitials(s.name)"></span>
-               </div>
-               <div class="truncate">
-                 <h3 class="font-bold text-gray-800 text-base truncate" x-text="s.name"></h3>
-                 <p class="text-[0.7rem] font-mono text-gray-500 mt-1" x-text="'ID: ' + s.academic_id"></p>
-               </div>
+          <div @click="openModal(s)"
+            class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:border-navy/30 hover:shadow-md transition-all cursor-pointer flex flex-col group relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-navy opacity-0 group-hover:opacity-100 transition-opacity">
             </div>
-            
+
+            <div class="flex items-start gap-4 mb-5">
+              <div
+                class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-lg uppercase shadow-sm border border-emerald-100 shrink-0">
+                <span x-text="getInitials(s.name)"></span>
+              </div>
+              <div class="truncate">
+                <h3 class="font-bold text-gray-800 text-base truncate" x-text="s.name"></h3>
+                <p class="text-[0.7rem] font-mono text-gray-500 mt-1" x-text="'ID: ' + s.academic_id"></p>
+              </div>
+            </div>
+
             <div class="mt-auto space-y-2">
               <div class="flex justify-between items-center text-xs">
                 <span class="text-gray-400 font-medium uppercase tracking-wider">Student Year</span>
@@ -118,81 +140,99 @@
               </div>
               <div class="flex justify-between items-center text-xs">
                 <span class="text-gray-400 font-medium uppercase tracking-wider">Status</span>
-                <span class="capitalize font-medium flex items-center gap-1.5" :class="s.status === 'active' ? 'text-emerald-600' : 'text-gray-500'">
-                   <span class="w-1.5 h-1.5 rounded-full" :class="s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'"></span>
-                   <span x-text="s.status"></span>
+                <span class="capitalize font-medium flex items-center gap-1.5"
+                  :class="s.status === 'active' ? 'text-emerald-600' : 'text-gray-500'">
+                  <span class="w-1.5 h-1.5 rounded-full"
+                    :class="s.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                  <span x-text="s.status"></span>
                 </span>
               </div>
-              
+
               <!-- Oracle Analytics Panel -->
               <template x-if="s.oracle_snapshot">
-                 <div class="pt-3 mt-3 border-t border-gray-100">
-                    <div class="flex justify-between items-center">
-                       <span class="text-[0.65rem] font-bold uppercase tracking-wider text-gray-400">Oracle Score</span>
-                       <span class="font-black text-navy text-sm px-1.5 py-0.5 bg-gray-50 rounded border border-gray-100" x-text="s.oracle_snapshot.progress_score"></span>
-                    </div>
-                    <div class="flex justify-between items-center mt-1.5">
-                       <span class="text-[0.65rem] font-bold px-2 py-0.5 rounded-full"
-                             :class="{
+                <div class="pt-3 mt-3 border-t border-gray-100">
+                  <div class="flex justify-between items-center">
+                    <span class="text-[0.65rem] font-bold uppercase tracking-wider text-gray-400">Oracle Score</span>
+                    <span class="font-black text-navy text-sm px-1.5 py-0.5 bg-gray-50 rounded border border-gray-100"
+                      x-text="s.oracle_snapshot.progress_score"></span>
+                  </div>
+                  <div class="flex justify-between items-center mt-1.5">
+                    <span class="text-[0.65rem] font-bold px-2 py-0.5 rounded-full" :class="{
                                'bg-emerald-50 text-emerald-600 border border-emerald-100': s.oracle_snapshot.risk_level === 'On Track',
                                'bg-amber-50 text-amber-600 border border-amber-100': s.oracle_snapshot.risk_level === 'At Risk',
                                'bg-orange-50 text-orange-600 border border-orange-100': s.oracle_snapshot.risk_level === 'High Risk',
                                'bg-red-50 text-red-600 border border-red-100': s.oracle_snapshot.risk_level === 'Critical'
                              }" x-text="s.oracle_snapshot.risk_level"></span>
-                    </div>
-                 </div>
+                  </div>
+                </div>
               </template>
             </div>
           </div>
         </template>
-        
-        <div x-show="students.length === 0" class="col-span-full py-16 text-center bg-white rounded-xl border border-dashed border-gray-300">
-           <div class="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-3">
-              <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-           </div>
-           <p class="text-gray-500 font-medium">No students found matching your team criteria.</p>
-           <p class="text-xs text-gray-400 mt-1">(5th years match Team Leader 1, other years match Team Leader 2)</p>
+
+        <div x-show="students.length === 0"
+          class="col-span-full py-16 text-center bg-white rounded-xl border border-dashed border-gray-300">
+          <div class="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </div>
+          <p class="text-gray-500 font-medium">No students found matching your team criteria.</p>
+          <p class="text-xs text-gray-400 mt-1">(5th years match Team Leader 1, other years match Team Leader 2)</p>
         </div>
       </div>
     </div>
 
     <!-- Verify Hash Section -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <button @click="hashOpen = !hashOpen" class="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition">
+      <button @click="hashOpen = !hashOpen"
+        class="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition">
         <div class="flex items-center gap-3">
           <div class="w-8 h-8 rounded-full bg-navy/10 flex items-center justify-center">
-            <svg class="w-4 h-4 text-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <svg class="w-4 h-4 text-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
           </div>
           <span class="text-sm font-semibold text-navy">Verify Treatment Hash</span>
         </div>
-        <svg class="w-4 h-4 text-gray-400 transition-transform" :class="hashOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        <svg class="w-4 h-4 text-gray-400 transition-transform" :class="hashOpen ? 'rotate-180' : ''" fill="none"
+          stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
       <div x-show="hashOpen" x-collapse class="border-t border-gray-100 px-5 py-5">
-        <p class="text-xs text-gray-500 mb-4">Paste the values from a student's verification email to validate the hash.</p>
+        <p class="text-xs text-gray-500 mb-4">Paste the values from a student's verification email to validate the hash.
+        </p>
         <div class="space-y-3 max-w-lg">
           <div>
             <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Verified At (ISO timestamp)</label>
             <input type="text" x-model="hashForm.verifiedAt" placeholder="e.g. 2026-03-01T02:00:00.000Z"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Record ID (UUID)</label>
             <input type="text" x-model="hashForm.recordId" placeholder="e.g. a1b2c3d4-e5f6-..."
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Hash (from student email)</label>
             <input type="text" x-model="hashForm.hash" placeholder="SHA-256 hex string"
-                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy focus:border-transparent">
           </div>
           <button @click="verifyHash()" :disabled="hashVerifying"
-                  class="bg-navy hover:bg-navy-light text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4"/></svg>
+            class="bg-navy hover:bg-navy-light text-white px-5 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4" />
+            </svg>
             <span x-text="hashVerifying ? 'Verifying...' : 'Verify Hash'"></span>
           </button>
         </div>
-        <div x-show="hashResult !== null" class="mt-4 p-3 rounded-lg border max-w-lg" :class="hashResult?.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'">
-          <div class="flex items-center gap-2 font-semibold text-sm" :class="hashResult?.valid ? 'text-emerald-700' : 'text-red-700'">
+        <div x-show="hashResult !== null" class="mt-4 p-3 rounded-lg border max-w-lg"
+          :class="hashResult?.valid ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'">
+          <div class="flex items-center gap-2 font-semibold text-sm"
+            :class="hashResult?.valid ? 'text-emerald-700' : 'text-red-700'">
             <span x-text="hashResult?.valid ? '✅ Hash Valid — Verified' : '❌ Hash Mismatch — Invalid'"></span>
           </div>
           <div x-show="!hashResult?.valid" class="mt-2 text-xs text-gray-600">
@@ -206,185 +246,258 @@
 
   <!-- Student Profile Modal -->
   <div x-show="modalOpen" style="display: none;"
-       class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-[5vh] bg-black/60 backdrop-blur-sm"
-       x-transition.opacity>
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm sm:w-[80vw] sm:max-w-none overflow-hidden animate-scale-in"
-         @click.outside="modalOpen = false">
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-[5vh] bg-black/60 backdrop-blur-sm"
+    x-transition.opacity>
+    <div
+      class="bg-white rounded-2xl shadow-2xl w-full max-w-sm sm:w-[80vw] sm:max-w-none overflow-hidden animate-scale-in"
+      @click.outside="modalOpen = false">
       <template x-if="selectedStudent">
         <div class="flex flex-col max-h-[90vh] sm:h-[90vh]">
-           <!-- Modal Header (Navy block) -->
-           <div class="bg-navy px-6 py-6 relative text-center shrink-0">
-             <button @click="modalOpen = false" class="absolute top-4 right-4 text-white/50 hover:text-white transition">
-               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-             </button>
-             
-             <!-- Avatar -->
-             <div class="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white mx-auto mb-3 flex items-center justify-center text-3xl font-bold uppercase shadow-lg border-2 border-white/20">
-                <span x-text="getInitials(selectedStudent.name)"></span>
-             </div>
-             
-             <h2 class="text-xl font-bold text-white tracking-tight leading-tight" x-text="selectedStudent.name"></h2>
-             <p class="text-sm font-mono text-white/70 mt-1" x-text="selectedStudent.email"></p>
-             
-             <div class="mt-4 flex justify-center">
-                <span class="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white border border-white/20 flex items-center gap-1.5 shadow-sm">
-                   Student Year <span class="bg-white text-navy px-1.5 py-0.5 rounded text-[0.6rem] ml-0.5" x-text="selectedStudent.calculated_year"></span>
-                </span>
-             </div>
-           </div>
-           
-           <!-- Modal Body — two-column on desktop, single column on mobile -->
-           <div class="flex-1 overflow-y-auto sm:overflow-hidden sm:flex sm:min-h-0">
+          <!-- Modal Header (Navy block) -->
+          <div class="bg-navy px-6 py-6 relative text-center shrink-0">
+            <button @click="modalOpen = false" class="absolute top-4 right-4 text-white/50 hover:text-white transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
 
-             <!-- Left column: student details + vault link -->
-             <div class="sm:w-2/5 sm:shrink-0 sm:border-r sm:border-gray-100 sm:overflow-y-auto">
-               <div class="p-6 space-y-4">
+            <!-- Avatar -->
+            <div
+              class="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white mx-auto mb-3 flex items-center justify-center text-3xl font-bold uppercase shadow-lg border-2 border-white/20">
+              <span x-text="getInitials(selectedStudent.name)"></span>
+            </div>
 
-                 <!-- Toggle (mobile only) -->
-                 <button @click="showStudentDetail = !showStudentDetail"
-                         class="sm:hidden text-xs text-blue-500 hover:underline flex items-center gap-1">
-                   <svg class="w-3 h-3 transition-transform" :class="showStudentDetail ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                   <span x-text="showStudentDetail ? 'Hide details' : 'Show details'"></span>
-                 </button>
+            <h2 class="text-xl font-bold text-white tracking-tight leading-tight" x-text="selectedStudent.name"></h2>
+            <p class="text-sm font-mono text-white/70 mt-1" x-text="selectedStudent.email"></p>
 
-                 <!-- Detail rows -->
-                 <div :class="showStudentDetail ? '' : 'hidden sm:block'" class="space-y-4">
-                   <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
-                     <span class="text-gray-500 font-medium">ID</span>
-                     <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.academic_id"></span>
-                   </div>
-                   <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
-                     <span class="text-gray-500 font-medium">Floor / Unit</span>
-                     <span class="font-medium text-gray-800">
-                       <span x-text="selectedStudent.floor_label"></span> / <span x-text="selectedStudent.unit_id"></span>
-                     </span>
-                   </div>
-                   <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                     <div class="flex flex-col gap-1 text-xs mb-3">
-                       <span class="text-gray-400 uppercase tracking-wider font-semibold">Team Leader 1</span>
-                       <span class="font-medium text-gray-800" x-text="selectedStudent.team_leader_1_name"></span>
-                     </div>
-                     <div class="flex flex-col gap-1 text-xs">
-                       <span class="text-gray-400 uppercase tracking-wider font-semibold">Team Leader 2</span>
-                       <span class="font-medium text-gray-800" x-text="selectedStudent.team_leader_2_name"></span>
-                     </div>
-                   </div>
-                 </div>
+            <div class="mt-4 flex justify-center">
+              <span
+                class="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white border border-white/20 flex items-center gap-1.5 shadow-sm">
+                Student Year <span class="bg-white text-navy px-1.5 py-0.5 rounded text-[0.6rem] ml-0.5"
+                  x-text="selectedStudent.calculated_year"></span>
+              </span>
+            </div>
+          </div>
 
-                 <!-- Vault link — always visible -->
-                 <a :href="'<?= appUrl ?>?page=vault&student_id=' + selectedStudent.student_id" target="_blank"
-                    class="w-full flex justify-center items-center gap-2 py-2 bg-navy text-white font-medium rounded-lg hover:bg-navy-light transition shadow-sm text-sm">
-                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                   Student's Requirement Vault
-                 </a>
+          <!-- Modal Body — two-column on desktop, single column on mobile -->
+          <div class="flex-1 overflow-y-auto sm:overflow-hidden sm:flex sm:min-h-0">
 
-               </div>
-             </div>
+            <!-- Left column: student details + vault link -->
+            <div class="sm:w-2/5 sm:shrink-0 sm:border-r sm:border-gray-100 sm:overflow-y-auto">
+              <div class="p-6 space-y-4">
 
-             <!-- Right column: patients -->
-             <div class="sm:w-3/5 sm:overflow-y-auto border-t sm:border-t-0 border-gray-100">
-               <div class="p-6 space-y-4">
+                <!-- Toggle (mobile only) -->
+                <button @click="showStudentDetail = !showStudentDetail"
+                  class="sm:hidden text-xs text-blue-500 hover:underline flex items-center gap-1">
+                  <svg class="w-3 h-3 transition-transform" :class="showStudentDetail ? 'rotate-90' : ''" fill="none"
+                    stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span x-text="showStudentDetail ? 'Hide details' : 'Show details'"></span>
+                </button>
 
-                 <div x-show="loadingPatients" class="py-4 text-center">
-                   <div class="spinner border-2 border-navy/20 border-t-navy w-5 h-5 rounded-full mx-auto animate-spin mb-2"></div>
-                   <span class="text-xs text-gray-400">Loading patients...</span>
-                 </div>
+                <!-- Detail rows -->
+                <div :class="showStudentDetail ? '' : 'hidden sm:block'" class="space-y-4">
+                  <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 font-medium">ID</span>
+                    <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.academic_id"></span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 font-medium">Floor / Unit</span>
+                    <span class="font-medium text-gray-800">
+                      <span x-text="selectedStudent.floor_label"></span> / <span
+                        x-text="selectedStudent.unit_id"></span>
+                    </span>
+                  </div>
+                  <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <div class="flex flex-col gap-1 text-xs mb-3">
+                      <span class="text-gray-400 uppercase tracking-wider font-semibold">Team Leader 1</span>
+                      <span class="font-medium text-gray-800" x-text="selectedStudent.team_leader_1_name"></span>
+                    </div>
+                    <div class="flex flex-col gap-1 text-xs">
+                      <span class="text-gray-400 uppercase tracking-wider font-semibold">Team Leader 2</span>
+                      <span class="font-medium text-gray-800" x-text="selectedStudent.team_leader_2_name"></span>
+                    </div>
+                  </div>
+                </div>
 
-                 <div x-show="!loadingPatients && studentPatients.length === 0" class="py-3 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                   <span class="text-xs text-gray-400 italic">No assigned patients</span>
-                 </div>
+                <!-- Vault link — always visible -->
+                <a :href="'<?= appUrl ?>?page=vault&student_id=' + selectedStudent.student_id" target="_blank"
+                  class="w-full flex justify-center items-center gap-2 py-2 bg-navy text-white font-medium rounded-lg hover:bg-navy-light transition shadow-sm text-sm mb-4">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                    </path>
+                  </svg>
+                  Requirement Vault
+                </a>
 
-                 <!-- Patients of Student (student_id_1) -->
-                 <div x-show="!loadingPatients && ownPatients().length > 0">
-                   <div class="flex items-center justify-between mb-2">
-                     <div class="flex items-center gap-2">
-                       <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Patients of Student</h3>
-                       <span class="text-xs font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full" x-text="ownPatients().length"></span>
-                     </div>
-                     <div class="flex items-center gap-2 text-[0.6rem] font-medium uppercase tracking-wide hidden sm:flex">
-                        <span class="text-gray-400">Complexity:</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> 1</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span> 2</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> ≥2</span>
-                     </div>
-                   </div>
-                   <div class="grid grid-cols-1 gap-3 sm:max-h-none max-h-48 overflow-y-auto pr-1">
-                     <template x-for="p in ownPatients()" :key="p.hn">
-                       <div class="rounded-xl shadow-sm border border-gray-200 p-3 transition-all hover:shadow-md relative overflow-hidden group"
-                             :class="getComplexityCardClass(p.complexity, false)">
-                          <div class="absolute top-0 left-0 w-1 h-full bg-navy opacity-50"></div>
-                         <div class="flex justify-between items-start mb-2">
-                           <div>
-                             <div class="font-bold text-navy text-sm" x-text="p.name"></div>
-                             <div class="text-[0.65rem] font-mono text-gray-500 mt-0.5">HN: <span x-text="p.hn"></span></div>
-                           </div>
-                           <span class="px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide border" :class="getComplexityClass(p.complexity)" x-text="p.status"></span>
-                         </div>
-                         <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
-                           <span class="font-medium text-gray-400">Type:</span> <span x-text="p.type_of_case || '-'"></span>
-                         </div>
-                         <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(p.hn)" target="_blank"
-                            class="w-full flex justify-center items-center gap-1.5 py-1.5 bg-gray-50 text-navy font-semibold rounded-lg hover:bg-gray-100 transition border border-gray-200 text-xs text-center">
-                           View Treatment Plan
-                         </a>
-                       </div>
-                     </template>
-                   </div>
-                 </div>
+                <!-- Oracle Forecast -->
+                <div class="bg-gray-50 rounded-lg p-2 border border-gray-200 shadow-inner">
+                  <button @click="showOracleForecast = !showOracleForecast"
+                    class="w-full flex justify-between items-center px-2 py-1.5 hover:bg-gray-100 rounded transition text-left">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Oracle Forecast</span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="showOracleForecast ? 'rotate-180' : ''" fill="none"
+                      stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <div x-show="showOracleForecast" x-collapse class="space-y-3 px-2 pt-3 pb-2 mt-1 border-t border-gray-200">
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600 mb-1">วันสิ้นสุดการปฏิบัติงานคลินิก (Clinical End Date):</label>
+                      <input type="date" x-model="clinicalEndDate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-800">
+                    </div>
+                    <div class="flex justify-between items-center text-sm border-b border-gray-200 pb-2">
+                      <span class="text-gray-500 font-medium text-xs">Remaining Date:</span>
+                      <span class="font-bold text-navy" x-text="getRemainingDate(clinicalEndDate)"></span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm border-b border-gray-200 pb-2 pt-1">
+                      <span class="text-gray-500 font-medium text-xs">Forecast Completion:</span>
+                      <span class="font-bold text-gray-800" x-text="formatDate(selectedStudent.forecast_completion_date)"></span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm border-b border-gray-200 pb-2 pt-1">
+                      <span class="text-gray-500 font-medium text-xs">Est. Requiring Date:</span>
+                      <span class="font-bold" :class="getForecastDiffClass(selectedStudent.forecast_completion_date)" x-text="getForecastDiff(selectedStudent.forecast_completion_date)"></span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm pt-1">
+                      <span class="text-gray-500 font-medium text-[0.65rem]">Last Calculated:</span>
+                      <span class="text-[0.65rem] text-gray-600" x-text="formatDate(selectedStudent.forecast_at) + ' ' + formatTime(selectedStudent.forecast_at)"></span>
+                    </div>
+                  </div>
+                </div>
 
-                 <!-- Referral Patients (student_id_2/3/4/5) -->
-                 <div x-show="!loadingPatients && referralPatients().length > 0">
-                   <div class="flex items-center justify-between mb-2">
-                     <div class="flex items-center gap-2">
-                       <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Referral Patients</h3>
-                       <span class="text-xs font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full" x-text="referralPatients().length"></span>
-                     </div>
-                     <div class="flex items-center gap-2 text-[0.6rem] font-medium uppercase tracking-wide hidden sm:flex">
-                        <span class="text-gray-400">Complexity:</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> 1</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span> 2</span>
-                        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span> ≥2</span>
-                     </div>
-                   </div>
-                   <div class="space-y-3 sm:max-h-none max-h-48 overflow-y-auto pr-1">
-                     <template x-for="p in referralPatients()" :key="p.hn">
-                       <div class="rounded-xl shadow-sm border border-gray-200 p-3 transition-all hover:shadow-md relative overflow-hidden group"
-                             :class="getComplexityCardClass(p.complexity, true)">
-                          <div class="absolute top-0 left-0 w-1 h-full bg-gold opacity-50"></div>
-                         <div class="flex justify-between items-start mb-2">
-                           <div>
-                             <div class="font-bold text-navy text-sm" x-text="p.name"></div>
-                             <div class="text-[0.65rem] font-mono text-gray-500 mt-0.5">HN: <span x-text="p.hn"></span></div>
-                           </div>
-                           <span class="px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide border shadow-sm" :class="getComplexityClass(p.complexity)" x-text="p.status"></span>
-                         </div>
-                         <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
-                           <span class="font-medium text-gray-400">Type:</span> <span x-text="p.type_of_case || '-'"></span>
-                         </div>
-                         <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(p.hn)" target="_blank"
-                            class="w-full flex justify-center items-center gap-1.5 py-1.5 bg-gray-50 text-navy font-semibold rounded-lg hover:bg-gray-100 transition border border-gray-200 text-xs text-center">
-                           View Treatment Plan
-                         </a>
-                       </div>
-                     </template>
-                   </div>
-                 </div>
+              </div>
+            </div>
 
-               </div>
-             </div>
+            <!-- Right column: patients -->
+            <div class="sm:w-3/5 sm:overflow-y-auto border-t sm:border-t-0 border-gray-100">
+              <div class="p-6 space-y-4">
 
-           </div><!-- /body -->
-           
-           <!-- Modal Footer -->
-           <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 shrink-0">
-              <button @click="modalOpen = false" class="w-full py-2 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition shadow-sm text-sm">Close</button>
-           </div>
+                <div x-show="loadingPatients" class="py-4 text-center">
+                  <div
+                    class="spinner border-2 border-navy/20 border-t-navy w-5 h-5 rounded-full mx-auto animate-spin mb-2">
+                  </div>
+                  <span class="text-xs text-gray-400">Loading patients...</span>
+                </div>
+
+                <div x-show="!loadingPatients && studentPatients.length === 0"
+                  class="py-3 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                  <span class="text-xs text-gray-400 italic">No assigned patients</span>
+                </div>
+
+                <!-- Patients of Student (student_id_1) -->
+                <div x-show="!loadingPatients && ownPatients().length > 0">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Patients of Student</h3>
+                      <span class="text-xs font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full"
+                        x-text="ownPatients().length"></span>
+                    </div>
+                    <div
+                      class="flex items-center gap-2 text-[0.6rem] font-medium uppercase tracking-wide hidden sm:flex">
+                      <span class="text-gray-400">Complexity:</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        1</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                        2</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        ≥2</span>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-1 gap-3 sm:max-h-none max-h-48 overflow-y-auto pr-1">
+                    <template x-for="p in ownPatients()" :key="p.hn">
+                      <div
+                        class="rounded-xl shadow-sm border border-gray-200 p-3 transition-all hover:shadow-md relative overflow-hidden group"
+                        :class="getComplexityCardClass(p.complexity, false)">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-navy opacity-50"></div>
+                        <div class="flex justify-between items-start mb-2">
+                          <div>
+                            <div class="font-bold text-navy text-sm" x-text="p.name"></div>
+                            <div class="text-[0.65rem] font-mono text-gray-500 mt-0.5">HN: <span x-text="p.hn"></span>
+                            </div>
+                          </div>
+                          <span class="px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide border"
+                            :class="getComplexityClass(p.complexity)" x-text="p.status"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                          <span class="font-medium text-gray-400">Type:</span> <span
+                            x-text="p.type_of_case || '-'"></span>
+                        </div>
+                        <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(p.hn)" target="_blank"
+                          class="w-full flex justify-center items-center gap-1.5 py-1.5 bg-gray-50 text-navy font-semibold rounded-lg hover:bg-gray-100 transition border border-gray-200 text-xs text-center">
+                          View Treatment Plan
+                        </a>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Referral Patients (student_id_2/3/4/5) -->
+                <div x-show="!loadingPatients && referralPatients().length > 0">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Referral Patients</h3>
+                      <span class="text-xs font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full"
+                        x-text="referralPatients().length"></span>
+                    </div>
+                    <div
+                      class="flex items-center gap-2 text-[0.6rem] font-medium uppercase tracking-wide hidden sm:flex">
+                      <span class="text-gray-400">Complexity:</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        1</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                        2</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        ≥2</span>
+                    </div>
+                  </div>
+                  <div class="space-y-3 sm:max-h-none max-h-48 overflow-y-auto pr-1">
+                    <template x-for="p in referralPatients()" :key="p.hn">
+                      <div
+                        class="rounded-xl shadow-sm border border-gray-200 p-3 transition-all hover:shadow-md relative overflow-hidden group"
+                        :class="getComplexityCardClass(p.complexity, true)">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-gold opacity-50"></div>
+                        <div class="flex justify-between items-start mb-2">
+                          <div>
+                            <div class="font-bold text-navy text-sm" x-text="p.name"></div>
+                            <div class="text-[0.65rem] font-mono text-gray-500 mt-0.5">HN: <span x-text="p.hn"></span>
+                            </div>
+                          </div>
+                          <span
+                            class="px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide border shadow-sm"
+                            :class="getComplexityClass(p.complexity)" x-text="p.status"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                          <span class="font-medium text-gray-400">Type:</span> <span
+                            x-text="p.type_of_case || '-'"></span>
+                        </div>
+                        <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(p.hn)" target="_blank"
+                          class="w-full flex justify-center items-center gap-1.5 py-1.5 bg-gray-50 text-navy font-semibold rounded-lg hover:bg-gray-100 transition border border-gray-200 text-xs text-center">
+                          View Treatment Plan
+                        </a>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div><!-- /body -->
+
+          <!-- Modal Footer -->
+          <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 shrink-0">
+            <button @click="modalOpen = false"
+              class="w-full py-2 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition shadow-sm text-sm">Close</button>
+          </div>
         </div>
       </template>
     </div>
 
     <!-- Tailwind JIT Safelist (Hidden) -->
-    <div class="hidden bg-gray-50 text-gray-500 border-gray-100 bg-emerald-50 text-emerald-600 border-emerald-100 bg-blue-50 text-blue-600 border-blue-100 bg-amber-50 text-amber-600 border-amber-100"></div>
+    <div
+      class="hidden bg-gray-50 text-gray-500 border-gray-100 bg-emerald-50 text-emerald-600 border-emerald-100 bg-blue-50 text-blue-600 border-blue-100 bg-amber-50 text-amber-600 border-amber-100">
+    </div>
 
   </div>
 
@@ -399,11 +512,13 @@
         studentPatients: [],
         loadingPatients: false,
         showStudentDetail: false,
+        showOracleForecast: false,
+        clinicalEndDate: '',
         hashOpen: false,
         hashForm: { verifiedAt: '', recordId: '', hash: '' },
         hashVerifying: false,
         hashResult: null,
-        
+
         init() {
           google.script.run
             .withSuccessHandler(res => {
@@ -416,12 +531,12 @@
             })
             .instructorGetOracleTeamRisk();
         },
-        
+
         getInitials(name) {
           if (!name) return '?';
           var parts = name.trim().split(/\s+/);
           if (parts.length === 0) return '?';
-          
+
           var firstPart = '';
           var lastPart = '';
           var firstWord = parts[0];
@@ -430,9 +545,9 @@
             var dotParts = firstWord.split('.');
             var afterLastDot = dotParts[dotParts.length - 1];
             if (afterLastDot.length > 0) {
-               firstPart = afterLastDot;
+              firstPart = afterLastDot;
             } else {
-               firstPart = parts.length > 1 ? parts[1] : '';
+              firstPart = parts.length > 1 ? parts[1] : '';
             }
           } else {
             var knownTitles = ['นาย', 'นาง', 'นางสาว', 'นพ', 'ทพ', 'ดร', 'ทญ'];
@@ -442,7 +557,7 @@
               firstPart = firstWord;
             }
           }
-          
+
           lastPart = parts.length > 1 ? parts[parts.length - 1] : '';
 
           function getConsonant(str) {
@@ -458,31 +573,31 @@
           if (!d) return '-';
           return new Date(d).toLocaleDateString('th-TH');
         },
-        
+
         getComplexityClass(complexity) {
-           if (!complexity || String(complexity).trim().toLowerCase() === 'none') {
-               return 'bg-gray-100 text-gray-400 border-gray-200';
-           }
-           const cStr = String(complexity).trim();
-           if (cStr === '1') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-           if (cStr === '2') return 'bg-blue-100 text-blue-700 border-blue-200';
-           if (cStr === '>=2' || cStr === '>2' || parseInt(cStr) >= 2) {
-               return 'bg-amber-100 text-amber-700 border-amber-200';
-           }
-           
-           return 'bg-gray-100 text-gray-400 border-gray-200';
+          if (!complexity || String(complexity).trim().toLowerCase() === 'none') {
+            return 'bg-gray-100 text-gray-400 border-gray-200';
+          }
+          const cStr = String(complexity).trim();
+          if (cStr === '1') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+          if (cStr === '2') return 'bg-blue-100 text-blue-700 border-blue-200';
+          if (cStr === '>=2' || cStr === '>2' || parseInt(cStr) >= 2) {
+            return 'bg-amber-100 text-amber-700 border-amber-200';
+          }
+
+          return 'bg-gray-100 text-gray-400 border-gray-200';
         },
 
         getComplexityCardClass(complexity, isReferred = false) {
-           const defaultBg = 'bg-white';
-           if (!complexity || String(complexity).trim().toLowerCase() === 'none') return defaultBg;
-           const cStr = String(complexity).trim();
-           if (cStr === '1') return 'bg-emerald-50';
-           if (cStr === '2') return 'bg-blue-50';
-           if (cStr === '>=2' || cStr === '>2' || parseInt(cStr) >= 2) return 'bg-amber-50';
-           return defaultBg;
+          const defaultBg = 'bg-white';
+          if (!complexity || String(complexity).trim().toLowerCase() === 'none') return defaultBg;
+          const cStr = String(complexity).trim();
+          if (cStr === '1') return 'bg-emerald-50';
+          if (cStr === '2') return 'bg-blue-50';
+          if (cStr === '>=2' || cStr === '>2' || parseInt(cStr) >= 2) return 'bg-amber-50';
+          return defaultBg;
         },
-        
+
         ownPatients() {
           if (!this.selectedStudent) return [];
           return this.studentPatients.filter(p => p.student_id_1 === this.selectedStudent.student_id);
@@ -498,15 +613,31 @@
           this.studentPatients = [];
           this.loadingPatients = true;
           this.modalOpen = true;
+          this.showOracleForecast = false;
+          
+          // Default clinical end date: last working day (Friday) of the 2nd week of May, 
+          // 2 years from first_clinic_year.
+          var baseYear = student.first_clinic_year ? parseInt(student.first_clinic_year) + 2 : new Date().getFullYear() + 1;
+          var mayFirst = new Date(baseYear, 4, 1); // Month is 0-indexed (4 = May)
+          // Find first Friday (Friday = 5)
+          var firstFridayOffset = (5 - mayFirst.getDay() + 7) % 7;
+          var secondFridayDate = 1 + firstFridayOffset + 7;
+          var defaultEndDate = new Date(baseYear, 4, secondFridayDate);
+          
+          // Format as local YYYY-MM-DD to avoid timezone shift
+          var yyyy = defaultEndDate.getFullYear();
+          var mm = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
+          var dd = String(defaultEndDate.getDate()).padStart(2, '0');
+          this.clinicalEndDate = yyyy + '-' + mm + '-' + dd;
 
           google.script.run
             .withSuccessHandler(res => {
-               this.studentPatients = res || [];
-               this.loadingPatients = false;
+              this.studentPatients = res || [];
+              this.loadingPatients = false;
             })
             .withFailureHandler(err => {
-               console.error(err);
-               this.loadingPatients = false;
+              console.error(err);
+              this.loadingPatients = false;
             })
             .getStudentPatients(student.student_id);
         },
@@ -524,9 +655,51 @@
               this.hashResult = { valid: false, computed: 'Error: ' + err.message };
             })
             .adminVerifyHash(this.hashForm.verifiedAt.trim(), this.hashForm.recordId.trim(), this.hashForm.hash.trim());
+        },
+
+        getRemainingDate(endDateString) {
+          if (!endDateString) return '-';
+          var end = new Date(endDateString);
+          var now = new Date();
+          // Reset time to compare just dates
+          end.setHours(0,0,0,0);
+          now.setHours(0,0,0,0);
+          var diffTime = end - now;
+          var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays < 0) return Math.abs(diffDays) + ' days overdue';
+          return diffDays + ' days left';
+        },
+
+        getForecastDiff(forecastDateString) {
+          if (!forecastDateString) return '-';
+          var forecast = new Date(forecastDateString);
+          var now = new Date();
+          forecast.setHours(0,0,0,0);
+          now.setHours(0,0,0,0);
+          var diffTime = forecast - now;
+          var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          var diffMonths = Math.round(diffDays / 30.44);
+          if (diffDays < 0) return Math.abs(diffDays) + ' days ago';
+          if (diffMonths >= 1) return '~' + diffMonths + ' months';
+          return diffDays + ' days';
+        },
+
+        getForecastDiffClass(forecastDateString) {
+           if (!forecastDateString) return 'text-gray-500';
+           var forecast = new Date(forecastDateString);
+           if (!this.clinicalEndDate) return 'text-navy';
+           var end = new Date(this.clinicalEndDate);
+           if (forecast > end) return 'text-red-500'; // Forecast is past the expected end date
+           return 'text-emerald-600'; // Forecast is within the expected end date
+        },
+
+        formatTime(d) {
+          if (!d) return '';
+          return new Date(d).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
         }
       }
     }
   </script>
 </body>
+
 </html>

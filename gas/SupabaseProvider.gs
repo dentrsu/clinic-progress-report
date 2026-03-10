@@ -1103,12 +1103,9 @@ var SupabaseProvider = (function () {
 
       return this.createStudent(payload);
     },
-    /**
-     * List all students with user details.
-     */
     listStudents: function () {
       return _getCached(
-        "/rest/v1/students?select=*,users(name,email),floors(label)",
+        "/rest/v1/students?select=*,users(name,email),floors(label),forecast_completion_date,forecast_at",
         600,
       );
     },
@@ -1250,7 +1247,9 @@ var SupabaseProvider = (function () {
      * List all students in the system.
      */
     listStudents: function () {
-      return _get("/rest/v1/students?select=*");
+      return _get(
+        "/rest/v1/students?select=*,forecast_completion_date,forecast_at",
+      );
     },
 
     /**

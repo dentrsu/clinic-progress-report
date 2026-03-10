@@ -837,6 +837,7 @@
               <th class="px-6 py-4">Min CDA (Unit)</th>
               <th class="px-6 py-4 text-center">Default RSU</th>
               <th class="px-6 py-4 text-center">Default CDA</th>
+              <th class="px-6 py-4 text-center">Est. Duration</th>
               <th class="px-6 py-4 text-center">Pt. Tx</th>
               <th class="px-6 py-4 text-center">Non-MC</th>
               <th class="px-6 py-4 text-center">Selectable</th>
@@ -869,6 +870,9 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-center">
                   <span class="text-sm text-gray-700" x-text="req.default_cda != null ? req.default_cda : '—'"></span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                  <span class="text-sm text-gray-700" x-text="req.est_work_duration != null ? req.est_work_duration : '—'"></span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-center">
                   <span x-show="req.is_patient_treatment" class="text-emerald-500">
@@ -1544,6 +1548,14 @@
             <input type="number" x-model="reqForm.default_cda" placeholder="—" min="0" step="0.01"
                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
           </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
+              Est. Work Duration
+              <span class="normal-case text-gray-400 font-normal ml-1">(hours per unit, used for Oracle predictions)</span>
+            </label>
+            <input type="number" x-model="reqForm.est_work_duration" placeholder="1.0" min="0.1" step="0.1"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-navy">
+          </div>
           <div class="col-span-2 pt-2 flex flex-col space-y-2">
             <label class="flex items-center space-x-2 cursor-pointer">
               <input type="checkbox" x-model="reqForm.is_patient_treatment" class="rounded text-navy focus:ring-navy w-4 h-4 text-navy">
@@ -1940,6 +1952,7 @@
           cda_unit: '',
           default_rsu: '',
           default_cda: '',
+          est_work_duration: '',
           is_patient_treatment: true
         },
         // Case Type Form
@@ -2627,9 +2640,9 @@
           } else if (this.activeTab === 'requirements') {
             // Requirements
             if (mode === 'create') {
-              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', default_rsu: '', default_cda: '', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '', display_order: 0 };
+              this.reqForm = { requirement_id: null, division_id: '', requirement_type: '', cda_requirement_type: '', minimum_rsu: '', minimum_cda: '', rsu_unit: 'Case', cda_unit: 'Case', default_rsu: '', default_cda: '', est_work_duration: '', is_patient_treatment: true, non_mc_pateint_req: true, is_selectable: true, is_exam: false, aggregation_config: '', display_order: 0 };
             } else {
-              this.reqForm = { ...item, cda_requirement_type: item.cda_requirement_type || '', default_rsu: item.default_rsu != null ? item.default_rsu : '', default_cda: item.default_cda != null ? item.default_cda : '', is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false, is_selectable: item.is_selectable !== false, is_exam: item.is_exam === true, aggregation_config: item.aggregation_config ? JSON.stringify(item.aggregation_config, null, 2) : '' };
+              this.reqForm = { ...item, cda_requirement_type: item.cda_requirement_type || '', default_rsu: item.default_rsu != null ? item.default_rsu : '', default_cda: item.default_cda != null ? item.default_cda : '', est_work_duration: item.est_work_duration != null ? item.est_work_duration : '', is_patient_treatment: item.is_patient_treatment !== false, non_mc_pateint_req: item.non_mc_pateint_req !== false, is_selectable: item.is_selectable !== false, is_exam: item.is_exam === true, aggregation_config: item.aggregation_config ? JSON.stringify(item.aggregation_config, null, 2) : '' };
             }
           } else if (this.activeTab === 'announcements') {
             if (mode === 'create') {

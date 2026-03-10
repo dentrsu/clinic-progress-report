@@ -3201,6 +3201,7 @@ function getStudentVaultData(targetStudentId) {
       pending_cda: Math.round(prog.p_cda * 100) / 100,
       rsu_unit: req.rsu_unit || "Case",
       cda_unit: req.cda_unit || "Case",
+      est_work_duration: req.est_work_duration || 1,
       is_exam: isExam,
       is_selectable: req.is_selectable !== false, // default true if column not yet migrated
       calc_method: calcMethod,
@@ -3375,6 +3376,8 @@ function instructorGetTeamStudents() {
       floor_id: s.floor_id,
       floor_label: s.floor ? s.floor.label : "-",
       unit_id: s.unit_id || "-",
+      forecast_completion_date: s.forecast_completion_date || null,
+      forecast_at: s.forecast_at || null,
       team_leader_1_name: getTeamLeaderName(s.team_leader_1_id),
       team_leader_2_name: getTeamLeaderName(s.team_leader_2_id),
     });
@@ -3509,9 +3512,10 @@ function advisorGetStudentDivisionVault(studentId, divisionName) {
 
   // Reuse the full vault generation, then pick only the requested division
   var fullVault = getStudentVaultData(studentId);
-  for (var i = 0; i < fullVault.length; i++) {
-    if (fullVault[i].name === divisionName) {
-      return fullVault[i];
+  var divs = fullVault.divisions || [];
+  for (var i = 0; i < divs.length; i++) {
+    if (divs[i].name === divisionName) {
+      return divs[i];
     }
   }
 
@@ -3745,6 +3749,9 @@ function studentGetOracleDashboard(studentId) {
   if (profile.role === "student" && targetId !== profile.student_id) {
     throw new Error("Access Denied: You can only view your own dashboard.");
   }
+
+  // Ensure the latest data is calculated and saved to the database
+  SupabaseProvider.refreshOracleSnapshot(targetId);
 
   return {
     snapshot: SupabaseProvider.getOracleStudentSnapshot(targetId),
@@ -5547,6 +5554,7 @@ function adminCreateRequirement(form) {
       minimum_cda: parseFloat(form.minimum_cda) || 0,
       rsu_unit: form.rsu_unit || "Case",
       cda_unit: form.cda_unit || "Case",
+      est_work_duration: parseFloat(form.est_work_duration) || 1.0,
       default_rsu:
         form.default_rsu !== "" && form.default_rsu != null
           ? parseFloat(form.default_rsu)
@@ -5604,6 +5612,7 @@ function adminUpdateRequirement(id, form) {
       minimum_cda: parseFloat(form.minimum_cda) || 0,
       rsu_unit: form.rsu_unit || "Case",
       cda_unit: form.cda_unit || "Case",
+      est_work_duration: parseFloat(form.est_work_duration) || 1.0,
       default_rsu:
         form.default_rsu !== "" && form.default_rsu != null
           ? parseFloat(form.default_rsu)
