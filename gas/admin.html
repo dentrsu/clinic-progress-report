@@ -427,6 +427,7 @@
               <th class="px-6 py-4">Name / ID / Email</th>
               <th class="px-6 py-4">Location</th>
               <th class="px-6 py-4">Year</th>
+              <th class="px-6 py-4">Forecast</th>
               <th class="px-6 py-4">Status</th>
               <th class="px-6 py-4 text-right">Actions</th>
             </tr>
@@ -447,9 +448,15 @@
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600" x-text="student.first_clinic_year"></td>
                 <td class="px-6 py-4">
+                  <div class="flex flex-col gap-1">
+                     <span class="text-xs font-medium text-navy" x-text="student.forecast_completion_date ? new Date(student.forecast_completion_date).toLocaleDateString('en-GB') : '-'"></span>
+                     <span class="text-[10px] text-gray-400" x-show="student.forecast_at">Updated <span x-text="new Date(student.forecast_at).toLocaleDateString('en-GB')"></span></span>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
                   <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                        :class="student.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'">
-                    <span class="w-1.5 h-1.5 rounded-full" :class="student.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                        :class="isActiveStatus(student.status) ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'">
+                    <span class="w-1.5 h-1.5 rounded-full" :class="isActiveStatus(student.status) ? 'bg-emerald-500' : 'bg-gray-400'"></span>
                     <span x-text="student.status"></span>
                   </span>
                 </td>
@@ -459,7 +466,7 @@
               </tr>
             </template>
             <tr x-show="filteredStudents.length === 0">
-              <td colspan="5" class="px-6 py-12 text-center text-gray-500 italic">No students found.</td>
+              <td colspan="6" class="px-6 py-12 text-center text-gray-500 italic">No students found.</td>
             </tr>
           </tbody>
         </table>
@@ -491,8 +498,8 @@
               </td>
               <td class="px-6 py-4">
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                      :class="user.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'">
-                  <span class="w-1.5 h-1.5 rounded-full" :class="user.status === 'active' ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                      :class="isActiveStatus(user.status) ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'">
+                  <span class="w-1.5 h-1.5 rounded-full" :class="isActiveStatus(user.status) ? 'bg-emerald-500' : 'bg-gray-400'"></span>
                   <span x-text="user.status"></span>
                 </span>
               </td>
@@ -1977,6 +1984,12 @@
 
         // UI State
         activeTab: 'users',
+        
+        isActiveStatus(status) {
+           if (!status) return false;
+           const s = String(status).toLowerCase();
+           return s.includes('active') && !s.includes('inactive');
+        },
         syncing: false,
         syncResult: null,
         syncResultMessage: '',
@@ -2580,6 +2593,7 @@
               // Edit User - Optimistic
                this.userForm = { 
                 ...item,
+                status: item.users && item.users.status ? item.users.status : (item.status || 'active'),
                 first_clinic_year: new Date().getFullYear(),
                 teamleader_role: false,
                 division_id: item.division_id || '',

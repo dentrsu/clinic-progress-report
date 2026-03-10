@@ -122,8 +122,8 @@
               </div>
               <div class="flex justify-between items-center text-xs">
                 <span class="text-gray-400 font-medium uppercase tracking-wider">Status</span>
-                <span class="capitalize font-medium flex items-center gap-1.5" :class="s.status === 'active' ? 'text-indigo-600' : 'text-gray-500'">
-                   <span class="w-1.5 h-1.5 rounded-full" :class="s.status === 'active' ? 'bg-indigo-500' : 'bg-gray-400'"></span>
+                <span class="capitalize font-medium flex items-center gap-1.5" :class="isActiveStatus(s.status) ? 'text-indigo-600' : 'text-gray-500'">
+                   <span class="w-1.5 h-1.5 rounded-full" :class="isActiveStatus(s.status) ? 'bg-indigo-500' : 'bg-gray-400'"></span>
                    <span x-text="s.status"></span>
                 </span>
               </div>
@@ -455,6 +455,12 @@
         studentVaultLoading: false,
         studentVaultData: null,
         expandedReqs: new Set(),
+        
+        isActiveStatus(status) {
+           if (!status) return false;
+           const s = String(status).toLowerCase();
+           return s.includes('active') && !s.includes('inactive');
+        },
         
         init() {
           google.script.run

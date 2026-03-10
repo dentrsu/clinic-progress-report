@@ -1105,7 +1105,7 @@ var SupabaseProvider = (function () {
     },
     listStudents: function () {
       return _getCached(
-        "/rest/v1/students?select=*,users(name,email),floors(label),forecast_completion_date,forecast_at",
+        "/rest/v1/students?select=*,users(name,email,status),floors(label)",
         600,
       );
     },
@@ -1246,11 +1246,7 @@ var SupabaseProvider = (function () {
     /**
      * List all students in the system.
      */
-    listStudents: function () {
-      return _get(
-        "/rest/v1/students?select=*,forecast_completion_date,forecast_at",
-      );
-    },
+
 
     /**
      * Update an announcement by id.

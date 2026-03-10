@@ -4213,7 +4213,10 @@ function getUserProfile(email) {
     }
 
     // Check active status
-    if (user.status && user.status !== "active") {
+    var statusStr = user.status ? String(user.status).toLowerCase().trim() : "";
+    var isUserActive = statusStr === "active" || (statusStr.includes("active") && !statusStr.includes("inactive"));
+    
+    if (user.status && !isUserActive) {
       return {
         found: true,
         active: false,
@@ -4233,7 +4236,7 @@ function getUserProfile(email) {
       email: user.email,
       name: user.name || "",
       role: user.role,
-      status: user.status,
+      status: user.status ? String(user.status).toLowerCase().trim() : "",
       user_id: user.user_id,
       source: "supabase",
     };
@@ -5191,7 +5194,8 @@ function adminSyncStudents() {
         var tl2Email = String(row[13]).trim();
 
         // 1. Filter: Sync only Active
-        if (statusRaw !== "active") continue;
+        var isStudentActive = statusRaw === "active" || (statusRaw.includes("active") && !statusRaw.includes("inactive"));
+        if (!isStudentActive) continue;
 
         if (!email) {
           stats.warnings.push("Row " + (i + 1) + ": Missing email");
