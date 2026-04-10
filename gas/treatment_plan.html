@@ -1414,6 +1414,41 @@
           this.form.cda_units = cda.toFixed(2);
         },
 
+        /** Build a record object from form data + loaded catalog for optimistic UI. */
+        _buildOptimisticRecord: function(recordId) {
+          var f = this.form;
+          var phase = this.phases.find(function(p) { return p.phase_id === f.phase_id; });
+          var treat = this.catalog.find(function(c) { return c.treatment_id === f.treatment_id; });
+          var step = this.allSteps.find(function(s) { return s.step_id === f.step_id; });
+          var stu = this.students.find(function(s) { return s.student_id === f.student_id; });
+          return {
+            record_id: recordId || '_optimistic_' + Date.now(),
+            patient_id: this.patient ? this.patient.patient_id : null,
+            phase_id: f.phase_id || null,
+            treatment_id: f.treatment_id || null,
+            step_id: f.step_id || null,
+            student_id: f.student_id || null,
+            division_id: f.division_id || null,
+            requirement_id: f.requirement_id || null,
+            area: f.area || null,
+            start_date: f.start_date || null,
+            complete_date: f.complete_date || null,
+            rsu_units: f.rsu_units !== '' ? Number(f.rsu_units) : null,
+            cda_units: f.cda_units !== '' ? Number(f.cda_units) : null,
+            severity: f.severity !== '' ? Number(f.severity) : null,
+            book_number: f.book_number !== '' ? Number(f.book_number) : null,
+            page_number: f.page_number !== '' ? Number(f.page_number) : null,
+            is_exam: !!f.is_exam,
+            perio_exams: f.perio_exams || null,
+            status: f.status || 'planned',
+            treatment_order: f.treatment_order || null,
+            treatment_phases: phase ? { phase_name: phase.phase_name, phase_order: phase.phase_order } : null,
+            treatment_catalog: treat ? { treatment_name: treat.treatment_name, division_id: treat.division_id } : null,
+            treatment_steps: step ? { step_name: step.step_name } : null,
+            student: stu ? { user: { name: stu.name } } : null,
+          };
+        },
+
         saveRecord: function() {
           var self = this;
           self.saving = true;
@@ -1423,39 +1458,52 @@
             if (self.originalWasVerified && self.verifiedRecordChanged) {
               self.form.status = 'pending verification';
             }
-            // Update
+            // Optimistic update: patch the record in-place
+            var optRec = self._buildOptimisticRecord(self.editingRecord.record_id);
+            var idx = self.records.findIndex(function(r) { return r.record_id === self.editingRecord.record_id; });
+            if (idx !== -1) self.records.splice(idx, 1, optRec);
+            self.closeModal();
+            self.showToast('Treatment updated successfully');
+
+            // Update on server in background
             google.script.run
               .withSuccessHandler(function(res) {
                 self.saving = false;
                 if (res.success) {
-                  self.showToast('Treatment updated successfully');
-                  self.closeModal();
-                  self.reload();
+                  self.refreshRecords(); // Sync with server truth
                 } else {
                   self.errorMsg = res.error || 'Failed to update.';
+                  self.refreshRecords(); // Rollback to server state
                 }
               })
               .withFailureHandler(function(err) {
                 self.saving = false;
                 self.errorMsg = 'Error: ' + (err.message || err);
+                self.refreshRecords(); // Rollback to server state
               })
               .studentUpdateTreatmentRecord(self.editingRecord.record_id, self.form);
           } else {
-            // Create
+            // Optimistic insert: add to records immediately
+            var optRec = self._buildOptimisticRecord(null);
+            self.records.push(optRec);
+            self.closeModal();
+            self.showToast('Treatment added successfully');
+
+            // Create on server in background
             google.script.run
               .withSuccessHandler(function(res) {
                 self.saving = false;
                 if (res.success) {
-                  self.showToast('Treatment added successfully');
-                  self.closeModal();
-                  self.reload();
+                  self.refreshRecords(); // Replace optimistic with real record
                 } else {
                   self.errorMsg = res.error || 'Failed to create.';
+                  self.refreshRecords(); // Remove optimistic record
                 }
               })
               .withFailureHandler(function(err) {
                 self.saving = false;
                 self.errorMsg = 'Error: ' + (err.message || err);
+                self.refreshRecords(); // Remove optimistic record
               })
               .studentCreateTreatmentRecord(self.hn, self.form);
           }
@@ -1493,9 +1541,9 @@
               .withSuccessHandler(function(res) {
                 self.requestingVerification = false;
                 if (res.success) {
-                  self.showToast('Verification request sent to advisor successfully');
                   self.closeModal();
-                  self.reload();
+                  self.refreshRecords();
+                  self.showToast('Verification request sent to advisor successfully');
                 } else {
                   self.errorMsg = res.error || 'Failed to send request.';
                 }
@@ -1540,7 +1588,7 @@
               self.showDeleteConfirm = false;
               if (res.success) {
                 self.showToast('Treatment deleted');
-                self.reload();
+                self.refreshRecords();
               } else {
                 self.errorMsg = res.error || 'Failed to delete.';
               }
@@ -1569,9 +1617,9 @@
               self.verifying = false;
               self.showApproveConfirm = false;
               if (res.success) {
-                self.showToast('Requirement verified');
                 self.closeModal();
-                self.reload();
+                self.refreshRecords();
+                self.showToast('Requirement verified');
               } else {
                 self.errorMsg = res.error || 'Verification failed.';
               }
@@ -1604,6 +1652,19 @@
             .withFailureHandler(function(err) {
               self.errorMsg = "Error reloading: " + (err.message || err);
               self.loading = false;
+            })
+            .studentGetTreatmentPlan(self.hn);
+        },
+
+        /** Lightweight refresh — updates only the records list without a loading spinner. */
+        refreshRecords: function() {
+          var self = this;
+          google.script.run
+            .withSuccessHandler(function(res) {
+              self.records = res.records || [];
+            })
+            .withFailureHandler(function(err) {
+              // silent fail — data is still stale but usable
             })
             .studentGetTreatmentPlan(self.hn);
         },
@@ -1696,9 +1757,9 @@
             .withSuccessHandler(function(res) {
               self.changingOrder = false;
               if (res.success) {
+                self.activeActionRow = null;
+                self.refreshRecords();
                 self.showToast(res.message || 'Order updated');
-                self.activeActionRow = null; 
-                self.reload();
               } else {
                 self.errorMsg = res.error || 'Failed to reorder.';
                 self.loading = false;
@@ -1862,9 +1923,9 @@
             .withSuccessHandler(function(res) {
               self.savingComplexity = false;
               if (res.success) {
-                self.showToast('Patient case complexity saved');
                 self.closeComplexityModal();
-                self.reload();
+                self.refreshRecords();
+                self.showToast('Patient case complexity saved');
               } else {
                 self.errorMsg = res.error || 'Failed to save complexity.';
               }

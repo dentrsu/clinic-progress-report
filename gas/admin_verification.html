@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy:    { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
+            gold:    { DEFAULT: '#C4972F', light: '#D4AD4E' },
+            surface: '#F8F7F4',
+          },
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+        },
+      },
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <?!= include('styles') ?>
+  <style>
+    [x-cloak] { display: none !important; }
+    .spinner {
+      border-top-color: transparent !important;
+      border-right-color: transparent !important;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="min-h-screen bg-surface font-sans"
+      x-data="adminVerificationApp()"
+      x-init="init()">
+
+  <!-- Header -->
+  <header class="bg-navy text-white px-6 py-5 flex items-center justify-between shadow-md sticky top-0 z-30">
+    <div class="flex items-center gap-4">
+      <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight leading-none">Admin Verification</h1>
+        <p class="text-white/60 text-xs mt-0.5">All pending verification records</p>
+      </div>
+    </div>
+    <a href="<?= appUrl ?>?page=admin"
+       class="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition border border-white/20 text-white">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+      </svg>
+      Admin Console
+    </a>
+  </header>
+
+  <!-- Loading -->
+  <div x-show="loading" class="flex flex-col items-center justify-center py-24 gap-4">
+    <div class="spinner border-4 border-navy/20 w-10 h-10 rounded-full"></div>
+    <p class="text-gray-500 text-sm">Loading pending records...</p>
+  </div>
+
+  <!-- Error -->
+  <div x-show="!loading && errorMsg" class="max-w-2xl mx-auto mt-8 px-4">
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-xl px-6 py-4 text-sm">
+      <span x-text="errorMsg"></span>
+    </div>
+    <button @click="init()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition">Retry</button>
+  </div>
+
+  <!-- Main Content -->
+  <div x-show="!loading && !errorMsg" class="max-w-6xl mx-auto px-4 py-6 space-y-4" x-cloak>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <!-- Student filter -->
+      <div class="flex items-center gap-2 flex-1 min-w-0">
+        <label class="text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Student</label>
+        <select x-model="filterStudent"
+                class="flex-1 min-w-0 text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-navy/30 focus:border-navy">
+          <option value="">All Students</option>
+          <template x-for="s in studentOptions" :key="s.student_id">
+            <option :value="s.student_id" x-text="s.name + ' (' + s.academic_id + ')'"></option>
+          </template>
+        </select>
+      </div>
+      <!-- Division filter -->
+      <div class="flex items-center gap-2">
+        <label class="text-xs font-medium text-gray-500 uppercase whitespace-nowrap">Division</label>
+        <select x-model="filterDivision"
+                class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-navy/30 focus:border-navy">
+          <option value="">All Divisions</option>
+          <template x-for="d in divisionOptions" :key="d">
+            <option :value="d" x-text="d"></option>
+          </template>
+        </select>
+      </div>
+      <!-- Counts -->
+      <div class="flex items-center gap-3 text-xs text-gray-500 ml-auto">
+        <span><strong class="text-navy" x-text="filteredGroups.length"></strong> students</span>
+        <span><strong class="text-navy" x-text="totalFilteredPending"></strong> records</span>
+      </div>
+    </div>
+
+    <!-- Bulk Action Bar -->
+    <div x-show="totalFilteredPending > 0"
+         class="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 shadow-sm sticky top-[72px] z-20">
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" :checked="isAllSelected" @change="toggleAll()" class="w-4 h-4 rounded border-gray-300 text-indigo-600 cursor-pointer" />
+          <span class="text-xs text-gray-500">Select all</span>
+        </label>
+        <span class="text-sm font-medium text-gray-700">
+          <span x-text="totalSelected()"></span> record<span x-show="totalSelected() !== 1">s</span> selected
+        </span>
+      </div>
+      <div class="ml-auto flex gap-2">
+        <button @click="bulkAction('verified')"
+                :disabled="totalSelected() === 0 || submitting"
+                :class="totalSelected() === 0 || submitting ? 'opacity-40 cursor-not-allowed' : 'hover:bg-emerald-700'"
+                class="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium transition">
+          <template x-if="submitting && lastAction === 'verified'">
+            <div class="spinner border-2 border-white/30 border-t-white w-4 h-4 rounded-full"></div>
+          </template>
+          Verify Selected
+        </button>
+        <button @click="bulkAction('rejected')"
+                :disabled="totalSelected() === 0 || submitting"
+                :class="totalSelected() === 0 || submitting ? 'opacity-40 cursor-not-allowed' : 'hover:bg-red-600'"
+                class="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium transition">
+          <template x-if="submitting && lastAction === 'rejected'">
+            <div class="spinner border-2 border-white/30 border-t-white w-4 h-4 rounded-full"></div>
+          </template>
+          Reject Selected
+        </button>
+      </div>
+    </div>
+
+    <!-- Result banner -->
+    <div x-show="result" class="rounded-xl px-4 py-3 text-sm font-medium"
+         :class="result && result.success ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'">
+      <template x-if="result && result.success">
+        <span x-text="'Successfully processed ' + result.count + ' record(s).' + (result.errors.length ? ' Errors: ' + result.errors.length : '')"></span>
+      </template>
+      <template x-if="result && !result.success">
+        <span x-text="result.error || 'An error occurred.'"></span>
+      </template>
+    </div>
+
+    <!-- Empty state -->
+    <div x-show="filteredGroups.length === 0 && !loading" class="text-center py-16">
+      <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+      </div>
+      <h3 class="text-lg font-bold text-gray-700">All clear!</h3>
+      <p class="text-gray-500 text-sm mt-1">No pending verification records found.</p>
+    </div>
+
+    <!-- Student Groups -->
+    <template x-for="group in filteredGroups" :key="group.student_id">
+      <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <!-- Student Header -->
+        <div class="bg-gradient-to-r from-amber-50 to-amber-100/60 border-b border-amber-200/60 px-4 py-3 flex items-center gap-3">
+          <input type="checkbox"
+                 :checked="isAllStudentSelected(group.student_id)"
+                 :indeterminate.prop="!isAllStudentSelected(group.student_id) && someStudentSelected(group.student_id)"
+                 @change="toggleStudent(group.student_id)"
+                 class="w-4 h-4 rounded border-gray-300 text-indigo-600 cursor-pointer" />
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-semibold text-gray-800 text-sm" x-text="group.name"></span>
+              <span class="text-[0.65rem] font-mono text-gray-500" x-text="group.academic_id"></span>
+              <span x-show="group.calculated_year" class="text-[0.6rem] font-medium bg-white px-1.5 py-0.5 rounded border border-gray-200 text-gray-600"
+                    x-text="'Y' + group.calculated_year"></span>
+            </div>
+          </div>
+          <span class="shrink-0 text-[0.65rem] font-semibold px-2.5 py-1 rounded-full bg-amber-200/80 text-amber-800"
+                x-text="filteredRecords(group).length + ' pending'"></span>
+        </div>
+
+        <!-- Desktop Table -->
+        <div class="hidden sm:block overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                <th class="w-8 px-4 py-2.5 text-center font-medium"></th>
+                <th class="px-4 py-2.5 text-left font-medium">Patient</th>
+                <th class="px-4 py-2.5 text-left font-medium">Treatment</th>
+                <th class="px-4 py-2.5 text-left font-medium">Requirement</th>
+                <th class="px-4 py-2.5 text-left font-medium">Division</th>
+                <th class="px-4 py-2.5 text-left font-medium">Area</th>
+                <th class="px-4 py-2.5 text-center font-medium">RSU</th>
+                <th class="px-4 py-2.5 text-center font-medium">CDA</th>
+                <th class="px-4 py-2.5 text-left font-medium">Submitted</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="rec in filteredRecords(group)" :key="rec.record_id">
+                <tr :class="isSelected(rec.record_id) ? 'bg-indigo-50' : 'hover:bg-gray-50'"
+                    class="transition-colors cursor-pointer"
+                    @click="toggleRecord(rec.record_id)">
+                  <td class="px-4 py-3 text-center" @click.stop>
+                    <input type="checkbox" :checked="isSelected(rec.record_id)"
+                           @change="toggleRecord(rec.record_id)"
+                           class="w-4 h-4 rounded border-gray-300 text-indigo-600 cursor-pointer" />
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="font-medium text-gray-800 text-xs" x-text="rec.patient_name"></div>
+                    <div class="font-mono text-[0.65rem] text-gray-400 mt-0.5" x-text="'HN ' + rec.hn"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="text-gray-800 text-xs font-medium" x-text="rec.treatment_name"></div>
+                    <div class="text-gray-400 text-[0.65rem] mt-0.5" x-text="rec.step_name !== '-' ? rec.step_name : ''"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="inline-block text-[0.65rem] font-medium px-2 py-0.5 rounded bg-navy/5 text-navy border border-navy/10"
+                          x-text="rec.requirement_type"></span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <span class="inline-block text-[0.65rem] font-medium px-2 py-0.5 rounded"
+                          :class="divisionColor(rec.division_code)"
+                          x-text="rec.division_code"></span>
+                  </td>
+                  <td class="px-4 py-3 text-gray-500 text-xs" x-text="rec.area"></td>
+                  <td class="px-4 py-3 text-center font-mono text-xs text-indigo-700 font-semibold" x-text="rec.rsu_units"></td>
+                  <td class="px-4 py-3 text-center font-mono text-xs text-amber-700 font-semibold" x-text="rec.cda_units"></td>
+                  <td class="px-4 py-3 text-gray-400 text-[0.65rem]" x-text="formatDate(rec.updated_at)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mobile Cards -->
+        <div class="sm:hidden divide-y divide-gray-100">
+          <template x-for="rec in filteredRecords(group)" :key="rec.record_id">
+            <div :class="isSelected(rec.record_id) ? 'bg-indigo-50' : 'bg-white'"
+                 class="px-4 py-3 flex gap-3 transition-colors cursor-pointer"
+                 @click="toggleRecord(rec.record_id)">
+              <div class="pt-0.5" @click.stop>
+                <input type="checkbox"
+                       class="w-4 h-4 rounded border-gray-300 text-indigo-600 cursor-pointer"
+                       :checked="isSelected(rec.record_id)"
+                       @change="toggleRecord(rec.record_id)" />
+              </div>
+              <div class="flex-1 min-w-0 space-y-1">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="font-semibold text-gray-800 text-sm" x-text="rec.patient_name"></div>
+                    <div class="font-mono text-[0.65rem] text-gray-400">HN <span x-text="rec.hn"></span></div>
+                  </div>
+                  <div class="flex gap-2 shrink-0">
+                    <span class="text-[0.65rem] font-mono font-bold text-indigo-700" x-text="rec.rsu_units + ' RSU'"></span>
+                    <span class="text-[0.65rem] font-mono font-bold text-amber-700" x-text="rec.cda_units + ' CDA'"></span>
+                  </div>
+                </div>
+                <div class="text-xs text-gray-600">
+                  <span x-text="rec.treatment_name"></span>
+                  <span x-show="rec.step_name !== '-'" class="text-gray-400"> · <span x-text="rec.step_name"></span></span>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[0.65rem] font-medium px-1.5 py-0.5 rounded" :class="divisionColor(rec.division_code)" x-text="rec.division_code"></span>
+                  <span class="text-[0.65rem] font-medium px-1.5 py-0.5 rounded bg-navy/5 text-navy border border-navy/10"
+                        x-text="rec.requirement_type"></span>
+                  <span class="text-[0.65rem] text-gray-400" x-text="formatDate(rec.updated_at)"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <script>
+    function adminVerificationApp() {
+      return {
+        loading: true,
+        errorMsg: '',
+        submitting: false,
+        lastAction: '',
+        result: null,
+        allGroups: [],
+        selected: {},
+        filterStudent: '',
+        filterDivision: '',
+
+        // Computed
+        get studentOptions() {
+          return this.allGroups.map(g => ({
+            student_id: g.student_id,
+            name: g.name,
+            academic_id: g.academic_id,
+          })).sort((a, b) => a.name.localeCompare(b.name));
+        },
+
+        get divisionOptions() {
+          var codes = {};
+          this.allGroups.forEach(g => {
+            g.records.forEach(r => { if (r.division_code) codes[r.division_code] = true; });
+          });
+          return Object.keys(codes).sort();
+        },
+
+        get filteredGroups() {
+          var self = this;
+          return this.allGroups
+            .filter(g => {
+              if (self.filterStudent && g.student_id !== self.filterStudent) return false;
+              if (self.filterDivision) {
+                return g.records.some(r => r.division_code === self.filterDivision);
+              }
+              return true;
+            })
+            .map(g => {
+              if (!self.filterDivision) return g;
+              return { ...g, _filtered: true };
+            });
+        },
+
+        get totalFilteredPending() {
+          var self = this;
+          return this.filteredGroups.reduce((sum, g) => sum + self.filteredRecords(g).length, 0);
+        },
+
+        get isAllSelected() {
+          var self = this;
+          var all = [];
+          this.filteredGroups.forEach(g => {
+            self.filteredRecords(g).forEach(r => all.push(r.record_id));
+          });
+          return all.length > 0 && all.every(id => !!self.selected[id]);
+        },
+
+        filteredRecords(group) {
+          if (!this.filterDivision) return group.records;
+          return group.records.filter(r => r.division_code === this.filterDivision);
+        },
+
+        totalSelected() {
+          return Object.keys(this.selected).length;
+        },
+
+        isSelected(id) { return !!this.selected[id]; },
+
+        isAllStudentSelected(studentId) {
+          var group = this.filteredGroups.find(g => g.student_id === studentId);
+          if (!group) return false;
+          var recs = this.filteredRecords(group);
+          return recs.length > 0 && recs.every(r => !!this.selected[r.record_id]);
+        },
+
+        someStudentSelected(studentId) {
+          var group = this.filteredGroups.find(g => g.student_id === studentId);
+          if (!group) return false;
+          return this.filteredRecords(group).some(r => !!this.selected[r.record_id]);
+        },
+
+        toggleRecord(id) {
+          if (this.selected[id]) { delete this.selected[id]; }
+          else { this.selected[id] = true; }
+          this.selected = Object.assign({}, this.selected);
+        },
+
+        toggleStudent(studentId) {
+          var group = this.filteredGroups.find(g => g.student_id === studentId);
+          if (!group) return;
+          var recs = this.filteredRecords(group);
+          var allSel = recs.every(r => !!this.selected[r.record_id]);
+          recs.forEach(r => {
+            if (allSel) { delete this.selected[r.record_id]; }
+            else { this.selected[r.record_id] = true; }
+          });
+          this.selected = Object.assign({}, this.selected);
+        },
+
+        toggleAll() {
+          var self = this;
+          var all = [];
+          this.filteredGroups.forEach(g => {
+            self.filteredRecords(g).forEach(r => all.push(r.record_id));
+          });
+          var allSel = all.every(id => !!self.selected[id]);
+          all.forEach(id => {
+            if (allSel) { delete self.selected[id]; }
+            else { self.selected[id] = true; }
+          });
+          this.selected = Object.assign({}, this.selected);
+        },
+
+        divisionColor(code) {
+          var map = {
+            OPER: 'bg-blue-50 text-blue-700 border border-blue-200',
+            ENDO: 'bg-purple-50 text-purple-700 border border-purple-200',
+            PERIO: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+            PROSTH: 'bg-amber-50 text-amber-700 border border-amber-200',
+            DIAG: 'bg-cyan-50 text-cyan-700 border border-cyan-200',
+            RADIO: 'bg-gray-100 text-gray-700 border border-gray-200',
+            SUR: 'bg-red-50 text-red-700 border border-red-200',
+            ORTHO: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
+            PEDO: 'bg-pink-50 text-pink-700 border border-pink-200',
+          };
+          return map[code] || 'bg-gray-50 text-gray-600 border border-gray-200';
+        },
+
+        formatDate(iso) {
+          if (!iso) return '-';
+          var d = new Date(iso);
+          return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        },
+
+        bulkAction(action) {
+          var selectedIds = Object.keys(this.selected);
+          if (selectedIds.length === 0 || this.submitting) return;
+
+          var allRecords = [];
+          this.allGroups.forEach(g => {
+            g.records.forEach(r => {
+              if (this.selected[r.record_id]) allRecords.push(r);
+            });
+          });
+
+          this.submitting = true;
+          this.lastAction = action;
+          this.result = null;
+
+          google.script.run
+            .withSuccessHandler(res => {
+              this.submitting = false;
+              this.result = res;
+              if (res.success) {
+                this.allGroups = this.allGroups
+                  .map(g => ({
+                    ...g,
+                    records: g.records.filter(r => !this.selected[r.record_id])
+                  }))
+                  .filter(g => g.records.length > 0);
+                this.selected = {};
+              }
+            })
+            .withFailureHandler(err => {
+              this.submitting = false;
+              this.result = { success: false, error: err.message || 'Unknown error' };
+            })
+            .adminBulkUpdateRecordStatus({ records: allRecords, action: action });
+        },
+
+        init() {
+          this.loading = true;
+          this.errorMsg = '';
+          google.script.run
+            .withSuccessHandler(data => {
+              this.allGroups = data || [];
+              this.loading = false;
+            })
+            .withFailureHandler(err => {
+              this.errorMsg = err.message || 'Failed to load pending verifications.';
+              this.loading = false;
+            })
+            .adminGetAllPendingVerifications();
+        },
+      };
+    }
+  </script>
+</body>
+</html>

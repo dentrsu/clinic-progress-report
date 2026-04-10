@@ -44,16 +44,16 @@
       </div>
       <div>
         <h1 class="text-lg font-bold tracking-tight leading-none">Requirement Verification</h1>
-        <p class="text-white/60 text-xs mt-0.5">Pending verification records — my team students</p>
+        <p class="text-white/60 text-xs mt-0.5" x-text="isAdvisorMode ? 'Pending verification records — my advisees' : 'Pending verification records — my team students'"></p>
       </div>
     </div>
-    <a href="<?= appUrl ?>?page=instructor"
-       title="Go back to the Instructor Portal"
+    <a :href="isAdvisorMode ? '<?= appUrl ?>?page=advisor' : '<?= appUrl ?>?page=instructor'"
+       :title="isAdvisorMode ? 'Go back to the Advisor Portal' : 'Go back to the Instructor Portal'"
        class="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition border border-white/20 text-white">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
       </svg>
-      Instructor Portal
+      <span x-text="isAdvisorMode ? 'Advisor Portal' : 'Instructor Portal'"></span>
     </a>
   </header>
 
@@ -381,12 +381,14 @@
 
   <script>
     function verificationQueueApp() {
+      var advisorMode = '<?= queueMode ?>' === 'advisor';
       return {
         loading: true,
         errorMsg: '',
         submitting: false,
         lastAction: '',
         result: null,
+        isAdvisorMode: advisorMode,
         divisionCode: '',  // derived from first record after load
         studentGroups: [], // [{ student_id, name, academic_id, calculated_year, records[] }]
         selected: {},      // { [record_id]: true }
@@ -535,7 +537,7 @@
         init() {
           this.loading = true;
           this.errorMsg = '';
-          google.script.run
+          var handler = google.script.run
             .withSuccessHandler(data => {
               this.studentGroups = data || [];
               // Derive division code from first available record
@@ -552,8 +554,12 @@
             .withFailureHandler(err => {
               this.errorMsg = err.message || 'Failed to load pending verifications.';
               this.loading = false;
-            })
-            .instructorGetPendingVerifications();
+            });
+          if (this.isAdvisorMode) {
+            handler.advisorGetPendingVerifications();
+          } else {
+            handler.instructorGetPendingVerifications();
+          }
         },
       };
     }

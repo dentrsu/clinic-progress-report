@@ -146,6 +146,27 @@ var SupabaseProvider = (function () {
   }
 
   /**
+   * Parallel GET helper — fetches multiple paths in a single batch.
+   * @param {string[]} paths — array of REST paths
+   * @returns {Array[]} — array of parsed results, same order as paths
+   */
+  function _getAll(paths) {
+    var baseUrl = getSupabaseUrl();
+    var hdrs = _headers();
+    var requests = paths.map(function (p) {
+      return { url: baseUrl + p, method: "get", headers: hdrs, muteHttpExceptions: true };
+    });
+    var responses = UrlFetchApp.fetchAll(requests);
+    return responses.map(function (resp, i) {
+      var code = resp.getResponseCode();
+      if (code < 200 || code >= 300) {
+        throw new Error("Supabase GET " + paths[i] + " returned " + code + ": " + resp.getContentText());
+      }
+      return JSON.parse(resp.getContentText());
+    });
+  }
+
+  /**
    * Cached GET helper using CacheService.
    */
   function _getCached(path, ttlSeconds) {
@@ -268,6 +289,11 @@ var SupabaseProvider = (function () {
   // ──────────────────────────────────────────────
 
   return {
+    /** Expose internal helpers for advanced callers */
+    _get: _get,
+    _getAll: _getAll,
+    _getCached: _getCached,
+
     /** Lightweight health check */
     ping: function () {
       var url = getSupabaseUrl() + "/rest/v1/";
@@ -527,6 +553,24 @@ var SupabaseProvider = (function () {
      * @param {string} instructorId the UUID of the instructor
      * @returns {Array}
      */
+    /**
+     * List students where instructorId appears in ANY division instructor column.
+     * @param {string} instructorId
+     * @returns {Array}
+     */
+    listStudentsByAnyDivisionInstructor: function (instructorId) {
+      var cols = [
+        "oper_instructor_id","endo_instructor_id","perio_instructor_id",
+        "prosth_instructor_id","diag_instructor_id","radio_instructor_id",
+        "sur_instructor_id","ortho_instructor_id","pedo_instructor_id"
+      ];
+      var orClauses = cols.map(function (c) { return c + ".eq." + instructorId; }).join(",");
+      var select = "*,user:users(name,email),floor:floors(label)";
+      return _get(
+        "/rest/v1/students?or=(" + orClauses + ")&select=" + select + "&order=academic_id.asc"
+      ) || [];
+    },
+
     listStudentsByDivisionInstructor: function (columnName, instructorId) {
       var params = encodeURIComponent(columnName) + "=eq." + instructorId;
       var select = "*,user:users(name,email),floor:floors(label)";
@@ -1153,6 +1197,51 @@ var SupabaseProvider = (function () {
      * @param {Array<string>} studentIds — UUIDs
      * @returns {Array}
      */
+    /**
+     * List all pending verification records assigned to a specific instructor.
+     * @param {string} instructorId
+     * @returns {Array}
+     */
+    listPendingRecordsByInstructor: function (instructorId) {
+      if (!instructorId) return [];
+      var select = [
+        "record_id","student_id","hn","patient_name","area",
+        "rsu_units","cda_units","severity","book_number","page_number",
+        "is_exam","perio_exams","requirement_id","division_id","status","updated_at",
+        "treatment_catalog(treatment_name,division_id,divisions(name,code))",
+        "treatment_steps(step_name)",
+        "requirement_list(requirement_type)",
+        "patient:patients(hn,name)",
+        "student:students(student_id,academic_id,first_clinic_year,user:users(name,email))"
+      ].join(",");
+      return _get(
+        "/rest/v1/treatment_records?instructor_id=eq." + instructorId +
+        "&status=eq.pending verification&select=" + select +
+        "&order=updated_at.asc"
+      ) || [];
+    },
+
+    /**
+     * List ALL pending verification records (admin use).
+     * @returns {Array}
+     */
+    listAllPendingRecords: function () {
+      var select = [
+        "record_id","student_id","hn","patient_name","area",
+        "rsu_units","cda_units","severity","book_number","page_number",
+        "is_exam","perio_exams","requirement_id","division_id","status","updated_at",
+        "treatment_catalog(treatment_name,division_id,divisions(name,code))",
+        "treatment_steps(step_name)",
+        "requirement_list(requirement_type)",
+        "patient:patients(hn,name)",
+        "student:students(student_id,academic_id,first_clinic_year,user:users(name,email))"
+      ].join(",");
+      return _get(
+        "/rest/v1/treatment_records?status=eq.pending verification&select=" + select +
+        "&order=updated_at.asc"
+      ) || [];
+    },
+
     listPendingRecordsByStudentIds: function (studentIds) {
       if (!studentIds || studentIds.length === 0) return [];
       var inClause = "in.(" + studentIds.join(",") + ")";
@@ -1302,20 +1391,27 @@ var SupabaseProvider = (function () {
 
     listRecordsForDashboard: function (studentIds) {
       if (!studentIds || studentIds.length === 0) return [];
-      var BATCH = 40;
-      var results = [];
+      var BATCH = 50;
       var select =
         "record_id,student_id,requirement_id,status,rsu_units,cda_units,is_exam," +
         "treatment_steps(step_name)";
+      // Build all batch paths
+      var paths = [];
       for (var i = 0; i < studentIds.length; i += BATCH) {
         var batch = studentIds.slice(i, i + BATCH);
-        var rows = _get(
+        paths.push(
           "/rest/v1/treatment_records?student_id=in.(" +
             batch.join(",") +
             ")&status=neq.void&requirement_id=not.is.null&select=" +
-            select,
+            select
         );
-        results = results.concat(rows || []);
+      }
+      // Fetch all batches in parallel
+      if (paths.length === 1) return _get(paths[0]) || [];
+      var allResults = _getAll(paths);
+      var results = [];
+      for (var j = 0; j < allResults.length; j++) {
+        results = results.concat(allResults[j] || []);
       }
       return results;
     },

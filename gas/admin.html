@@ -52,7 +52,7 @@
       </button>
     </div>
 
-    <nav class="flex-1 px-4 py-6 space-y-2">
+    <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
       <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition"
          :class="activeTab === 'users' ? 'bg-navy-light text-white' : ''"
          @click.prevent="switchTab('users')">
@@ -120,6 +120,11 @@
         Patients
       </a>
       <div class="my-3 border-t border-navy-700"></div>
+      <a href="<?= appUrl ?>?page=admin_verification" target="_blank"
+         class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Verification Queue
+      </a>
       <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition"
          :class="activeTab === 'verifyHash' ? 'bg-navy-light text-white' : ''"
          @click.prevent="switchTab('verifyHash')">
@@ -161,6 +166,16 @@
              <div class="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in">
                 <input type="checkbox" x-model="maintenanceMode" @change="toggleMaintenance" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer duration-200 ease-in placeholder-shown:bg-gray-300 focus:outline-none"/>
                 <label class="toggle-label block overflow-hidden h-4 rounded-full bg-gray-600 cursor-pointer"></label>
+            </div>
+          </label>
+          <!-- Email Verification Toggle -->
+          <label class="flex items-center justify-between cursor-pointer mt-2">
+            <span class="text-xs font-medium" :class="emailVerificationMode ? 'text-blue-400' : 'text-gray-300'">
+              Allow Verification Emails<template x-if="emailVerificationMode"><span class="ml-1 text-[0.6rem] font-bold bg-blue-400/20 text-blue-300 px-1.5 py-0.5 rounded">ON</span></template>
+            </span>
+            <div class="relative inline-block w-8 h-4 align-middle select-none transition duration-200 ease-in">
+              <input type="checkbox" x-model="emailVerificationMode" @change="toggleEmailVerificationMode" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-4 appearance-none cursor-pointer duration-200 ease-in focus:outline-none"/>
+              <label class="toggle-label block overflow-hidden h-4 rounded-full bg-gray-600 cursor-pointer" :class="emailVerificationMode ? '!bg-blue-500' : ''"></label>
             </div>
           </label>
           <!-- Dev Mode Toggle -->
@@ -218,6 +233,14 @@
           <p class="text-sm text-gray-500">Manage system users and configurations.</p>
         </div>
         <div class="flex items-center gap-3 w-full sm:w-auto">
+          <!-- Email Verification quick toggle -->
+          <button @click="emailVerificationMode = !emailVerificationMode; toggleEmailVerificationMode()"
+                  :class="emailVerificationMode ? 'bg-blue-100 border-blue-400 text-blue-700' : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'"
+                  title="Toggle Email Verification — when OFF, no emails will be sent out"
+                  class="shrink-0 flex items-center gap-1.5 border rounded-lg px-3 py-2 text-xs font-medium transition whitespace-nowrap">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            <span x-text="emailVerificationMode ? 'Email Verif: ON' : 'Email Verif: OFF'"></span>
+          </button>
           <!-- Dev Mode quick toggle -->
           <button @click="devMode = !devMode; toggleDevMode()"
                   :class="devMode ? 'bg-amber-100 border-amber-400 text-amber-700' : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'"
@@ -405,17 +428,42 @@
             </h2>
             <p class="text-sm text-gray-500 mt-1">Sync students from Google Sheet (Student, Active).</p>
           </div>
-          <div class="flex items-center gap-3">
-             <div x-show="syncResult" class="text-xs font-medium px-3 py-1.5 rounded-lg" 
+          <div class="flex flex-col items-end gap-2">
+             <div class="flex items-center gap-2">
+               <div class="relative">
+                 <input type="text" x-model="syncStudentEmail" placeholder="Email to sync single student..."
+                        class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-64 focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy placeholder:text-gray-400"
+                        @keydown.enter="syncStudentEmail.trim() && syncStudents(syncStudentEmail.trim())">
+                 <button x-show="syncStudentEmail" @click="syncStudentEmail = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                 </button>
+               </div>
+               <button @click="syncStudents(syncStudentEmail.trim() || null)" :disabled="syncing"
+                       :title="syncStudentEmail.trim() ? 'Sync this student only' : 'Sync all active students from master sheet'"
+                       class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                 <svg class="w-4 h-4" :class="{'animate-spin': syncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                 <span x-text="syncing ? 'Syncing...' : (syncStudentEmail.trim() ? 'Sync Student' : 'Sync All')"></span>
+               </button>
+             </div>
+             <!-- Progress bar -->
+             <div x-show="syncing && syncProgress" class="w-full max-w-md">
+               <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                 <span x-text="syncProgress ? syncProgress.currentName : ''"></span>
+                 <span x-text="syncProgress ? syncProgress.current + ' / ' + syncProgress.total : ''"></span>
+               </div>
+               <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                 <div class="bg-navy h-2 rounded-full transition-all duration-300"
+                      :style="'width: ' + (syncProgress && syncProgress.total > 0 ? Math.round(syncProgress.current / syncProgress.total * 100) : 0) + '%'"></div>
+               </div>
+               <div class="flex items-center gap-3 text-[10px] text-gray-400 mt-1">
+                 <span x-text="'Updated: ' + (syncProgress ? syncProgress.updated : 0)"></span>
+                 <span x-show="syncProgress && syncProgress.errors > 0" class="text-red-500" x-text="'Errors: ' + syncProgress.errors"></span>
+               </div>
+             </div>
+             <div x-show="!syncing && syncResult" class="text-xs font-medium px-3 py-1.5 rounded-lg"
                   :class="syncResult && syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
                 <span x-text="syncResultMessage"></span>
              </div>
-             <button @click="syncStudents" :disabled="syncing"
-                     title="Import students from the Google Sheet master list (Student, Active)"
-                     class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-               <svg class="w-4 h-4" :class="{'animate-spin': syncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-               <span x-text="syncing ? 'Syncing...' : 'Sync Students'"></span>
-             </button>
           </div>
        </div>
 
@@ -1166,7 +1214,7 @@
     
     <!-- Panel -->
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative z-10 animate-fade-in">
-      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'instructors' ? 'Instructor' : (activeTab === 'students' ? 'Student' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : (activeTab === 'announcements' ? 'Announcement' : (activeTab === 'cohorts' ? 'Cohort' : 'Requirement'))))))))))))"></h2>
+      <h2 class="text-xl font-bold text-navy mb-6" x-text="(mode === 'create' ? 'Add ' : 'Edit ') + (activeTab === 'users' ? 'User' : (activeTab === 'instructors' ? 'Instructor' : (activeTab === 'students' ? 'Student' : (activeTab === 'divisions' ? 'Division' : (activeTab === 'floors' ? 'Floor' : (activeTab === 'phases' ? 'Treatment Phase' : (activeTab === 'catalog' ? 'Treatment' : (activeTab === 'caseTypes' ? 'Case Type' : (activeTab === 'steps' ? 'Treatment Step' : (activeTab === 'announcements' ? 'Announcement' : (activeTab === 'cohorts' ? 'Cohort' : 'Requirement')))))))))))"></h2>
       
       <!-- User Form -->
       <div x-show="['users', 'instructors', 'students'].includes(activeTab)" class="space-y-4">
@@ -1255,6 +1303,18 @@
                 </template>
               </select>
             </div>
+           </div>
+
+           <!-- Sync single student from sheet -->
+           <div x-show="mode === 'edit'" class="mt-3">
+             <button @click="syncStudents(userForm.email)" :disabled="syncing"
+                     class="w-full flex items-center justify-center gap-2 border border-gray-300 text-gray-600 hover:border-navy hover:text-navy px-3 py-2 rounded-lg text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">
+               <svg class="w-3.5 h-3.5" :class="{'animate-spin': syncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+               <span x-text="syncing ? 'Syncing...' : 'Sync from Master Sheet'"></span>
+             </button>
+             <div x-show="!syncing && syncResult" class="text-[10px] font-medium mt-1 text-center"
+                  :class="syncResult && syncResult.success ? 'text-green-600' : 'text-red-600'"
+                  x-text="syncResultMessage"></div>
            </div>
 
            <p class="text-xs text-navy font-semibold mb-2 mt-4">Division Instructors</p>
@@ -1833,6 +1893,7 @@
         sidebarOpen: false, // Fix ReferenceError
         maintenanceMode: false,
         devMode: false,
+        emailVerificationMode: true,
         health: { source: '...', healthy: true }, // Added health state
         
         // Warning Modal State
@@ -1993,11 +2054,15 @@
         syncing: false,
         syncResult: null,
         syncResultMessage: '',
+        syncStudentEmail: '',
+        syncProgress: null,
+        syncPollTimer: null,
         
         init() {
           this.loadInitData();
           this.checkMaintenanceMode();
           this.checkDevMode();
+          this.checkEmailVerificationMode();
           this.checkSystemHealth();
           
           this.$watch('search', () => {
@@ -2069,13 +2134,17 @@
             .adminVerifyHash(this.hashForm.verifiedAt.trim(), this.hashForm.recordId.trim(), this.hashForm.hash.trim());
         },
 
-        syncStudents() {
+        syncStudents(targetEmail) {
           this.syncing = true;
           this.syncResult = null;
-          this.syncResultMessage = 'Starting sync...';
+          this.syncProgress = null;
+          this.syncResultMessage = targetEmail ? 'Syncing student...' : 'Starting sync...';
+          this.startSyncPolling();
           google.script.run
             .withSuccessHandler(res => {
+              this.stopSyncPolling();
               this.syncing = false;
+              this.syncProgress = null;
               this.syncResult = res;
               if (res.success) {
                 this.syncResultMessage = `Processed: ${res.stats.processed}, Updated/Created: ${res.stats.updated}, Errors: ${res.stats.errors}`;
@@ -2085,6 +2154,13 @@
                      this.warningOpen = true;
                 }
                 this.loadStudents(); // Refresh list
+                // If modal is open for a single-student sync, reload form data
+                if (targetEmail && this.modalOpen && this.activeTab === 'students') {
+                  this.$nextTick(() => {
+                    var updated = this.students.find(s => s.users && s.users.email === targetEmail);
+                    if (updated) this.openModal('edit', { ...updated, role: 'student', email: updated.users?.email, name: updated.users?.name });
+                  });
+                }
               } else {
                 this.syncResultMessage = `Failed: ${res.error}`;
                 this.warningType = 'error';
@@ -2093,10 +2169,25 @@
               }
             })
             .withFailureHandler(err => {
+              this.stopSyncPolling();
               this.syncing = false;
+              this.syncProgress = null;
               this.syncResultMessage = `Error: ${err.message}`;
             })
-            .adminSyncStudents();
+            .adminSyncStudents(targetEmail || null);
+        },
+
+        startSyncPolling() {
+          this.stopSyncPolling();
+          this.syncPollTimer = setInterval(() => {
+            google.script.run
+              .withSuccessHandler(prog => { if (prog) this.syncProgress = prog; })
+              .adminGetSyncStudentsProgress();
+          }, 3000);
+        },
+
+        stopSyncPolling() {
+          if (this.syncPollTimer) { clearInterval(this.syncPollTimer); this.syncPollTimer = null; }
         },
         
         syncInstructors() {
@@ -2179,6 +2270,18 @@
           google.script.run
             .withSuccessHandler(res => { if (res.success) this.devMode = res.devMode; })
             .adminSetDevMode(this.devMode);
+        },
+
+        checkEmailVerificationMode() {
+          google.script.run
+            .withSuccessHandler(enabled => { this.emailVerificationMode = enabled; })
+            .adminGetEmailVerificationMode();
+        },
+
+        toggleEmailVerificationMode() {
+          google.script.run
+            .withSuccessHandler(res => { if (res.success) this.emailVerificationMode = res.emailVerificationMode; })
+            .adminSetEmailVerificationMode(this.emailVerificationMode);
         },
 
         switchTab(tab) {

@@ -262,13 +262,13 @@
             </button>
 
             <!-- Avatar -->
-            <div
+            <!-- <div
               class="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white mx-auto mb-3 flex items-center justify-center text-3xl font-bold uppercase shadow-lg border-2 border-white/20">
               <span x-text="getInitials(selectedStudent.name)"></span>
-            </div>
+            </div> -->
 
             <h2 class="text-xl font-bold text-white tracking-tight leading-tight" x-text="selectedStudent.name"></h2>
-            <p class="text-sm font-mono text-white/70 mt-1" x-text="selectedStudent.email"></p>
+            <!-- <p class="text-sm font-mono text-white/70 mt-1" x-text="selectedStudent.email"></p>
 
             <div class="mt-4 flex justify-center">
               <span
@@ -276,7 +276,7 @@
                 Student Year <span class="bg-white text-navy px-1.5 py-0.5 rounded text-[0.6rem] ml-0.5"
                   x-text="selectedStudent.calculated_year"></span>
               </span>
-            </div>
+            </div> -->
           </div>
 
           <!-- Modal Body — two-column on desktop, single column on mobile -->
@@ -301,6 +301,14 @@
                   <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
                     <span class="text-gray-500 font-medium">ID</span>
                     <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.academic_id"></span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 font-medium">Email</span>
+                    <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.email"></span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 font-medium">Student Year</span>
+                    <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.calculated_year"></span>
                   </div>
                   <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
                     <span class="text-gray-500 font-medium">Floor / Unit</span>

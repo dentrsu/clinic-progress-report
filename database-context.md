@@ -266,6 +266,7 @@ create table public.treatment_records (
   book_number numeric,                               -- OPER division
   page_number numeric,                               -- OPER division
   requirement_id uuid references public.requirement_list(requirement_id), -- Linked requirement
+  instructor_id uuid references public.instructors(instructor_id), -- Instructor requested for verification
   verified_by uuid references public.users(user_id), -- The Instructor's user_id
   is_exam boolean default false,                  -- Flag for Exam cases
   perio_exams jsonb default null,                 -- PERIO exam flags: {"ohi_1st":bool,"ohi_2nd":bool,"srp_1st":bool,"srp_2nd":bool}; null for non-PERIO Case G/P records
