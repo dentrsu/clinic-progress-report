@@ -125,6 +125,11 @@
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         Verification Queue
       </a>
+      <a href="<?= appUrl ?>?page=student_dashboard" target="_blank"
+         class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Student Dashboard
+      </a>
       <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:bg-navy-light hover:text-white transition"
          :class="activeTab === 'verifyHash' ? 'bg-navy-light text-white' : ''"
          @click.prevent="switchTab('verifyHash')">
@@ -480,50 +485,70 @@
     <!-- Students Tab -->
     <div x-show="!loading && activeTab === 'students'" class="space-y-6 animate-fade-in">
        <!-- Sync Section -->
-       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div>
-            <h2 class="text-lg font-bold text-navy flex items-center gap-2">
-               <div class="w-5 h-5 rounded-full bg-white flex items-center justify-center overflow-hidden inline-[flex]">
-                 <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain" />
-               </div> Sync from Master Sheet
-            </h2>
-            <p class="text-sm text-gray-500 mt-1">Sync students from Google Sheet (Student, Active).</p>
-          </div>
-          <div class="flex flex-col items-end gap-2">
-             <div class="flex items-center gap-2">
-               <div class="relative">
-                 <input type="text" x-model="syncStudentEmail" placeholder="Email to sync single student..."
-                        class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-64 focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy placeholder:text-gray-400"
-                        @keydown.enter="syncStudentEmail.trim() && syncStudents(syncStudentEmail.trim())">
-                 <button x-show="syncStudentEmail" @click="syncStudentEmail = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-4">
+          <div class="flex flex-col sm:flex-row justify-between items-center gap-4 pb-4 border-b border-gray-50">
+            <div>
+              <h2 class="text-lg font-bold text-navy flex items-center gap-2">
+                 <div class="w-5 h-5 rounded-full bg-white flex items-center justify-center overflow-hidden inline-[flex]">
+                   <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain" />
+                 </div> Sync from Master Sheet
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">Sync students from Google Sheet (Student, Active).</p>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+               <div class="flex items-center gap-2">
+                 <div class="relative">
+                   <input type="text" x-model="syncStudentEmail" placeholder="Email to sync single student..."
+                          class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-64 focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy placeholder:text-gray-400"
+                          @keydown.enter="syncStudentEmail.trim() && syncStudents(syncStudentEmail.trim())">
+                   <button x-show="syncStudentEmail" @click="syncStudentEmail = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                   </button>
+                 </div>
+                 <button @click="syncStudents(syncStudentEmail.trim() || null)" :disabled="syncing || clearing"
+                         :title="syncStudentEmail.trim() ? 'Sync this student only' : 'Sync all active students from master sheet'"
+                         class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                   <svg class="w-4 h-4" :class="{'animate-spin': syncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                   <span x-text="syncing ? 'Syncing...' : (syncStudentEmail.trim() ? 'Sync Student' : 'Sync All')"></span>
                  </button>
                </div>
-               <button @click="syncStudents(syncStudentEmail.trim() || null)" :disabled="syncing"
-                       :title="syncStudentEmail.trim() ? 'Sync this student only' : 'Sync all active students from master sheet'"
-                       class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
-                 <svg class="w-4 h-4" :class="{'animate-spin': syncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                 <span x-text="syncing ? 'Syncing...' : (syncStudentEmail.trim() ? 'Sync Student' : 'Sync All')"></span>
-               </button>
+               <!-- Progress bar -->
+               <div x-show="syncing && syncProgress" class="w-full max-w-md">
+                 <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                   <span x-text="syncProgress ? syncProgress.currentName : ''"></span>
+                   <span x-text="syncProgress ? syncProgress.current + ' / ' + syncProgress.total : ''"></span>
+                 </div>
+                 <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                   <div class="bg-navy h-2 rounded-full transition-all duration-300"
+                        :style="'width: ' + (syncProgress && syncProgress.total > 0 ? Math.round(syncProgress.current / syncProgress.total * 100) : 0) + '%'"></div>
+                 </div>
+                 <div class="flex items-center gap-3 text-[10px] text-gray-400 mt-1">
+                   <span x-text="'Updated: ' + (syncProgress ? syncProgress.updated : 0)"></span>
+                   <span x-show="syncProgress && syncProgress.errors > 0" class="text-red-500" x-text="'Errors: ' + syncProgress.errors"></span>
+                 </div>
+               </div>
+               <div x-show="!syncing && syncResult" class="text-xs font-medium px-3 py-1.5 rounded-lg"
+                    :class="syncResult && syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+                  <span x-text="syncResultMessage"></span>
+               </div>
+            </div>
+          </div>
+          
+          <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+             <div>
+                <h3 class="text-sm font-bold text-gray-800">Clear Inactive Students</h3>
+                <p class="text-xs text-gray-500 mt-1 max-w-md">Clear the local active status of students not found or not marked as 'Active' in the Master Sheet. Excludes admin student.</p>
              </div>
-             <!-- Progress bar -->
-             <div x-show="syncing && syncProgress" class="w-full max-w-md">
-               <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
-                 <span x-text="syncProgress ? syncProgress.currentName : ''"></span>
-                 <span x-text="syncProgress ? syncProgress.current + ' / ' + syncProgress.total : ''"></span>
-               </div>
-               <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                 <div class="bg-navy h-2 rounded-full transition-all duration-300"
-                      :style="'width: ' + (syncProgress && syncProgress.total > 0 ? Math.round(syncProgress.current / syncProgress.total * 100) : 0) + '%'"></div>
-               </div>
-               <div class="flex items-center gap-3 text-[10px] text-gray-400 mt-1">
-                 <span x-text="'Updated: ' + (syncProgress ? syncProgress.updated : 0)"></span>
-                 <span x-show="syncProgress && syncProgress.errors > 0" class="text-red-500" x-text="'Errors: ' + syncProgress.errors"></span>
-               </div>
-             </div>
-             <div x-show="!syncing && syncResult" class="text-xs font-medium px-3 py-1.5 rounded-lg"
-                  :class="syncResult && syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
-                <span x-text="syncResultMessage"></span>
+             <div class="flex flex-col items-end gap-2">
+                <button @click="clearInactiveStudents()" :disabled="syncing || clearing"
+                     class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                  <svg class="w-4 h-4" :class="{'animate-spin': clearing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  <span x-text="clearing ? 'Clearing...' : 'Clear Inactive'"></span>
+                </button>
+                <div x-show="!clearing && clearResult" class="text-xs font-medium px-3 py-1.5 rounded-lg"
+                     :class="clearResult && clearResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+                   <span x-text="clearResultMessage"></span>
+                </div>
              </div>
           </div>
        </div>
@@ -2059,6 +2084,21 @@
         emailVerificationMode: true,
         health: { source: '...', healthy: true }, // Added health state
         
+        // Sync State
+        syncing: false,
+        syncProgress: null,
+        syncResult: null,
+        syncResultMessage: '',
+        syncStudentEmail: '',
+        syncPollTimer: null,
+        instructorSyncProgress: null,
+        instructorSyncEmails: '',
+        
+        // Clearing Status State
+        clearing: false,
+        clearResult: null,
+        clearResultMessage: '',
+        
         // Warning Modal State
         warningOpen: false,
         warningType: 'warning', // warning | error
@@ -2444,6 +2484,43 @@
 
         stopSyncPolling() {
           if (this.syncPollTimer) { clearInterval(this.syncPollTimer); this.syncPollTimer = null; }
+        },
+        
+        clearInactiveStudents() {
+          this.confirmMessage = "This will clear the active status for all local students not found or inactive in the Master Sheet. Continue?";
+          this.confirmCallback = () => {
+             this._executeClearInactiveStudents();
+          };
+          this.confirmOpen = true;
+        },
+        
+        _executeClearInactiveStudents() {
+          this.clearing = true;
+          this.clearResult = null;
+          this.clearResultMessage = "Clearing inactive statuses...";
+          
+          google.script.run
+            .withSuccessHandler(res => {
+              this.clearing = false;
+              this.clearResult = res;
+              if (res.success) {
+                this.clearResultMessage = `Processed: ${res.stats.processed}, Cleared: ${res.stats.cleared}, Skipped: ${res.stats.skipped}`;
+                if (res.stats.cleared > 0) {
+                    this.loadStudents(); // Refresh the list to reflect cleared statuses
+                }
+              } else {
+                this.clearResultMessage = `Failed: ${res.error}`;
+                this.warningType = 'error';
+                this.warningMessage = "Clear Status Failed:\n" + res.error;
+                this.warningOpen = true;
+              }
+            })
+            .withFailureHandler(err => {
+              this.clearing = false;
+              this.clearResult = { success: false };
+              this.clearResultMessage = `Error: ${err.message}`;
+            })
+            .adminClearInactiveStudents();
         },
         
         syncInstructors() {

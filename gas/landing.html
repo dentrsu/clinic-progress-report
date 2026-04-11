@@ -343,6 +343,23 @@
             </a>
           </template>
 
+          <!-- Student Dashboard Route (Admin) -->
+          <template x-if="profile.role === 'admin'">
+            <a href="<?= appUrl ?>?page=student_dashboard" target="_blank"
+              title="Browse all active students with filters by year, floor, and team leader"
+              class="flex items-center justify-center gap-2 w-full py-2.5 bg-white border border-gray-200 text-navy text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 hover:text-navy hover:scale-[1.02] transition-all relative">
+              <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              Student Dashboard
+              <div class="absolute right-3 opacity-50"><svg class="w-4 h-4" fill="none" stroke="currentColor"
+                  viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg></div>
+            </a>
+          </template>
+
           <!-- Division Dashboard Route (Admin) -->
           <template x-if="profile.role === 'admin'">
             <a href="<?= appUrl ?>?page=dashboard" target="_blank"

@@ -128,6 +128,12 @@
                 <span class="font-bold text-navy bg-navy/5 px-2 py-0.5 rounded" x-text="s.calculated_year"></span>
               </div>
               <div class="flex justify-between items-center text-xs">
+                <span class="text-gray-400 font-medium uppercase tracking-wider">Floor / Unit</span>
+                <span class="font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                  <span x-text="s.floor_label"></span> / <span x-text="s.unit_id"></span>
+                </span>
+              </div>
+              <div class="flex justify-between items-center text-xs">
                 <span class="text-gray-400 font-medium uppercase tracking-wider">Status</span>
                 <span class="capitalize font-medium flex items-center gap-1.5" :class="isActiveStatus(s.status) ? 'text-indigo-600' : 'text-gray-500'">
                    <span class="w-1.5 h-1.5 rounded-full" :class="isActiveStatus(s.status) ? 'bg-indigo-500' : 'bg-gray-400'"></span>
@@ -150,12 +156,12 @@
 
   <!-- Student Profile Modal -->
   <div x-show="modalOpen" style="display: none;"
-       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
        x-transition.opacity>
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md sm:max-w-2xl overflow-hidden animate-scale-in"
+    <div class="bg-white shadow-2xl w-full h-full overflow-hidden animate-scale-in"
          @click.outside="modalOpen = false">
       <template x-if="selectedStudent">
-        <div class="flex flex-col max-h-[90vh]">
+        <div class="flex flex-col h-full">
            <!-- Modal Header (Navy block) -->
            <div class="bg-navy px-6 py-6 relative text-center shrink-0">
              <button @click="modalOpen = false" class="absolute top-4 right-4 text-white/50 hover:text-white transition">
@@ -163,22 +169,22 @@
              </button>
              
              <!-- Avatar -->
-             <div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white mx-auto mb-3 flex items-center justify-center text-3xl font-bold uppercase shadow-lg border-2 border-white/20">
+             <!-- <div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white mx-auto mb-3 flex items-center justify-center text-3xl font-bold uppercase shadow-lg border-2 border-white/20">
                 <span x-text="getInitials(selectedStudent.name)"></span>
-             </div>
+             </div> -->
              
              <h2 class="text-xl font-bold text-white tracking-tight leading-tight" x-text="selectedStudent.name"></h2>
              <p class="text-sm font-mono text-white/70 mt-1" x-text="selectedStudent.email"></p>
              
-             <div class="mt-4 flex justify-center">
+             <!-- <div class="mt-4 flex justify-center">
                 <span class="px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-white border border-white/20 flex items-center gap-1.5 shadow-sm">
                    Student Year <span class="bg-white text-navy px-1.5 py-0.5 rounded text-[0.6rem] ml-0.5" x-text="selectedStudent.calculated_year"></span>
                 </span>
-             </div>
+             </div> -->
            </div>
            
            <!-- Modal Body (Details) -->
-           <div class="p-6 space-y-4 overflow-y-auto">
+           <div class="p-6 flex-1 space-y-4 overflow-y-auto">
              <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
                 <span class="text-gray-500 font-medium">Academic ID</span>
                 <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.academic_id"></span>
@@ -212,222 +218,153 @@
                
                <!-- Vault Data -->
                <template x-if="!studentVaultLoading && studentVaultData">
-                 <div class="space-y-4">
+                 <div class="space-y-6">
                      <!-- Empty state -->
                      <div x-show="studentVaultData.requirements.length === 0" class="py-6 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
                          <span class="text-xs text-gray-400">No requirements assigned to this division.</span>
                      </div>
                      
-                     <!-- RSU Requirements Table -->
-                     <div x-show="studentVaultData.requirements.some(r => r.minimum_rsu > 0 || r.is_exam)" class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                         <div class="px-3 py-2 bg-navy/5 border-b border-gray-100 flex items-center justify-between">
-                              <span class="text-[10px] font-bold text-navy uppercase tracking-widest">RSU</span>
-                         </div>
-                         <div class="divide-y divide-gray-50">
-                             <template x-for="req in studentVaultData.requirements" :key="'rsu_'+req.requirement_id">
-                                 <div x-show="req.minimum_rsu > 0 || req.is_exam">
-                                     <!-- Row -->
-                                     <div @click="toggleReq('rsu_'+req.requirement_id)" class="px-3 py-3 hover:bg-indigo-50/50 cursor-pointer select-none">
-                                         <div class="flex items-start gap-2">
-                                             <svg class="w-3.5 h-3.5 mt-0.5 text-gray-400 transition-transform flex-shrink-0" :class="expandedReqs.has('rsu_'+req.requirement_id) ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
-                                             </svg>
-                                             <div class="flex-1 min-w-0">
-                                                 <div class="text-sm font-bold text-gray-800" x-text="req.requirement_type"></div>
-                                                 <div class="mt-1.5 flex items-center justify-between gap-3">
-                                                     <div class="flex-1">
-                                                         <div class="flex items-end justify-between mb-1">
-                                                             <span class="text-[9px] font-bold text-navy">PROGRESS</span>
-                                                             <span class="text-xs font-black text-gray-900">
-                                                                 <span x-text="req.current_rsu"></span>
-                                                                 <template x-if="req.pending_rsu > 0"><span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'+' + req.pending_rsu"></span></template>
-                                                                 <template x-if="req.minimum_rsu > 0"><span class="text-gray-400 font-medium"> / <span x-text="req.minimum_rsu"></span></span></template>
-                                                             </span>
-                                                         </div>
-                                                         <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden p-[1px]">
-                                                             <div class="h-full rounded-full transition-all duration-1000 shadow-sm"
-                                                                  :class="getBarColor(req.current_rsu, req.minimum_rsu)"
-                                                                  :style="'width: ' + getPercent(req.current_rsu, req.minimum_rsu) + '%'">
-                                                             </div>
-                                                         </div>
-                                                     </div>
-                                                     <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
-                                                           :class="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu) ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'">
-                                                         <span x-text="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu) ? '✓ Done' : 'Track'"></span>
-                                                     </span>
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     </div>
-                                     <!-- Expanded Details -->
-                                     <div x-show="expandedReqs.has('rsu_'+req.requirement_id)" class="px-3 pb-3 pt-1 bg-indigo-50/30 border-t border-indigo-50">
-                                         <template x-if="req.rsu_records && req.rsu_records.length > 0">
-                                             <div class="mt-2">
-                                                 <!-- Mobile: compact cards -->
-                                                 <div class="sm:hidden space-y-1.5">
-                                                     <template x-for="(rec, i) in req.rsu_records" :key="i">
-                                                         <div class="flex items-center justify-between text-xs p-2 bg-white rounded border border-indigo-100/60 shadow-sm">
-                                                             <div class="font-mono text-gray-600 font-medium" x-text="rec.hn"></div>
-                                                             <div class="flex items-center gap-3">
-                                                                <span class="font-semibold text-navy" x-text="rec.rsu_units + ' RSU'"></span>
-                                                                <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-                                                                      :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-                                                                      x-text="rec.status === 'verified' ? 'VRFY' : 'PEND'">
-                                                                </span>
-                                                             </div>
-                                                         </div>
-                                                     </template>
-                                                 </div>
-                                                 <!-- Desktop: full table -->
-                                                 <div class="hidden sm:block rounded-xl overflow-hidden border border-blue-100">
-                                                     <table class="w-full text-left">
-                                                         <thead>
-                                                             <tr class="bg-navy/5 text-[9px] font-bold text-navy uppercase tracking-widest">
-                                                                 <th class="px-4 py-2">Patient</th>
-                                                                 <th class="px-4 py-2">Area</th>
-                                                                 <th class="px-4 py-2 text-center">RSU</th>
-                                                                 <th class="px-4 py-2 text-right">Status</th>
-                                                             </tr>
-                                                         </thead>
-                                                         <tbody class="divide-y divide-blue-100/60">
-                                                             <template x-for="(rec, i) in req.rsu_records" :key="i">
-                                                                 <tr class="text-xs" :class="rec.transferred_from ? 'bg-violet-50/60' : ''">
-                                                                     <td class="px-4 py-2">
-                                                                         <div class="flex items-center gap-1.5 flex-wrap">
-                                                                             <span class="font-mono font-semibold text-gray-700" x-text="rec.hn"></span>
-                                                                             <template x-if="rec.transferred_from">
-                                                                                 <span class="inline-flex px-1 py-0.5 rounded text-[9px] bg-violet-100 text-violet-700 font-semibold" x-text="'from ' + rec.transferred_from"></span>
-                                                                             </template>
-                                                                         </div>
-                                                                         <div class="text-gray-500 text-[10px] mt-0.5" x-text="rec.patient_name"></div>
-                                                                     </td>
-                                                                     <td class="px-4 py-2 text-gray-500 text-[11px]" x-text="rec.area"></td>
-                                                                     <td class="px-4 py-2 text-center font-semibold text-navy" x-text="rec.rsu_units"></td>
-                                                                     <td class="px-4 py-2 text-right">
-                                                                         <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-                                                                               :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-                                                                               x-text="rec.status === 'verified' ? 'Verified' : 'Pending'"></span>
-                                                                     </td>
-                                                                 </tr>
-                                                             </template>
-                                                         </tbody>
-                                                     </table>
-                                                 </div>
-                                             </div>
-                                         </template>
-                                         <template x-if="!req.rsu_records || req.rsu_records.length === 0">
-                                             <p class="text-xs text-gray-400 italic py-1 pl-6">No records yet.</p>
-                                         </template>
-                                     </div>
-                                 </div>
-                             </template>
-                         </div>
-                     </div>
-                     
-                     <!-- CDA Requirements Table -->
-                     <div x-show="studentVaultData.requirements.some(r => r.minimum_cda > 0 || r.is_exam)" class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                         <div class="px-3 py-2 bg-amber-50 border-b border-gray-100 flex items-center justify-between">
-                              <span class="text-[10px] font-bold text-amber-700 uppercase tracking-widest">CDA</span>
-                         </div>
-                         <div class="divide-y divide-gray-50">
-                             <template x-for="req in studentVaultData.requirements" :key="'cda_'+req.requirement_id">
-                                 <div x-show="req.minimum_cda > 0 || req.is_exam">
-                                     <!-- Row -->
-                                     <div @click="toggleReq('cda_'+req.requirement_id)" class="px-3 py-3 hover:bg-amber-50/50 cursor-pointer select-none">
-                                         <div class="flex items-start gap-2">
-                                             <svg class="w-3.5 h-3.5 mt-0.5 text-gray-400 transition-transform flex-shrink-0" :class="expandedReqs.has('cda_'+req.requirement_id) ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
-                                             </svg>
-                                             <div class="flex-1 min-w-0">
-                                                 <div class="text-sm font-bold text-gray-800" x-text="req.cda_requirement_type || req.requirement_type"></div>
-                                                 <div class="mt-1.5 flex items-center justify-between gap-3">
-                                                     <div class="flex-1">
-                                                         <div class="flex items-end justify-between mb-1">
-                                                             <span class="text-[9px] font-bold text-amber-600">PROGRESS</span>
-                                                             <span class="text-xs font-black text-gray-900">
-                                                                 <span x-text="req.current_cda"></span>
-                                                                 <template x-if="req.pending_cda > 0"><span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'+' + req.pending_cda"></span></template>
-                                                                 <template x-if="req.minimum_cda > 0"><span class="text-gray-400 font-medium"> / <span x-text="req.minimum_cda"></span></span></template>
-                                                             </span>
-                                                         </div>
-                                                         <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden p-[1px]">
-                                                             <div class="h-full rounded-full transition-all duration-1000 shadow-sm"
-                                                                  :class="getBarColor(req.current_cda, req.minimum_cda)"
-                                                                  :style="'width: ' + getPercent(req.current_cda, req.minimum_cda) + '%'">
-                                                             </div>
-                                                         </div>
-                                                     </div>
-                                                     <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
-                                                           :class="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda) ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'">
-                                                         <span x-text="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda) ? '✓ Done' : 'Track'"></span>
-                                                     </span>
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     </div>
-                                     <!-- Expanded Details -->
-                                     <div x-show="expandedReqs.has('cda_'+req.requirement_id)" class="px-3 pb-3 pt-1 bg-amber-50/30 border-t border-amber-50">
-                                         <template x-if="req.cda_records && req.cda_records.length > 0">
-                                             <div class="mt-2">
-                                                 <!-- Mobile: compact cards -->
-                                                 <div class="sm:hidden space-y-1.5">
-                                                     <template x-for="(rec, i) in req.cda_records" :key="i">
-                                                         <div class="flex items-center justify-between text-xs p-2 bg-white rounded border border-amber-100/60 shadow-sm">
-                                                             <div class="font-mono text-gray-600 font-medium" x-text="rec.hn"></div>
-                                                             <div class="flex items-center gap-3">
-                                                                <span class="font-semibold text-amber-700" x-text="rec.cda_units + ' CDA'"></span>
-                                                                <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-                                                                      :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-                                                                      x-text="rec.status === 'verified' ? 'VRFY' : 'PEND'">
-                                                                </span>
-                                                             </div>
-                                                         </div>
-                                                     </template>
-                                                 </div>
-                                                 <!-- Desktop: full table -->
-                                                 <div class="hidden sm:block rounded-xl overflow-hidden border border-amber-100">
-                                                     <table class="w-full text-left">
-                                                         <thead>
-                                                             <tr class="bg-amber-50 text-[9px] font-bold text-amber-700 uppercase tracking-widest">
-                                                                 <th class="px-4 py-2">Patient</th>
-                                                                 <th class="px-4 py-2">Area</th>
-                                                                 <th class="px-4 py-2 text-center">CDA</th>
-                                                                 <th class="px-4 py-2 text-right">Status</th>
-                                                             </tr>
-                                                         </thead>
-                                                         <tbody class="divide-y divide-amber-100/60">
-                                                             <template x-for="(rec, i) in req.cda_records" :key="i">
-                                                                 <tr class="text-xs" :class="rec.transferred_from ? 'bg-violet-50/60' : ''">
-                                                                     <td class="px-4 py-2">
-                                                                         <div class="flex items-center gap-1.5 flex-wrap">
-                                                                             <span class="font-mono font-semibold text-gray-700" x-text="rec.hn"></span>
-                                                                             <template x-if="rec.transferred_from">
-                                                                                 <span class="inline-flex px-1 py-0.5 rounded text-[9px] bg-violet-100 text-violet-700 font-semibold" x-text="'from ' + rec.transferred_from"></span>
-                                                                             </template>
-                                                                         </div>
-                                                                         <div class="text-gray-500 text-[10px] mt-0.5" x-text="rec.patient_name"></div>
-                                                                     </td>
-                                                                     <td class="px-4 py-2 text-gray-500 text-[11px]" x-text="rec.area"></td>
-                                                                     <td class="px-4 py-2 text-center font-semibold text-amber-700" x-text="rec.cda_units"></td>
-                                                                     <td class="px-4 py-2 text-right">
-                                                                         <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-                                                                               :class="rec.status === 'verified' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-                                                                               x-text="rec.status === 'verified' ? 'Verified' : 'Pending'"></span>
-                                                                     </td>
-                                                                 </tr>
-                                                             </template>
-                                                         </tbody>
-                                                     </table>
-                                                 </div>
-                                             </div>
-                                         </template>
-                                         <template x-if="!req.cda_records || req.cda_records.length === 0">
-                                             <p class="text-xs text-gray-400 italic py-1 pl-6">No records yet.</p>
-                                         </template>
-                                     </div>
-                                 </div>
-                             </template>
-                         </div>
+                     <!-- Side-by-Side Flex Layout -->
+                     <div class="flex flex-col lg:flex-row items-start gap-6">
+                       <!-- RSU Requirements Table -->
+                       <div x-show="studentVaultData.requirements.some(r => r.minimum_rsu > 0 || r.is_exam)" class="flex-1 w-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                           <div class="px-3 py-2 bg-navy/5 border-b border-gray-100 flex items-center justify-between shrink-0">
+                                <span class="text-[10px] font-bold text-navy uppercase tracking-widest">RSU Requirements</span>
+                           </div>
+                           <div class="divide-y divide-gray-50">
+                               <template x-for="req in studentVaultData.requirements" :key="'rsu_'+req.requirement_id">
+                                   <div x-show="req.minimum_rsu > 0 || req.is_exam">
+                                       <!-- Row -->
+                                       <div @click="toggleReq('rsu_'+req.requirement_id)" class="px-3 py-3 hover:bg-indigo-50/50 cursor-pointer select-none">
+                                           <div class="flex items-start gap-2">
+                                               <svg class="w-3.5 h-3.5 mt-0.5 text-gray-400 transition-transform flex-shrink-0" :class="expandedReqs.has('rsu_'+req.requirement_id) ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
+                                               </svg>
+                                               <div class="flex-1 min-w-0">
+                                                   <div class="text-sm font-bold text-gray-800" x-text="req.requirement_type"></div>
+                                                   <div class="mt-1.5 flex items-center justify-between gap-3">
+                                                       <div class="flex-1">
+                                                           <div class="flex items-end justify-between mb-1">
+                                                               <span class="text-[9px] font-bold text-navy">PROGRESS</span>
+                                                               <span class="text-xs font-black text-gray-900">
+                                                                   <span x-text="req.current_rsu"></span>
+                                                                   <template x-if="req.pending_rsu > 0"><span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'+' + req.pending_rsu"></span></template>
+                                                                   <template x-if="req.minimum_rsu > 0"><span class="text-gray-400 font-medium"> / <span x-text="req.minimum_rsu"></span></span></template>
+                                                               </span>
+                                                           </div>
+                                                           <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden p-[1px]">
+                                                               <div class="h-full rounded-full transition-all duration-1000 shadow-sm"
+                                                                    :class="getBarColor(req.current_rsu, req.minimum_rsu)"
+                                                                    :style="'width: ' + getPercent(req.current_rsu, req.minimum_rsu) + '%'">
+                                                               </div>
+                                                           </div>
+                                                       </div>
+                                                       <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                                                             :class="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu) ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'">
+                                                           <span x-text="(req.minimum_rsu <= 0 && !req.is_exam) || (req.minimum_rsu > 0 && req.current_rsu >= req.minimum_rsu) ? '✓ Done' : 'Track'"></span>
+                                                       </span>
+                                                   </div>
+                                               </div>
+                                           </div>
+                                       </div>
+                                       <!-- Expanded Details -->
+                                       <div x-show="expandedReqs.has('rsu_'+req.requirement_id)" class="px-3 pb-3 pt-1 bg-indigo-50/30 border-t border-indigo-50">
+                                           <template x-if="req.rsu_records && req.rsu_records.length > 0">
+                                               <div class="mt-2 text-[11px]">
+                                                   <div class="space-y-1.5">
+                                                       <template x-for="(rec, i) in req.rsu_records" :key="i">
+                                                           <div class="p-2 bg-white rounded border border-indigo-100/60 shadow-sm flex flex-col gap-1">
+                                                               <div class="flex justify-between items-center">
+                                                                   <span class="font-mono font-bold text-gray-700" x-text="rec.hn"></span>
+                                                                   <span class="font-bold text-navy" x-text="rec.rsu_units + ' RSU'"></span>
+                                                               </div>
+                                                               <div class="flex justify-between items-center text-[10px]">
+                                                                   <span class="text-gray-500 truncate" x-text="rec.patient_name"></span>
+                                                                   <span class="px-1 py-0.5 rounded font-black uppercase text-[8px]" :class="rec.status === 'verified' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'" x-text="rec.status"></span>
+                                                               </div>
+                                                           </div>
+                                                       </template>
+                                                   </div>
+                                               </div>
+                                           </template>
+                                           <template x-if="!req.rsu_records || req.rsu_records.length === 0">
+                                               <p class="text-xs text-gray-400 italic py-1 pl-6">No records yet.</p>
+                                           </template>
+                                       </div>
+                                   </div>
+                               </template>
+                           </div>
+                       </div>
+
+                       <!-- CDA Requirements Table -->
+                       <div x-show="studentVaultData.requirements.some(r => r.minimum_cda > 0 || r.is_exam)" class="flex-1 w-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                           <div class="px-3 py-2 bg-amber-50 border-b border-gray-100 flex items-center justify-between shrink-0">
+                                <span class="text-[10px] font-bold text-amber-700 uppercase tracking-widest">CDA Requirements</span>
+                           </div>
+                           <div class="divide-y divide-gray-50">
+                               <template x-for="req in studentVaultData.requirements" :key="'cda_'+req.requirement_id">
+                                   <div x-show="req.minimum_cda > 0 || req.is_exam">
+                                       <!-- Row -->
+                                       <div @click="toggleReq('cda_'+req.requirement_id)" class="px-3 py-3 hover:bg-amber-50/50 cursor-pointer select-none">
+                                           <div class="flex items-start gap-2">
+                                               <svg class="w-3.5 h-3.5 mt-0.5 text-gray-400 transition-transform flex-shrink-0" :class="expandedReqs.has('cda_'+req.requirement_id) ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
+                                               </svg>
+                                               <div class="flex-1 min-w-0">
+                                                   <div class="text-sm font-bold text-gray-800" x-text="req.cda_requirement_type || req.requirement_type"></div>
+                                                   <div class="mt-1.5 flex items-center justify-between gap-3">
+                                                       <div class="flex-1">
+                                                           <div class="flex items-end justify-between mb-1">
+                                                               <span class="text-[9px] font-bold text-amber-600">PROGRESS</span>
+                                                               <span class="text-xs font-black text-gray-900">
+                                                                   <span x-text="req.current_cda"></span>
+                                                                   <template x-if="req.pending_cda > 0"><span class="text-[9px] text-amber-500 font-bold ml-0.5" x-text="'+' + req.pending_cda"></span></template>
+                                                                   <template x-if="req.minimum_cda > 0"><span class="text-gray-400 font-medium"> / <span x-text="req.minimum_cda"></span></span></template>
+                                                               </span>
+                                                           </div>
+                                                           <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden p-[1px]">
+                                                               <div class="h-full rounded-full transition-all duration-1000 shadow-sm"
+                                                                    :class="getBarColor(req.current_cda, req.minimum_cda)"
+                                                                    :style="'width: ' + getPercent(req.current_cda, req.minimum_cda) + '%'">
+                                                               </div>
+                                                           </div>
+                                                       </div>
+                                                       <span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider"
+                                                             :class="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda) ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'">
+                                                           <span x-text="(req.minimum_cda <= 0 && !req.is_exam) || (req.minimum_cda > 0 && req.current_cda >= req.minimum_cda) ? '✓ Done' : 'Track'"></span>
+                                                       </span>
+                                                   </div>
+                                               </div>
+                                           </div>
+                                       </div>
+                                       <!-- Expanded Details -->
+                                       <div x-show="expandedReqs.has('cda_'+req.requirement_id)" class="px-3 pb-3 pt-1 bg-amber-50/30 border-t border-amber-50">
+                                           <template x-if="req.cda_records && req.cda_records.length > 0">
+                                               <div class="mt-2 text-[11px]">
+                                                   <div class="space-y-1.5">
+                                                       <template x-for="(rec, i) in req.cda_records" :key="i">
+                                                           <div class="p-2 bg-white rounded border border-amber-100/60 shadow-sm flex flex-col gap-1">
+                                                               <div class="flex justify-between items-center">
+                                                                   <span class="font-mono font-bold text-gray-700" x-text="rec.hn"></span>
+                                                                   <span class="font-bold text-amber-700" x-text="rec.cda_units + ' CDA'"></span>
+                                                               </div>
+                                                               <div class="flex justify-between items-center text-[10px]">
+                                                                   <span class="text-gray-500 truncate" x-text="rec.patient_name"></span>
+                                                                   <span class="px-1 py-0.5 rounded font-black uppercase text-[8px]" :class="rec.status === 'verified' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'" x-text="rec.status"></span>
+                                                               </div>
+                                                           </div>
+                                                       </template>
+                                                   </div>
+                                               </div>
+                                           </template>
+                                           <template x-if="!req.cda_records || req.cda_records.length === 0">
+                                               <p class="text-xs text-gray-400 italic py-1 pl-6">No records yet.</p>
+                                           </template>
+                                       </div>
+                                   </div>
+                               </template>
+                           </div>
+                       </div>
                      </div>
                  </div>
                </template>

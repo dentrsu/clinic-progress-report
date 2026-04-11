@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { DEFAULT: '#1B2A4A', light: '#2A3E66', dark: '#111D35' },
+            gold: { DEFAULT: '#C4972F', light: '#D4AD4E' },
+            surface: '#F8F7F4',
+            cardwhite: '#FFFFFF',
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.3s ease-out',
+            'scale-in': 'scaleIn 0.2s ease-out'
+          },
+          keyframes: {
+            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            scaleIn: {
+              '0%': { opacity: '0', transform: 'scale(0.98)' },
+              '100%': { opacity: '1', transform: 'scale(1)' }
+            }
+          }
+        }
+      },
+      safelist: [
+        'bg-gray-50', 'text-gray-400', 'border-gray-100', 'border-gray-200', 'bg-gray-100',
+        'bg-emerald-50', 'text-emerald-700', 'border-emerald-100', 'border-emerald-200', 'bg-emerald-100',
+        'bg-blue-50', 'text-blue-700', 'border-blue-100', 'border-blue-200', 'bg-blue-100',
+        'bg-amber-50', 'text-amber-700', 'border-amber-100', 'border-amber-200', 'bg-amber-100'
+      ]
+    }
+  </script>
+  <style>
+    .spinner { border-top-color: transparent !important; border-right-color: transparent !important; animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    [x-cloak] { display: none !important; }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <?!= include('styles') ?>
+</head>
+
+<body class="min-h-screen bg-surface flex flex-col p-4 md:p-8 font-[Inter,sans-serif]"
+      x-data="studentDashboardApp()" x-init="init()" x-cloak>
+
+  <!-- Loading state -->
+  <div x-show="state === 'loading'" class="flex-grow flex flex-col items-center justify-center animate-fade-in">
+    <div class="w-16 h-16 rounded-full bg-white flex items-center justify-center p-1 shadow-lg mb-5 overflow-hidden">
+      <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain" />
+    </div>
+    <div class="spinner border-4 border-navy/20 border-t-navy w-10 h-10 rounded-full mb-4"></div>
+    <p class="text-sm text-gray-500 font-medium">Loading Student Dashboard...</p>
+  </div>
+
+  <!-- Error state -->
+  <div x-show="state === 'error'" style="display:none" class="flex-grow flex items-center justify-center animate-fade-in">
+    <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-sm">
+      <div class="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-bold text-gray-800 mb-2">Access Error</h3>
+      <p class="text-sm text-gray-500 mb-6" x-text="errorMessage"></p>
+      <button type="button" @click="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}" class="block w-full py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition text-sm">Close</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div x-show="state === 'loaded'" style="display:none" class="w-full max-w-7xl mx-auto space-y-6 animate-fade-in">
+
+    <!-- Header -->
+    <div class="bg-navy rounded-2xl p-6 md:px-8 md:py-6 text-white flex flex-col md:flex-row justify-between items-center shadow-lg gap-4">
+      <div class="flex items-center gap-5">
+        <div class="w-14 h-14 rounded-full bg-white flex items-center justify-center overflow-hidden">
+          <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-0.5" />
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight">Student Dashboard</h1>
+          <p class="text-white/70 text-sm mt-0.5">Admin view — all active students</p>
+        </div>
+      </div>
+      <button type="button" @click="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}"
+         class="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition text-white border border-white/20">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span class="hidden sm:inline">Close</span>
+      </button>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div>
+          <label class="block text-[0.65rem] font-semibold text-gray-400 uppercase tracking-wider mb-1">Search</label>
+          <input type="text" x-model="searchQuery" placeholder="Name or academic ID..."
+                 class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-navy focus:border-transparent">
+        </div>
+        <div>
+          <label class="block text-[0.65rem] font-semibold text-gray-400 uppercase tracking-wider mb-1">Student Year</label>
+          <select x-model="filterYear"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-navy focus:border-transparent">
+            <option value="all">All Years</option>
+            <template x-for="y in availableYears()" :key="y">
+              <option :value="y" x-text="'Year ' + y"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[0.65rem] font-semibold text-gray-400 uppercase tracking-wider mb-1">Floor</label>
+          <select x-model="filterFloor"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-navy focus:border-transparent">
+            <option value="all">All Floors</option>
+            <template x-for="f in availableFloors()" :key="f.floor_id">
+              <option :value="f.floor_id" x-text="f.label"></option>
+            </template>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[0.65rem] font-semibold text-gray-400 uppercase tracking-wider mb-1">Team Leader</label>
+          <select x-model="filterTeamLeader"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-navy focus:border-transparent">
+            <option value="all">All Team Leaders</option>
+            <template x-for="tl in availableTeamLeaders()" :key="tl">
+              <option :value="tl" x-text="tl"></option>
+            </template>
+          </select>
+        </div>
+      </div>
+      <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
+        <span>
+          Showing <span class="font-bold text-navy" x-text="filteredStudents().length"></span>
+          / <span x-text="students.length"></span> students
+        </span>
+        <button @click="resetFilters()" class="text-navy hover:underline font-medium">Reset filters</button>
+      </div>
+    </div>
+
+    <!-- Students Grid -->
+    <div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <template x-for="s in filteredStudents()" :key="s.student_id">
+          <div @click="openModal(s)"
+               class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:border-navy/30 hover:shadow-md transition-all cursor-pointer flex flex-col group relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-navy opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+            <div class="flex items-start gap-4 mb-4">
+              <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center text-lg uppercase shadow-sm border border-emerald-100 shrink-0">
+                <span x-text="getInitials(s.name)"></span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-bold text-gray-800 text-base truncate" x-text="s.name"></h3>
+                <p class="text-[0.7rem] font-mono text-gray-500 mt-1" x-text="'ID: ' + s.academic_id"></p>
+              </div>
+              <span class="font-bold text-navy bg-navy/5 px-2 py-0.5 rounded text-xs shrink-0" x-text="'Y' + s.calculated_year"></span>
+            </div>
+
+            <div class="mt-auto space-y-1.5 text-xs">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-400 font-medium uppercase tracking-wider">Floor / Unit</span>
+                <span class="font-medium text-gray-700">
+                  <span x-text="s.floor_label"></span> / <span x-text="s.unit_id"></span>
+                </span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-400 font-medium uppercase tracking-wider">Team Leader 1</span>
+                <span class="font-medium text-gray-700 truncate ml-2 max-w-[55%] text-right" x-text="s.team_leader_1_name"></span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-400 font-medium uppercase tracking-wider">Team Leader 2</span>
+                <span class="font-medium text-gray-700 truncate ml-2 max-w-[55%] text-right" x-text="s.team_leader_2_name"></span>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <div x-show="filteredStudents().length === 0"
+             class="col-span-full py-16 text-center bg-white rounded-xl border border-dashed border-gray-300">
+          <div class="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </div>
+          <p class="text-gray-500 font-medium">No students found.</p>
+          <p class="text-xs text-gray-400 mt-1">Try adjusting your filters.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Student Profile Modal (full screen) -->
+  <div x-show="modalOpen" style="display:none"
+       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+       x-transition.opacity>
+    <div class="bg-white shadow-2xl w-full h-full overflow-hidden animate-scale-in"
+         @click.outside="modalOpen = false">
+      <template x-if="selectedStudent">
+        <div class="flex flex-col h-full">
+          <!-- Modal Header -->
+          <div class="bg-navy px-6 py-6 relative text-center shrink-0">
+            <button @click="modalOpen = false" class="absolute top-4 right-4 text-white/50 hover:text-white transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <h2 class="text-xl font-bold text-white tracking-tight leading-tight" x-text="selectedStudent.name"></h2>
+          </div>
+
+          <!-- Modal Body — two-column on desktop -->
+          <div class="flex-1 overflow-y-auto sm:overflow-hidden sm:flex sm:min-h-0">
+
+            <!-- Left column: student details + vault link -->
+            <div class="sm:w-2/5 sm:shrink-0 sm:border-r sm:border-gray-100 sm:overflow-y-auto">
+              <div class="p-6 space-y-4">
+
+                <button @click="showStudentDetail = !showStudentDetail"
+                        class="sm:hidden text-xs text-blue-500 hover:underline flex items-center gap-1">
+                  <svg class="w-3 h-3 transition-transform" :class="showStudentDetail ? 'rotate-90' : ''" fill="none"
+                       stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                  <span x-text="showStudentDetail ? 'Hide details' : 'Show details'"></span>
+                </button>
+
+                <div :class="showStudentDetail ? '' : 'hidden sm:block'" class="space-y-4">
+                  <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 font-medium">ID</span>
+                    <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.academic_id"></span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 font-medium">Email</span>
+                    <span class="font-mono text-gray-800 font-semibold text-xs truncate ml-2 max-w-[60%] text-right" x-text="selectedStudent.email"></span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 font-medium">Student Year</span>
+                    <span class="font-mono text-gray-800 font-semibold" x-text="selectedStudent.calculated_year"></span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 font-medium">Floor / Unit</span>
+                    <span class="font-medium text-gray-800">
+                      <span x-text="selectedStudent.floor_label"></span> / <span x-text="selectedStudent.unit_id"></span>
+                    </span>
+                  </div>
+                  <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <div class="flex flex-col gap-1 text-xs mb-3">
+                      <span class="text-gray-400 uppercase tracking-wider font-semibold">Team Leader 1</span>
+                      <span class="font-medium text-gray-800" x-text="selectedStudent.team_leader_1_name"></span>
+                    </div>
+                    <div class="flex flex-col gap-1 text-xs">
+                      <span class="text-gray-400 uppercase tracking-wider font-semibold">Team Leader 2</span>
+                      <span class="font-medium text-gray-800" x-text="selectedStudent.team_leader_2_name"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <a :href="'<?= appUrl ?>?page=vault&student_id=' + selectedStudent.student_id" target="_blank"
+                   class="w-full flex justify-center items-center gap-2 py-2 bg-navy text-white font-medium rounded-lg hover:bg-navy-light transition shadow-sm text-sm mb-4">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                  </svg>
+                  Requirement Vault
+                </a>
+
+                <!-- Oracle Forecast -->
+                <div class="bg-gray-50 rounded-lg p-2 border border-gray-200 shadow-inner">
+                  <button @click="showOracleForecast = !showOracleForecast"
+                          class="w-full flex justify-between items-center px-2 py-1.5 hover:bg-gray-100 rounded transition text-left">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Oracle Forecast</span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="showOracleForecast ? 'rotate-180' : ''" fill="none"
+                         stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <div x-show="showOracleForecast" x-collapse class="space-y-3 px-2 pt-3 pb-2 mt-1 border-t border-gray-200">
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600 mb-1">วันสิ้นสุดการปฏิบัติงานคลินิก (Clinical End Date):</label>
+                      <input type="date" x-model="clinicalEndDate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-800">
+                    </div>
+                    <div class="flex justify-between items-center text-sm border-b border-gray-200 pb-2">
+                      <span class="text-gray-500 font-medium text-xs">Remaining Date:</span>
+                      <span class="font-bold text-navy" x-text="getRemainingDate(clinicalEndDate)"></span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm border-b border-gray-200 pb-2 pt-1">
+                      <span class="text-gray-500 font-medium text-xs">Forecast Completion:</span>
+                      <span class="font-bold text-gray-800" x-text="formatDate(selectedStudent.forecast_completion_date)"></span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm border-b border-gray-200 pb-2 pt-1">
+                      <span class="text-gray-500 font-medium text-xs">Est. Requiring Date:</span>
+                      <span class="font-bold" :class="getForecastDiffClass(selectedStudent.forecast_completion_date)" x-text="getForecastDiff(selectedStudent.forecast_completion_date)"></span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm pt-1">
+                      <span class="text-gray-500 font-medium text-[0.65rem]">Last Calculated:</span>
+                      <span class="text-[0.65rem] text-gray-600" x-text="formatDate(selectedStudent.forecast_at) + ' ' + formatTime(selectedStudent.forecast_at)"></span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Right column: patients -->
+            <div class="sm:w-3/5 sm:overflow-y-auto border-t sm:border-t-0 border-gray-100">
+              <div class="p-6 space-y-4">
+
+                <div x-show="loadingPatients" class="py-4 text-center">
+                  <div class="spinner border-2 border-navy/20 border-t-navy w-5 h-5 rounded-full mx-auto animate-spin mb-2"></div>
+                  <span class="text-xs text-gray-400">Loading patients...</span>
+                </div>
+
+                <div x-show="!loadingPatients && studentPatients.length === 0"
+                     class="py-3 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                  <span class="text-xs text-gray-400 italic">No assigned patients</span>
+                </div>
+
+                <!-- Own patients -->
+                <div x-show="!loadingPatients && ownPatients().length > 0">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Patients of Student</h3>
+                      <span class="text-xs font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full" x-text="ownPatients().length"></span>
+                    </div>
+                    <div class="flex items-center gap-2 text-[0.6rem] font-medium uppercase tracking-wide hidden sm:flex">
+                      <span class="text-gray-400">Complexity:</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>1</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400"></span>2</span>
+                      <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>≥2</span>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-1 gap-3 pr-1">
+                    <template x-for="p in ownPatients()" :key="p.hn">
+                      <div class="rounded-xl shadow-sm border border-gray-200 p-3 transition-all hover:shadow-md relative overflow-hidden group"
+                           :class="getComplexityCardClass(p.complexity, false)">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-navy opacity-50"></div>
+                        <div class="flex justify-between items-start mb-2">
+                          <div>
+                            <div class="font-bold text-navy text-sm" x-text="p.name"></div>
+                            <div class="text-[0.65rem] font-mono text-gray-500 mt-0.5">HN: <span x-text="p.hn"></span></div>
+                          </div>
+                          <span class="px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide border"
+                                :class="getComplexityClass(p.complexity)" x-text="p.status"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                          <span class="font-medium text-gray-400">Type:</span> <span x-text="p.type_of_case || '-'"></span>
+                        </div>
+                        <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(p.hn)" target="_blank"
+                           class="w-full flex justify-center items-center gap-1.5 py-1.5 bg-gray-50 text-navy font-semibold rounded-lg hover:bg-gray-100 transition border border-gray-200 text-xs text-center">
+                          View Treatment Plan
+                        </a>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Referral patients -->
+                <div x-show="!loadingPatients && referralPatients().length > 0">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Referral Patients</h3>
+                      <span class="text-xs font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full" x-text="referralPatients().length"></span>
+                    </div>
+                  </div>
+                  <div class="space-y-3 pr-1">
+                    <template x-for="p in referralPatients()" :key="p.hn">
+                      <div class="rounded-xl shadow-sm border border-gray-200 p-3 transition-all hover:shadow-md relative overflow-hidden group"
+                           :class="getComplexityCardClass(p.complexity, true)">
+                        <div class="absolute top-0 left-0 w-1 h-full bg-gold opacity-50"></div>
+                        <div class="flex justify-between items-start mb-2">
+                          <div>
+                            <div class="font-bold text-navy text-sm" x-text="p.name"></div>
+                            <div class="text-[0.65rem] font-mono text-gray-500 mt-0.5">HN: <span x-text="p.hn"></span></div>
+                          </div>
+                          <span class="px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-wide border shadow-sm"
+                                :class="getComplexityClass(p.complexity)" x-text="p.status"></span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                          <span class="font-medium text-gray-400">Type:</span> <span x-text="p.type_of_case || '-'"></span>
+                        </div>
+                        <a :href="'<?= appUrl ?>?page=treatment_plan&hn=' + encodeURIComponent(p.hn)" target="_blank"
+                           class="w-full flex justify-center items-center gap-1.5 py-1.5 bg-gray-50 text-navy font-semibold rounded-lg hover:bg-gray-100 transition border border-gray-200 text-xs text-center">
+                          View Treatment Plan
+                        </a>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 shrink-0">
+            <button @click="modalOpen = false"
+                    class="w-full py-2 bg-white border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition shadow-sm text-sm">Close</button>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    function studentDashboardApp() {
+      return {
+        state: 'loading',
+        errorMessage: '',
+        students: [],
+
+        searchQuery: '',
+        filterYear: 'all',
+        filterFloor: 'all',
+        filterTeamLeader: 'all',
+
+        modalOpen: false,
+        selectedStudent: null,
+        studentPatients: [],
+        loadingPatients: false,
+        showStudentDetail: false,
+        showOracleForecast: false,
+        clinicalEndDate: '',
+
+        init() {
+          google.script.run
+            .withSuccessHandler(res => {
+              this.students = res || [];
+              this.state = 'loaded';
+            })
+            .withFailureHandler(err => {
+              this.errorMessage = err.message || 'An unexpected error occurred.';
+              this.state = 'error';
+            })
+            .adminGetAllStudents();
+        },
+
+        availableYears() {
+          var set = new Set();
+          this.students.forEach(s => { if (typeof s.calculated_year === 'number') set.add(s.calculated_year); });
+          return Array.from(set).sort((a, b) => b - a);
+        },
+
+        availableFloors() {
+          var map = {};
+          this.students.forEach(s => { if (s.floor_id) map[s.floor_id] = s.floor_label; });
+          return Object.keys(map).map(id => ({ floor_id: id, label: map[id] }))
+            .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+        },
+
+        availableTeamLeaders() {
+          var set = new Set();
+          this.students.forEach(s => {
+            if (s.team_leader_1_name && s.team_leader_1_name !== '-') set.add(s.team_leader_1_name);
+            if (s.team_leader_2_name && s.team_leader_2_name !== '-') set.add(s.team_leader_2_name);
+          });
+          return Array.from(set).sort((a, b) => String(a).localeCompare(String(b)));
+        },
+
+        filteredStudents() {
+          var q = (this.searchQuery || '').trim().toLowerCase();
+          return this.students.filter(s => {
+            if (this.filterYear !== 'all' && String(s.calculated_year) !== String(this.filterYear)) return false;
+            if (this.filterFloor !== 'all' && String(s.floor_id) !== String(this.filterFloor)) return false;
+            if (this.filterTeamLeader !== 'all' &&
+                s.team_leader_1_name !== this.filterTeamLeader &&
+                s.team_leader_2_name !== this.filterTeamLeader) return false;
+            if (q && !(String(s.name).toLowerCase().indexOf(q) >= 0 ||
+                       String(s.academic_id).toLowerCase().indexOf(q) >= 0)) return false;
+            return true;
+          });
+        },
+
+        resetFilters() {
+          this.searchQuery = '';
+          this.filterYear = 'all';
+          this.filterFloor = 'all';
+          this.filterTeamLeader = 'all';
+        },
+
+        getInitials(name) {
+          if (!name) return '?';
+          var parts = name.trim().split(/\s+/);
+          if (parts.length === 0) return '?';
+          var firstPart = '', lastPart = '';
+          var firstWord = parts[0];
+          if (firstWord.indexOf('.') !== -1) {
+            var dotParts = firstWord.split('.');
+            var afterLastDot = dotParts[dotParts.length - 1];
+            firstPart = afterLastDot.length > 0 ? afterLastDot : (parts.length > 1 ? parts[1] : '');
+          } else {
+            var knownTitles = ['นาย', 'นาง', 'นางสาว', 'นพ', 'ทพ', 'ดร', 'ทญ'];
+            firstPart = (knownTitles.indexOf(firstWord) !== -1 || parts.length >= 3)
+              ? (parts.length > 1 ? parts[1] : '')
+              : firstWord;
+          }
+          lastPart = parts.length > 1 ? parts[parts.length - 1] : '';
+          function getConsonant(str) {
+            if (!str) return '';
+            var m = str.match(/[ก-ฮa-zA-Z]/);
+            return m ? m[0] : str.charAt(0);
+          }
+          return (getConsonant(firstPart) + (lastPart ? getConsonant(lastPart) : '')).toUpperCase();
+        },
+
+        getComplexityClass(complexity) {
+          if (!complexity || String(complexity).trim().toLowerCase() === 'none') {
+            return 'bg-gray-100 text-gray-400 border-gray-200';
+          }
+          const cStr = String(complexity).trim();
+          if (cStr === '1') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+          if (cStr === '2') return 'bg-blue-100 text-blue-700 border-blue-200';
+          if (cStr === '>=2' || cStr === '>2' || parseInt(cStr) >= 2) {
+            return 'bg-amber-100 text-amber-700 border-amber-200';
+          }
+          return 'bg-gray-100 text-gray-400 border-gray-200';
+        },
+
+        getComplexityCardClass(complexity) {
+          const defaultBg = 'bg-white';
+          if (!complexity || String(complexity).trim().toLowerCase() === 'none') return defaultBg;
+          const cStr = String(complexity).trim();
+          if (cStr === '1') return 'bg-emerald-50';
+          if (cStr === '2') return 'bg-blue-50';
+          if (cStr === '>=2' || cStr === '>2' || parseInt(cStr) >= 2) return 'bg-amber-50';
+          return defaultBg;
+        },
+
+        ownPatients() {
+          if (!this.selectedStudent) return [];
+          return this.studentPatients.filter(p => p.student_id_1 === this.selectedStudent.student_id);
+        },
+
+        referralPatients() {
+          if (!this.selectedStudent) return [];
+          return this.studentPatients.filter(p => p.student_id_1 !== this.selectedStudent.student_id);
+        },
+
+        openModal(student) {
+          this.selectedStudent = student;
+          this.studentPatients = [];
+          this.loadingPatients = true;
+          this.modalOpen = true;
+          this.showOracleForecast = false;
+
+          var baseYear = student.first_clinic_year ? parseInt(student.first_clinic_year) + 2 : new Date().getFullYear() + 1;
+          var mayFirst = new Date(baseYear, 4, 1);
+          var firstFridayOffset = (5 - mayFirst.getDay() + 7) % 7;
+          var secondFridayDate = 1 + firstFridayOffset + 7;
+          var defaultEndDate = new Date(baseYear, 4, secondFridayDate);
+          var yyyy = defaultEndDate.getFullYear();
+          var mm = String(defaultEndDate.getMonth() + 1).padStart(2, '0');
+          var dd = String(defaultEndDate.getDate()).padStart(2, '0');
+          this.clinicalEndDate = yyyy + '-' + mm + '-' + dd;
+
+          google.script.run
+            .withSuccessHandler(res => {
+              this.studentPatients = res || [];
+              this.loadingPatients = false;
+            })
+            .withFailureHandler(err => {
+              console.error(err);
+              this.loadingPatients = false;
+            })
+            .getStudentPatients(student.student_id);
+        },
+
+        formatDate(d) {
+          if (!d) return '-';
+          return new Date(d).toLocaleDateString('th-TH');
+        },
+
+        formatTime(d) {
+          if (!d) return '';
+          return new Date(d).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        },
+
+        getRemainingDate(endDateString) {
+          if (!endDateString) return '-';
+          var end = new Date(endDateString);
+          var now = new Date();
+          end.setHours(0, 0, 0, 0);
+          now.setHours(0, 0, 0, 0);
+          var diffDays = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+          if (diffDays < 0) return Math.abs(diffDays) + ' days overdue';
+          return diffDays + ' days left';
+        },
+
+        getForecastDiff(forecastDateString) {
+          if (!forecastDateString) return '-';
+          var forecast = new Date(forecastDateString);
+          var now = new Date();
+          forecast.setHours(0, 0, 0, 0);
+          now.setHours(0, 0, 0, 0);
+          var diffDays = Math.ceil((forecast - now) / (1000 * 60 * 60 * 24));
+          var diffMonths = Math.round(diffDays / 30.44);
+          if (diffDays < 0) return Math.abs(diffDays) + ' days ago';
+          if (diffMonths >= 1) return '~' + diffMonths + ' months';
+          return diffDays + ' days';
+        },
+
+        getForecastDiffClass(forecastDateString) {
+          if (!forecastDateString) return 'text-gray-500';
+          var forecast = new Date(forecastDateString);
+          if (!this.clinicalEndDate) return 'text-navy';
+          var end = new Date(this.clinicalEndDate);
+          if (forecast > end) return 'text-red-500';
+          return 'text-emerald-600';
+        }
+      }
+    }
+  </script>
+</body>
+
+</html>
