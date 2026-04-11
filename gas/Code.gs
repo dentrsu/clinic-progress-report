@@ -3672,14 +3672,17 @@ function advisorGetDashboardData(viewMode, divisionCode) {
   // 1. Students by view mode (admin always uses whole-division view)
   var rawStudents;
   if (!isAdmin && viewMode === "advisor") {
-    rawStudents =
-      SupabaseProvider.listStudentsByDivisionInstructor(
-        columnName,
-        profile.instructor_id,
-      ) || [];
+    rawStudents = (SupabaseProvider.listStudentsByTeamLeader(
+        profile.instructor_id
+      ) || []).filter(function (s) {
+        return (s.status || "active").toLowerCase().includes("active");
+      });
   } else {
+    // Whole-division view: include ALL active students, even those without a
+    // <div>_instructor_id assigned or any treatment records yet. Division
+    // requirements act as the baseline; students with no records render as 0%.
     rawStudents = (SupabaseProvider.listStudents() || []).filter(function (s) {
-      return s[columnName] != null;
+      return (s.status || "active").toLowerCase().includes("active");
     });
   }
 

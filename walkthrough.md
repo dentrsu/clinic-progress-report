@@ -180,3 +180,28 @@ Follow these steps to verify that patient cards are correctly color-coded based 
 3. **Multi-Column Alignment**:
    - Log in as an **instructor** and open a student's patient list.
    - **Verify** that the same color-coding logic is applied correctly in the instructor's view.
+
+---
+
+## 8. Division Dashboard & Window Control Enhancements
+
+Follow these steps to verify recent UI improvements and precise dashboard tracking.
+
+1. **Window Close Behaviors**:
+   - **Verify**: On non-primary pages (`Treatment Plan`, `Requirement Vault`, `Verify`, `Verification Workflow`, `Admin Console`), the navigation button should display a **Close** button (X icon) instead of a back arrow.
+   - Click the **Close** button.
+   - **Verify**: The browser tab should securely close, maintaining cross-browser compatibility standards.
+
+2. **Full-Screen Rotate Modal**:
+   - Log in as a **Student** and open the **Rotate** requirement action.
+   - **Verify**: The rotate form now opens in a clean, full-screen takeover modal over the dashboard, rather than routing to a separate HTML file.
+
+3. **Dashboard "My Advisees" Pool**:
+   - Log in as an **Instructor (Team Leader)** and navigate to a Division Dashboard.
+   - Ensure the view mode is set to **My Advisees**.
+   - **Verify**: The total student count explicitly includes **all** students directly assigned to your advisory team (`team_leader_1` or `team_leader_2`), including students who haven't yet submitted a treatment record for that specific clinic division.
+
+4. **N/A Progress Distribution Calculation**:
+   - Choose the **Whole Division** view as an administrator.
+   - Select the dropdown filters (e.g., Year 4) to narrow the student list.
+   - **Verify**: The progress distribution bars accurately compute an **"N/A"** baseline for each requirement. The N/A segment represents the minimum requirement multiplied by the number of currently filtered students who have no submitted records for that component.

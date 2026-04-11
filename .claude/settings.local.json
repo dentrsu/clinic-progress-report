@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(awk '/^    function treatmentApp/,/^    }$/ {print NR\": \"$0}' \"/c/Users/oddha/OneDrive/Documents/Antigravity/clinic-progress-report/gas/treatment_plan.html\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

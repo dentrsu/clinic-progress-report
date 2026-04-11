@@ -47,14 +47,14 @@
         <p class="text-white/60 text-xs mt-0.5" x-text="isAdvisorMode ? 'Pending verification records — my advisees' : 'Pending verification records — my team students'"></p>
       </div>
     </div>
-    <a :href="isAdvisorMode ? '<?= appUrl ?>?page=advisor' : '<?= appUrl ?>?page=instructor'"
-       :title="isAdvisorMode ? 'Go back to the Advisor Portal' : 'Go back to the Instructor Portal'"
-       class="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition border border-white/20 text-white">
+    <button type="button" @click="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}"
+            title="Close this window"
+            class="flex items-center gap-2 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition border border-white/20 text-white">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
       </svg>
-      <span x-text="isAdvisorMode ? 'Advisor Portal' : 'Instructor Portal'"></span>
-    </a>
+      <span>Close</span>
+    </button>
   </header>
 
   <!-- ── Loading ── -->

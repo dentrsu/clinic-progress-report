@@ -191,12 +191,12 @@
 
   <!-- ── Sticky nav bar ── -->
   <nav class="top-nav">
-    <a href="<?= appUrl ?>" class="back">
+    <button type="button" class="back" style="background:none; border:none; padding:0; cursor:pointer; color: white;" onclick="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}">
       <svg style="width:14px;height:14px;margin-right:5px;display:inline;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
       </svg>
-      Home
-    </a>
+      Close
+    </button>
     <span class="nav-title">Verification Workflow Guide</span>
     <button class="pdf-btn" onclick="window.print()">Save as PDF</button>
   </nav>

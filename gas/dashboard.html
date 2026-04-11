@@ -71,10 +71,10 @@
         <h1 class="text-base md:text-lg font-bold leading-tight">Division Dashboard</h1>
         <p class="text-white/60 text-xs">Admin — Select a division to view</p>
       </div>
-      <a href="<?= appUrl ?>?page=admin" class="ml-auto flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-        <span class="hidden sm:inline">Admin Console</span>
-      </a>
+      <button type="button" @click="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}" class="ml-auto flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <span class="hidden sm:inline">Close</span>
+      </button>
     </header>
     <div class="flex-1 px-4 md:px-6 py-8 max-w-4xl mx-auto w-full">
       <p class="text-sm text-gray-500 mb-5">Select a division to open its dashboard in whole-division view.</p>
@@ -106,7 +106,7 @@
         <img src="https://img2.pic.in.th/logo9365a3657362b3e3.th.png" alt="University Crest" class="w-full h-full object-contain p-0.5" />
         </div>
         <div>
-          <h1 class="text-base md:text-lg font-bold leading-tight">Division Dashboard</h1>
+          <h1 class="text-base md:text-lg font-bold leading-tight" x-text="viewMode === 'advisor' ? 'My Advisees Dashboard' : 'Whole Division Dashboard'">Division Dashboard</h1>
           <p class="text-white/60 text-xs" x-text="profile ? profile.division.code + ' — ' + profile.division.name : ''"></p>
         </div>
       </div>
@@ -132,12 +132,12 @@
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
           Print
         </button>
-        <!-- Back -->
-        <a :href="isAdmin ? '<?= appUrl ?>?page=admin' : '<?= appUrl ?>?page=advisor'"
+        <!-- Close -->
+        <button type="button" @click="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}"
            class="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs border border-white/20 transition">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-          <span class="hidden sm:inline" x-text="isAdmin ? 'Admin Console' : 'Advisor Portal'"></span>
-        </a>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <span class="hidden sm:inline">Close</span>
+        </button>
       </div>
     </header>
 
@@ -245,6 +245,8 @@
                 <div class="h-3 flex rounded-full overflow-hidden bg-gray-100">
                   <template x-if="reqTotal(req) > 0">
                     <div class="flex w-full">
+                      <div class="bg-gray-200 transition-all h-full"
+                           :style="'width:' + (reqNaCount(req) / reqTotal(req) * 100) + '%'"></div>
                       <div class="bg-slate-400 transition-all h-full"
                            :style="'width:' + (effectiveProgress(req).planned   / reqTotal(req) * 100) + '%'"></div>
                       <div class="bg-amber-400 transition-all h-full"
@@ -256,6 +258,10 @@
                 </div>
                 <!-- Legend -->
                 <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px]">
+                  <span class="flex items-center gap-1 text-gray-500" x-show="reqNaCount(req) > 0">
+                    <span class="w-2 h-2 rounded-full bg-gray-200 inline-block"></span>
+                    N/A <span class="font-bold text-gray-700 ml-0.5" x-text="Math.round(reqNaCount(req) * 10) / 10"></span>
+                  </span>
                   <span class="flex items-center gap-1 text-gray-500">
                     <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span>
                     Planned <span class="font-bold text-gray-700 ml-0.5" x-text="effectiveProgress(req).planned"></span>
@@ -814,8 +820,8 @@
         // ── Filters ───────────────────────────────────────────
         filteredStudents() {
           return this.students.filter(s => {
-            if (this.filterYear  !== 'all' && s.calculated_year !== this.filterYear)  return false;
-            if (this.filterFloor !== 'all' && s.floor_id        !== this.filterFloor) return false;
+            if (this.filterYear  !== 'all' && String(s.calculated_year) !== String(this.filterYear))  return false;
+            if (this.filterFloor !== 'all' && String(s.floor_id)        !== String(this.filterFloor)) return false;
             return true;
           });
         },
@@ -927,9 +933,30 @@
           }).filter(r => this.recordGroup(r) === 'completed').length;
         },
 
+        reqNaCount(req) {
+          var cfg = req.aggregation_config;
+          var isCountExam = cfg && cfg.type === 'count_exam' && cfg.source_ids && cfg.source_ids.length;
+          var ids = isCountExam
+            ? cfg.source_ids
+            : (cfg && cfg.type === 'derived' && cfg.source_ids && cfg.source_ids.length)
+              ? cfg.source_ids : [req.requirement_id];
+          
+          var hasRecord = new Set();
+          this.filteredRecords().forEach(r => {
+            if (ids.indexOf(r.requirement_id) !== -1) {
+              if (isCountExam && !r.is_exam) return;
+              hasRecord.add(r.student_id);
+            }
+          });
+          
+          var count = this.filteredStudents().length - hasRecord.size;
+          var min = req.is_exam ? 1 : (parseFloat(req.minimum_rsu) || 0);
+          return count * min;
+        },
+
         reqTotal(req) {
           var p = this.effectiveProgress(req);
-          return p.planned + p.inProgress + p.completed;
+          return p.planned + p.inProgress + p.completed + this.reqNaCount(req);
         },
 
         // ── Stats ─────────────────────────────────────────────

@@ -250,7 +250,10 @@
                       title="Log a requirement completed at a rotate (non-main) clinic — e.g. a division outside your usual treatment plan"
                       class="group relative overflow-hidden inline-flex items-center gap-1.5 bg-gradient-to-r from-navy to-navy-light text-white px-4 py-2 rounded-lg font-medium text-base shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
                 <svg class="w-3.5 h-3.5 transition-transform group-hover:rotate-90 duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-                <span>Requirement ไม่อยู่ใน treatment plan</span>
+                <div class="flex flex-col items-start leading-tight text-left">
+                  <span class="text-sm font-semibold">Add Requirement of Rotate Clinic</span>
+                  <span class="text-[0.65rem] font-normal text-white/80">และ requirement ที่ไม่อยู่ใน treatment plan รวม</span>
+                </div>
               </button>
             </div>
           </div>
@@ -283,12 +286,12 @@
         
         <!-- Back to Lobby -->
         <div class="w-full">
-           <a href="<?= appUrl ?>"
-              title="Return to the main lobby page"
+           <button type="button" @click="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}"
+              title="Close this window"
               class="flex items-center justify-center gap-2 w-full py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition shadow-sm">
-             <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-             Back to Lobby
-           </a>
+             <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+             <span>Close</span>
+           </button>
         </div>
         
         <!-- Admin Link -->
@@ -788,15 +791,14 @@
 
   <!-- ─── Rotate Clinic Modal ─── -->
   <div x-show="rotateModalOpen" style="display: none;"
-       class="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+       class="fixed inset-0 z-[75] bg-white flex flex-col"
        x-transition.opacity>
     
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in flex flex-col max-h-[90vh]"
-         @click.outside="rotateModalOpen = false">
+    <div class="w-full h-full max-w-none overflow-hidden animate-fade-in flex flex-col">
       
       <!-- Header -->
       <div class="bg-navy px-6 py-4 flex justify-between items-center text-white shrink-0">
-        <h3 class="text-lg font-bold">Add Requirement ที่ไม่ใช่ Treatment Plan รวม</h3>
+        <h3 class="text-lg font-bold">Add Requirement of Rotate Clinic และ requirement ที่ไม่อยู่ใน Treatment Plan รวม</h3>
         <button @click="rotateModalOpen = false" title="Close without saving" class="text-white/70 hover:text-white">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
