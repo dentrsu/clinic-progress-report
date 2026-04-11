@@ -3672,8 +3672,9 @@ function advisorGetDashboardData(viewMode, divisionCode) {
   // 1. Students by view mode (admin always uses whole-division view)
   var rawStudents;
   if (!isAdmin && viewMode === "advisor") {
-    rawStudents = (SupabaseProvider.listStudentsByTeamLeader(
-        profile.instructor_id
+    rawStudents = (SupabaseProvider.listStudentsByDivisionInstructor(
+        columnName,
+        profile.instructor_id,
       ) || []).filter(function (s) {
         return (s.status || "active").toLowerCase().includes("active");
       });
@@ -4580,6 +4581,23 @@ function _assertInstructor() {
 }
 
 /**
+ * Ensure current user is an admin, instructor, or active student.
+ * @throws {Error} if not authorized
+ */
+function _assertAnyUser() {
+  var email = Session.getActiveUser().getEmail();
+  var user = SupabaseProvider.getUserByEmail(email);
+  if (!user || (user.role !== "instructor" && user.role !== "admin" && user.role !== "student")) {
+    throw new Error("Access denied: Unauthorized.");
+  }
+  // If student, ensure active
+  if (user.role === "student" && user.status && user.status.toLowerCase().includes("inactive")) {
+    throw new Error("Access denied: Inactive student.");
+  }
+  return user;
+}
+
+/**
  * List all users (Admin only).
  */
 function adminListUsers() {
@@ -5058,11 +5076,30 @@ function adminSyncPatients() {
     // A(0): HN, B(1): Name, C(2): Tel, D(3): TeamLeaderEmail, E(4): StudentEmail
     // L(11): Birthdate, P(15): Status, Q(16): Note
 
+    // Count non-empty HN rows for progress tracking
+    var totalRows = 0;
+    for (var p = 1; p < data.length; p++) {
+      if (String(data[p][0]).trim()) totalRows++;
+    }
+
+    var patientCache = CacheService.getScriptCache();
+    patientCache.put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+      status: "running", current: 0, total: totalRows,
+      updated: 0, errors: 0, currentHn: "", mode: "all"
+    }), 300);
+
     for (var i = 1; i < data.length; i++) {
       try {
         var row = data[i];
         var hn = String(row[0]).trim();
         if (!hn) continue;
+
+        stats.updated++; // increment before upsert so progress is accurate
+        patientCache.put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+          status: "running", current: stats.updated, total: totalRows,
+          updated: stats.updated, errors: stats.errors, currentHn: hn, mode: "all"
+        }), 300);
+        stats.updated--; // revert — will re-increment after successful upsert
 
         // Normalize Status
         var rawStatus = String(row[15]).trim();
@@ -5145,6 +5182,11 @@ function adminSyncPatients() {
         // Use UPSERT
         SupabaseProvider.upsertPatient(patientPayload);
         stats.updated++;
+        // Update progress after each successful upsert
+        patientCache.put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+          status: "running", current: stats.updated + stats.errors, total: totalRows,
+          updated: stats.updated, errors: stats.errors, currentHn: hn, mode: "all"
+        }), 300);
       } catch (rowErr) {
         Logger.log("Error processing row " + (i + 1) + ": " + rowErr.message);
         stats.errors++;
@@ -5169,70 +5211,321 @@ function adminSyncPatients() {
       };
     }
 
+    patientCache.put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+      status: "done", current: totalRows, total: totalRows,
+      updated: stats.updated, errors: stats.errors, currentHn: "", mode: "all"
+    }), 60);
     return { success: true, stats: stats };
   } catch (e) {
     Logger.log("adminSyncPatients error: " + e.message);
+    CacheService.getScriptCache().put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+      status: "error", current: 0, total: 0,
+      updated: 0, errors: 0, currentHn: "", error: e.message
+    }), 60);
     return { success: false, error: "Error syncing patients: " + e.message };
   }
 }
 
 /**
- * Syncs instructor data from the configured Google Sheet (MASTER_SHEET_ID).
+ * Syncs selected patient data from a configured Google Sheet to Supabase using an array of HNs.
  * (Admin only).
+ * @param {Array<string>} hnList The list of HNs to synchronize.
  */
-function adminSyncInstructors() {
-  _assertAdmin();
+function adminSyncSelectedPatients(hnList) {
+  // Sync a single patient
+  //var result1 = adminSyncSelectedPatients(["HN00123"]);
+  // Sync a group of patients
+  //var result2 = adminSyncSelectedPatients(["HN00123", "HN00456", "HN00789"]);
+  _assertAnyUser();
 
-  var sheetId =
-    PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
+  if (!hnList || !Array.isArray(hnList) || hnList.length === 0) {
+    return { success: false, error: "No HNs provided for selection." };
+  }
+
+  // Normalize target HNs
+  var targetHns = {};
+  for (var i = 0; i < hnList.length; i++) {
+    targetHns[String(hnList[i]).trim()] = true;
+  }
+
+  var sheetId = getPatientSheetId();
   if (!sheetId) {
-    return { success: false, error: "MASTER_SHEET_ID not configured." };
+    return { success: false, error: "PATIENT_SHEET_ID not configured." };
   }
 
   try {
     var ss = SpreadsheetApp.openById(sheetId);
-    var sheet = ss.getSheetByName("Teacher");
+    var sheet = ss.getSheetByName("patients");
     if (!sheet) {
-      return { success: false, error: "Sheet named 'Teacher' not found." };
+      return { success: false, error: "Sheet named 'patients' not found." };
     }
 
     var data = sheet.getDataRange().getValues();
     if (data.length <= 1) {
       return {
         success: false,
-        error: "Teacher sheet is empty or has only headers.",
+        error: "Patient sheet is empty or has only headers.",
       };
     }
+
+    // Pre-fetch Users/Instructors for Lookup
+    var allUsers = SupabaseProvider.listUsers() || [];
+    var allInstructors = SupabaseProvider.listInstructors() || [];
+
+    // Maps
+    var emailMap = {}; // email -> user_id
+    allUsers.forEach(function (u) {
+      if (u.email) emailMap[u.email.toLowerCase()] = u.user_id;
+    });
+
+    var instructorMap = {}; // user_id -> instructor_id
+    allInstructors.forEach(function (i) {
+      instructorMap[i.user_id] = i.instructor_id;
+    });
+
+    var stats = { updated: 0, errors: 0, skipped: 0 };
+    
+    // Track which HNs we actually found
+    var foundHns = {};
+    var selTotal = hnList.length;
+    var selDone = 0;
+
+    var selCache = CacheService.getScriptCache();
+    selCache.put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+      status: "running", current: 0, total: selTotal,
+      updated: 0, errors: 0, currentHn: "", mode: "selected"
+    }), 300);
+
+    for (var i = 1; i < data.length; i++) {
+      try {
+        var row = data[i];
+        var hn = String(row[0]).trim();
+        if (!hn) continue;
+        
+        // Skip if not in our target list
+        if (!targetHns[hn]) {
+          continue;
+        }
+        
+        foundHns[hn] = true;
+
+        // Normalize Status
+        var rawStatus = String(row[15]).trim();
+        var validStatuses = [
+          "Active",
+          "Full Chart",
+          "Treatment Plan",
+          "First Treatment Plan",
+          "Treatment Plan Approved",
+          "Initial Treatment",
+          "Inactive",
+          "Discharged",
+          "Orthodontic Treatment",
+          "Waiting in Recall Lists",
+        ];
+
+        // Simple case-insensitive match
+        var status = validStatuses.find(
+          (s) => s.toLowerCase() === rawStatus.toLowerCase(),
+        );
+        if (!status) status = "Waiting to Be Assigned"; // Default
+
+        var patientPayload = {
+          hn: hn,
+          name: String(row[1]).trim(),
+          tel: String(row[2]).trim(),
+          birthdate: row[11] instanceof Date ? row[11] : null,
+          status: status,
+          note: String(row[16]).trim(),
+          updated_at: new Date().toISOString(),
+        };
+
+        // Lookup Team Leader
+        var tlEmail = String(row[3]).trim().toLowerCase();
+        if (tlEmail && emailMap[tlEmail]) {
+          var tlUserId = emailMap[tlEmail];
+          if (instructorMap[tlUserId]) {
+            patientPayload.instructor_id = instructorMap[tlUserId];
+          }
+        }
+
+        // Lookup Student
+        var stEmail = String(row[4]).trim().toLowerCase();
+        if (stEmail) {
+          if (emailMap[stEmail]) {
+            var stUserId = emailMap[stEmail];
+            var studentData = SupabaseProvider.getStudentByUserId(stUserId);
+
+            if (studentData && studentData.student_id) {
+              patientPayload.student_id_1 = studentData.student_id;
+            } else {
+              console.log(
+                "Sync Warning: Student Profile NOT FOUND for User: " +
+                  stEmail +
+                  " (ID: " +
+                  stUserId +
+                  ")",
+              );
+              if (!stats.warnings) stats.warnings = [];
+              if (stats.warnings.length < 10)
+                stats.warnings.push(
+                  "Skipped Student Assignment: Profile missing for " + stEmail,
+                );
+            }
+          } else {
+            console.log(
+              "Sync Warning: Student Email NOT FOUND in System: " + stEmail,
+            );
+            if (!stats.warnings) stats.warnings = [];
+            if (stats.warnings.length < 10)
+              stats.warnings.push(
+                "Skipped Student Assignment: Email not found " + stEmail,
+              );
+          }
+        }
+
+        // Use UPSERT
+        SupabaseProvider.upsertPatient(patientPayload);
+        stats.updated++;
+        selDone++;
+        selCache.put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+          status: "running", current: selDone, total: selTotal,
+          updated: stats.updated, errors: stats.errors, currentHn: hn, mode: "selected"
+        }), 300);
+      } catch (rowErr) {
+        Logger.log("Error processing row " + (i + 1) + ": " + rowErr.message);
+        stats.errors++;
+      }
+    }
+    
+    // Check if any requested HNs were not found in the sheet
+    Object.keys(targetHns).forEach(function(reqHn) {
+      if (!foundHns[reqHn]) {
+        if (!stats.warnings) stats.warnings = [];
+        stats.warnings.push("HN not found in sheet: " + reqHn);
+      }
+    });
+
+    // Format a helpful message if fallback occurred OR we have data warnings
+    var warningMsg = "";
+    if (stats.supabaseErrors && stats.supabaseErrors.length > 0) {
+      warningMsg +=
+        "Supabase Write Failed: " + stats.supabaseErrors.join(", ") + ". ";
+    }
+    if (stats.warnings && stats.warnings.length > 0) {
+      warningMsg += "Data Warnings: " + stats.warnings.join(", ");
+    }
+
+    if (warningMsg) {
+      return {
+        success: true,
+        stats: stats,
+        warning: warningMsg,
+      };
+    }
+
+    selCache.put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+      status: "done", current: selTotal, total: selTotal,
+      updated: stats.updated, errors: stats.errors, currentHn: "", mode: "selected"
+    }), 60);
+    return { success: true, stats: stats };
+  } catch (e) {
+    Logger.log("adminSyncSelectedPatients error: " + e.message);
+    CacheService.getScriptCache().put("SYNC_PATIENTS_PROGRESS", JSON.stringify({
+      status: "error", current: 0, total: 0,
+      updated: 0, errors: 0, currentHn: "", error: e.message
+    }), 60);
+    return { success: false, error: "Error syncing patients: " + e.message };
+  }
+}
+
+/** Poll patient sync progress (admin only). */
+function adminGetSyncPatientsProgress() {
+  _assertAnyUser();
+  var raw = CacheService.getScriptCache().get("SYNC_PATIENTS_PROGRESS");
+  if (!raw) return null;
+  return JSON.parse(raw);
+}
+
+/**
+ * Syncs all instructor data from the configured Google Sheet (MASTER_SHEET_ID).
+ * (Admin only).
+ */
+function adminSyncInstructors() {
+  return _syncInstructorsInternal(null);
+}
+
+/**
+ * Syncs selected instructor data from the configured Google Sheet (MASTER_SHEET_ID).
+ * (Admin only).
+ */
+function adminSyncSelectedInstructors(emailList) {
+  if (!emailList || !Array.isArray(emailList) || emailList.length === 0) {
+    return { success: false, error: "No emails provided for selective sync." };
+  }
+  return _syncInstructorsInternal(emailList);
+}
+
+/** Poll instructor sync progress (admin only). */
+function adminGetSyncInstructorsProgress() {
+  _assertAnyUser();
+  var raw = CacheService.getScriptCache().get("SYNC_INSTRUCTORS_PROGRESS");
+  if (!raw) return null;
+  return JSON.parse(raw);
+}
+
+/**
+ * Shared internal helper for instructor sync with progress tracking.
+ * @param {string[]} [targetEmails] Optional list of emails to filter by.
+ */
+function _syncInstructorsInternal(targetEmails) {
+  _assertAdmin();
+
+  var sheetId = PropertiesService.getScriptProperties().getProperty("MASTER_SHEET_ID");
+  if (!sheetId) return { success: false, error: "MASTER_SHEET_ID not configured." };
+
+  try {
+    var ss = SpreadsheetApp.openById(sheetId);
+    var sheet = ss.getSheetByName("Teacher");
+    if (!sheet) return { success: false, error: "Sheet named 'Teacher' not found." };
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { success: false, error: "Teacher sheet is empty." };
 
     // Pre-fetch Divisions/Floors for Lookup
     var divisions = SupabaseProvider.listDivisions() || [];
     var floors = SupabaseProvider.listFloors() || [];
-
-    var divMap = {}; // code -> division_id
-    divisions.forEach(function (d) {
-      if (d.code) divMap[d.code.trim().toUpperCase()] = d.division_id;
-    });
-
-    var floorMap = {}; // label -> floor_id
-    floors.forEach(function (f) {
-      if (f.label) floorMap[f.label.trim()] = f.floor_id;
-    });
+    var divMap = {};
+    divisions.forEach(function (d) { if (d.code) divMap[d.code.trim().toUpperCase()] = d.division_id; });
+    var floorMap = {};
+    floors.forEach(function (f) { if (f.label) floorMap[f.label.trim()] = f.floor_id; });
 
     var stats = { processed: 0, updated: 0, errors: 0, warnings: [] };
+    var cache = CacheService.getScriptCache();
+    var progressKey = "SYNC_INSTRUCTORS_PROGRESS";
 
-    // Data starts at row 2 (index 1)
+    // Filter data if targeting specific emails
+    var rowsToProcess = [];
+    var targetSet = targetEmails ? new Set(targetEmails.map(function(e) { return e.toLowerCase(); })) : null;
+
     for (var i = 1; i < data.length; i++) {
-      try {
-        var row = data[i];
-        // Col B (1): Name
-        // Col C (2): Email
-        // Col D (3): Division (Code)
-        // Col E (4): Type ('ประจำ' or 'พิเศษ')
-        // Col F (5): Status
-        // Col G (6): Role ('Team Leader' or 'Instructor')
-        // Col H (7): Bay
-        // Col I (8): Floor Label
+      var rowEmail = String(data[i][2]).trim().toLowerCase();
+      if (targetSet && !targetSet.has(rowEmail)) continue;
+      rowsToProcess.push({ index: i, row: data[i] });
+    }
 
+    if (rowsToProcess.length === 0) {
+      return { success: false, error: "No matching instructors found in Master Sheet." };
+    }
+
+    var total = rowsToProcess.length;
+
+    for (var k = 0; k < rowsToProcess.length; k++) {
+      var pRow = rowsToProcess[k];
+      var i = pRow.index;
+      var row = pRow.row;
+
+      try {
         var name = String(row[1]).trim();
         var email = String(row[2]).trim().toLowerCase();
         var divCode = String(row[3]).trim().toUpperCase();
@@ -5242,37 +5535,37 @@ function adminSyncInstructors() {
         var bay = String(row[7]).trim().toUpperCase();
         var floorLabel = String(row[8]).trim();
 
-        // 1. Filter: Sync only Active & Permanent (ประจำ)
-        if (statusRaw !== "active") continue;
-        if (type !== "ประจำ") continue;
+        // Update progress
+        cache.put(progressKey, JSON.stringify({
+          current: k + 1,
+          total: total,
+          currentEmail: email,
+          updated: stats.updated,
+          errors: stats.errors
+        }), 120);
 
-        if (!email) {
-          stats.warnings.push("Row " + (i + 1) + ": Missing email");
+        if (statusRaw !== "active" || type !== "ประจำ") {
+          if (targetSet) stats.warnings.push("Instructor " + email + " is not Active/Permanent in sheet.");
           continue;
         }
+
+        if (!email) continue;
 
         stats.processed++;
 
         // 2. Upsert User
-        // Note: For instructors, we force role='instructor'.
         var userRecord = SupabaseProvider.upsertUser(email, {
           name: name,
           role: "instructor",
           status: "active",
         });
 
-        if (!userRecord || !userRecord.user_id) {
-          throw new Error("Failed to upsert user for " + email);
-        }
+        if (!userRecord || !userRecord.user_id) throw new Error("Failed to upsert user");
 
         // 3. Upsert Instructor
         var divId = divMap[divCode] || null;
         var floorId = floorMap[floorLabel] || null;
         var isTeamLeader = roleRaw === "Team Leader";
-
-        if (!divId && divCode) {
-          // stats.warnings.push("Row " + (i + 1) + ": Division code '" + divCode + "' not found.");
-        }
 
         SupabaseProvider.upsertInstructor(userRecord.user_id, {
           division_id: divId,
@@ -5284,17 +5577,16 @@ function adminSyncInstructors() {
 
         stats.updated++;
       } catch (rowErr) {
-        Logger.log(
-          "Error processing instructor row " + (i + 1) + ": " + rowErr.message,
-        );
         stats.errors++;
         stats.warnings.push("Row " + (i + 1) + ": " + rowErr.message);
       }
     }
 
+    // Final cache update
+    cache.put(progressKey, JSON.stringify({ current: total, total: total, currentEmail: "Completed", updated: stats.updated, errors: stats.errors }), 60);
     return { success: true, stats: stats };
   } catch (e) {
-    Logger.log("adminSyncInstructors error: " + e.message);
+    Logger.log("instructor sync error: " + e.message);
     return { success: false, error: "Error syncing instructors: " + e.message };
   }
 }

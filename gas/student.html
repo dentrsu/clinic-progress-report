@@ -537,6 +537,46 @@
            <p class="text-sm text-gray-400">No patients assigned yet.</p>
         </div>
 
+        <!-- HN Sync Strip -->
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-gold shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span class="text-xs font-semibold text-gray-600 uppercase tracking-wider">Sync Patients by HN</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" x-model="hnSyncInput"
+                   placeholder="e.g. HN00123 HN00456 or HN00123, HN00456"
+                   :disabled="hnSyncing"
+                   @keydown.enter="syncPatientsByHn()"
+                   class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono focus:ring-2 focus:ring-navy focus:border-navy disabled:bg-gray-50 placeholder:text-gray-300" />
+            <button @click="syncPatientsByHn()"
+                    :disabled="!hnSyncInput.trim() || hnSyncing"
+                    title="Sync patients matching the entered HNs from the master sheet"
+                    class="shrink-0 px-3 py-2 bg-navy hover:bg-navy-light text-white rounded-lg text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" :class="{'animate-spin': hnSyncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span x-text="hnSyncing ? 'Syncing...' : 'Sync'"></span>
+            </button>
+          </div>
+          <!-- Result feedback -->
+          <div x-show="hnSyncResult" class="mt-2 text-xs font-medium flex items-start gap-1.5"
+               :class="{
+                 'text-emerald-600': hnSyncResult && hnSyncResult.type === 'success',
+                 'text-amber-600':   hnSyncResult && hnSyncResult.type === 'warning',
+                 'text-red-500':     hnSyncResult && hnSyncResult.type === 'error'
+               }">
+            <template x-if="hnSyncResult && hnSyncResult.type === 'success'">
+              <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </template>
+            <template x-if="hnSyncResult && hnSyncResult.type === 'warning'">
+              <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </template>
+            <template x-if="hnSyncResult && hnSyncResult.type === 'error'">
+              <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </template>
+            <span x-text="hnSyncResult ? hnSyncResult.message : ''"></span>
+          </div>
+        </div>
+
         <!-- My Patients Group -->
         <div x-show="myPatients.length > 0">
            <div class="flex items-center justify-between mb-3 px-1">
@@ -1200,6 +1240,11 @@
         myPatients: [],
         referredPatients: [],
         typeOfCases: [],
+
+        // HN Sync
+        hnSyncInput: '',
+        hnSyncing: false,
+        hnSyncResult: null,
         
         // Modal State
         editModalOpen: false,
@@ -1247,6 +1292,81 @@
                console.error("Failed to load case types", err);
             })
             .studentListTypeOfCases();
+        },
+
+        syncPatientsByHn() {
+          const raw = this.hnSyncInput.trim();
+          if (!raw) return;
+          const hnList = raw.split(/[\s,]+/).map(s => s.trim()).filter(s => s.length > 0);
+          if (hnList.length === 0) return;
+
+          this.hnSyncing = true;
+          this.hnSyncResult = null;
+
+          // Step 1: Sync patient records in the master sheet -> Supabase
+          google.script.run
+            .withSuccessHandler((res) => {
+              if (!res.success) {
+                this.hnSyncing = false;
+                this.hnSyncResult = { type: 'error', message: res.error || 'Sync failed.' };
+                return;
+              }
+
+              // Step 2: Re-fetch fresh patient list to check assignment
+              google.script.run
+                .withSuccessHandler((freshData) => {
+                  this.hnSyncing = false;
+
+                  // Rebuild patient lists from fresh data
+                  const myId = this.profile.student_id;
+                  const newMyPatients = [];
+                  const newReferredPatients = [];
+                  (freshData || []).forEach(p => {
+                    if (p.student_id_1 === myId) newMyPatients.push(p);
+                    else newReferredPatients.push(p);
+                  });
+                  this.myPatients = newMyPatients;
+                  this.referredPatients = newReferredPatients;
+
+                  // Cross-check each synced HN
+                  const myHnSet = new Set(newMyPatients.map(p => p.hn));
+                  const matched = hnList.filter(hn => myHnSet.has(hn));
+                  const unmatched = hnList.filter(hn => !myHnSet.has(hn));
+
+                  if (unmatched.length === 0) {
+                    // All HNs are now in the user's own patient list
+                    this.hnSyncResult = {
+                      type: 'success',
+                      message: `✓ ${matched.length} patient(s) synced and updated in your list.`
+                    };
+                    setTimeout(() => { this.hnSyncInput = ''; this.hnSyncResult = null; }, 5000);
+                  } else if (matched.length > 0) {
+                    // Partial — some matched, some didn't
+                    this.hnSyncResult = {
+                      type: 'warning',
+                      message: `Synced ${hnList.length} patient(s). ${matched.length} updated in your list. ${unmatched.length} not displayed — still unassigned or assigned to another student: ${unmatched.join(', ')}`
+                    };
+                  } else {
+                    // None matched this student
+                    this.hnSyncResult = {
+                      type: 'warning',
+                      message: `Sync successful (${hnList.length} patient(s) updated in database), but not displayed — still unassigned or assigned to another student.`
+                    };
+                  }
+                })
+                .withFailureHandler((err) => {
+                  this.hnSyncing = false;
+                  // Sync worked; reload failed — still show partial success
+                  this.loadPatients();
+                  this.hnSyncResult = { type: 'warning', message: 'Sync done, but could not verify assignment. List refreshed.' };
+                })
+                .getStudentPatients();
+            })
+            .withFailureHandler((err) => {
+              this.hnSyncing = false;
+              this.hnSyncResult = { type: 'error', message: err.message || 'System error.' };
+            })
+            .adminSyncSelectedPatients(hnList);
         },
 
         toggleCompleteCase(p, fromModal = false) {

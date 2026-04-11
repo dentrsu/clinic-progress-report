@@ -37,7 +37,7 @@
   </nav>
 
   <!-- Sidebar (New) -->
-  <aside class="fixed top-0 left-0 h-full w-64 bg-navy-dark text-white shadow-lg transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-40"
+  <aside class="fixed top-0 left-0 h-full w-64 bg-navy-dark text-white shadow-lg transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-40 flex flex-col"
          :class="{'translate-x-0': sidebarOpen}"
          @click.away="sidebarOpen = false">
     <div class="p-6 flex items-center justify-between border-b border-navy-700">
@@ -346,25 +346,86 @@
     <!-- Instructors Tab -->
     <div x-show="!loading && activeTab === 'instructors'" class="space-y-6 animate-fade-in">
        <!-- Sync Section -->
-       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div>
-            <h2 class="text-lg font-bold text-navy flex items-center gap-2">
-               <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-               Sync from Master Sheet
-            </h2>
-            <p class="text-sm text-gray-500 mt-1">Sync instructors from Google Sheet (Teacher, Active, Permanent).</p>
+       <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+            <div>
+              <h2 class="text-lg font-bold text-navy flex items-center gap-2">
+                 <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                 Sync All Instructors
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">Import and update <strong>all</strong> instructors from the 'Teacher' sheet (Active, Permanent).</p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+               <div x-show="syncResult && !syncingSelectedInstructors && !syncing" class="text-xs font-medium px-3 py-1.5 rounded-lg" 
+                    :class="syncResult && syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
+                  <span x-text="syncResultMessage"></span>
+               </div>
+               <button @click="syncInstructors" :disabled="syncing || syncingSelectedInstructors"
+                       title="Import all instructors from the Google Sheet master list"
+                       class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                 <svg class="w-4 h-4" :class="{'animate-spin': syncing && !syncingSelectedInstructors}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                 <span x-text="(syncing && !syncingSelectedInstructors) ? 'Syncing...' : 'Sync All Instructors'"></span>
+               </button>
+            </div>
           </div>
-          <div class="flex items-center gap-3">
-             <div x-show="syncResult" class="text-xs font-medium px-3 py-1.5 rounded-lg" 
-                  :class="syncResult && syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
-                <span x-text="syncResultMessage"></span>
-             </div>
-             <button @click="syncInstructors" :disabled="syncing"
-                     title="Import instructors from the Google Sheet master list (Teacher, Active, Permanent)"
-                     class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-               <svg class="w-4 h-4" :class="{'animate-spin': syncing}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-               <span x-text="syncing ? 'Syncing...' : 'Sync Instructors'"></span>
-             </button>
+
+          <!-- Progress bar (full sync) -->
+          <div x-show="syncing && !syncingSelectedInstructors && instructorSyncProgress" class="w-full mb-4">
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span class="truncate max-w-xs font-mono" x-text="instructorSyncProgress ? instructorSyncProgress.currentEmail : ''"></span>
+              <span x-text="instructorSyncProgress ? (instructorSyncProgress.current + ' / ' + instructorSyncProgress.total) : ''"></span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+               <div class="bg-navy h-2 rounded-full transition-all duration-300"
+                    :style="'width: ' + (instructorSyncProgress && instructorSyncProgress.total > 0 ? Math.round(instructorSyncProgress.current / instructorSyncProgress.total * 100) : 0) + '%'"></div>
+            </div>
+          </div>
+
+          <!-- Selective Sync Section -->
+          <div class="pt-6 border-t border-gray-100 space-y-4">
+            <div>
+              <h3 class="text-sm font-bold text-navy flex items-center gap-2">
+                <svg class="w-4 h-4 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                Sync Selected Instructors by Email
+              </h3>
+              <p class="text-xs text-gray-400 mt-1">Enter multiple emails separated by commas or lines.</p>
+            </div>
+
+            <div class="max-w-xl">
+              <textarea x-model="syncInstructorEmailInput" rows="3"
+                        placeholder="e.g. instructor1@rsu.ac.th, instructor2@rsu.ac.th"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy resize-y"
+                        :disabled="syncingSelectedInstructors"></textarea>
+              
+              <div class="mt-3 flex items-center gap-3">
+                <button @click="syncSelectedInstructors" :disabled="parsedInstructorEmails.length === 0 || syncingSelectedInstructors || syncing"
+                        class="bg-gold hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <svg class="w-4 h-4" :class="{'animate-spin': syncingSelectedInstructors}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  <span x-text="syncingSelectedInstructors ? 'Syncing...' : ('Sync ' + (parsedInstructorEmails.length || '') + ' Instructor(s)')"></span>
+                </button>
+                <button x-show="syncInstructorEmailInput.trim()" @click="syncInstructorEmailInput = ''"
+                        class="text-xs text-gray-400 hover:text-gray-600 transition">Clear</button>
+              </div>
+
+              <!-- Selective Progress Bar -->
+              <div x-show="syncingSelectedInstructors && instructorSyncProgress" class="mt-4">
+                <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <span class="truncate max-w-xs font-mono" x-text="instructorSyncProgress ? instructorSyncProgress.currentEmail : ''"></span>
+                  <span x-text="instructorSyncProgress ? (instructorSyncProgress.current + ' / ' + instructorSyncProgress.total) : ''"></span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                   <div class="bg-gold h-2 rounded-full transition-all duration-300"
+                        :style="'width: ' + (instructorSyncProgress && instructorSyncProgress.total > 0 ? Math.round(instructorSyncProgress.current / instructorSyncProgress.total * 100) : 0) + '%'"></div>
+                </div>
+              </div>
+
+              <!-- Selective Result -->
+              <div x-show="instructorSyncResult" class="mt-4 p-3 rounded-lg border text-sm font-medium flex items-start gap-2"
+                   :class="instructorSyncResult && instructorSyncResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'">
+                 <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                 <span x-text="instructorSyncResult ? (instructorSyncResult.success ? 'Sync Successful! ' + (instructorSyncResult.stats ? ('Updated: ' + instructorSyncResult.stats.updated) : '') : 'Sync Failed: ' + instructorSyncResult.error) : ''"></span>
+              </div>
+            </div>
           </div>
        </div>
 
@@ -988,22 +1049,124 @@
 
        <!-- Patients Tab Content -->
       <div x-show="activeTab === 'patients'" class="space-y-6">
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 class="text-xl font-bold text-gray-800 mb-4">External Patient Sync</h2>
-          <p class="text-gray-600 mb-6">
-            Sync patient data from the configured Google Sheet (<code>PATIENT_SHEET_ID</code>). 
-            This will update existing patients (by HN) and create new ones.
-          </p>
-          
-          <div class="flex items-center space-x-4">
-             <button @click="syncPatients" :disabled="syncing" title="Import and update patient records from the configured Google Sheet (matches by HN, creates new if not found)" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed">
-               <i class="fas fa-sync-alt mr-2" :class="{'animate-spin': syncing}"></i>
-               <span x-text="syncing ? 'Syncing...' : 'Sync Patients Now'"></span>
-             </button>
-             
-             <div x-show="syncResult" class="text-sm" :class="{'text-green-600': syncResult && syncResult.success, 'text-red-600': syncResult && !syncResult.success}">
+
+        <!-- Full Sync Section -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-4">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h2 class="text-lg font-bold text-navy flex items-center gap-2">
+                <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Sync All Patients
+              </h2>
+              <p class="text-sm text-gray-500 mt-1">Import and update <strong>all</strong> patient records from the configured Google Sheet (<code class="text-xs bg-gray-100 px-1 rounded">PATIENT_SHEET_ID</code>). Matches by HN, creates new records if not found.</p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+              <div x-show="syncResult && !syncingSelected && !syncing" class="text-xs font-medium px-3 py-1.5 rounded-lg"
+                   :class="syncResult && syncResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'">
                 <span x-text="syncResultMessage"></span>
-             </div>
+              </div>
+              <button @click="syncPatients" :disabled="syncing || syncingSelected"
+                      title="Sync all patients from the PATIENT_SHEET_ID Google Sheet"
+                      class="bg-navy hover:bg-navy-light text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                <svg class="w-4 h-4" :class="{'animate-spin': syncing && !syncingSelected}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span x-text="(syncing && !syncingSelected) ? 'Syncing...' : 'Sync All Patients'"></span>
+              </button>
+            </div>
+          </div>
+          <!-- Progress bar (all sync) -->
+          <div x-show="syncing && !syncingSelected && patientSyncProgress" class="w-full">
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span class="font-mono truncate max-w-xs" x-text="patientSyncProgress ? ('HN: ' + (patientSyncProgress.currentHn || '...')) : ''"></span>
+              <span x-text="patientSyncProgress ? (patientSyncProgress.current + ' / ' + patientSyncProgress.total) : ''"></span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div class="bg-navy h-2.5 rounded-full transition-all duration-300"
+                   :style="'width: ' + (patientSyncProgress && patientSyncProgress.total > 0 ? Math.round(patientSyncProgress.current / patientSyncProgress.total * 100) : 0) + '%'"></div>
+            </div>
+            <div class="flex items-center gap-4 text-[10px] text-gray-400 mt-1.5">
+              <span x-text="'Updated: ' + (patientSyncProgress ? patientSyncProgress.updated : 0)"></span>
+              <span x-show="patientSyncProgress && patientSyncProgress.errors > 0" class="text-red-500 font-semibold" x-text="'Errors: ' + patientSyncProgress.errors"></span>
+              <span x-text="patientSyncProgress && patientSyncProgress.total > 0 ? Math.round(patientSyncProgress.current / patientSyncProgress.total * 100) + '%' : '0%'"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selective HN Sync Section -->
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <div>
+              <h2 class="text-lg font-bold text-navy">Sync Selected Patients by HN</h2>
+              <p class="text-sm text-gray-500 mt-0.5">Enter one or more HN numbers to sync specific patients only. Faster than a full import.</p>
+            </div>
+          </div>
+
+          <div class="space-y-4 max-w-xl">
+            <!-- HN Input area -->
+            <div>
+              <label class="block text-xs font-medium text-gray-500 uppercase mb-1">
+                HN Numbers
+                <span class="normal-case text-gray-400 font-normal ml-1">(one per line, or comma-separated)</span>
+              </label>
+              <textarea x-model="syncHnInput" rows="5"
+                        placeholder="e.g.&#10;HN00123&#10;HN00456&#10;HN00789"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-navy resize-y"
+                        :disabled="syncingSelected"></textarea>
+              <!-- Tag preview -->
+              <template x-if="parsedHns.length > 0">
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  <template x-for="hn in parsedHns" :key="hn">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-navy/10 text-navy text-xs font-mono font-semibold" x-text="hn"></span>
+                  </template>
+                </div>
+              </template>
+              <p x-show="parsedHns.length > 0" class="text-[10px] text-gray-400 mt-1" x-text="parsedHns.length + ' HN(s) queued for sync'"></p>
+            </div>
+
+            <!-- Action Row -->
+            <div class="flex items-center gap-3">
+              <button @click="syncSelectedPatients" :disabled="parsedHns.length === 0 || syncingSelected || syncing"
+                      title="Sync only the listed HNs from the patient sheet"
+                      class="bg-gold hover:bg-amber-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg class="w-4 h-4" :class="{'animate-spin': syncingSelected}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span x-text="syncingSelected ? 'Syncing...' : ('Sync ' + (parsedHns.length || '') + ' Patient(s)')"></span>
+              </button>
+              <button x-show="syncHnInput.trim()" @click="syncHnInput = ''"
+                      class="text-xs text-gray-400 hover:text-gray-600 transition">Clear</button>
+            </div>
+
+            <!-- Progress bar (selected sync) -->
+            <div x-show="syncingSelected && patientSyncProgress" class="w-full">
+              <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                <span class="font-mono truncate max-w-xs" x-text="patientSyncProgress ? ('HN: ' + (patientSyncProgress.currentHn || '...')) : ''"></span>
+                <span x-text="patientSyncProgress ? (patientSyncProgress.current + ' / ' + patientSyncProgress.total) : ''"></span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                <div class="bg-gold h-2.5 rounded-full transition-all duration-300"
+                     :style="'width: ' + (patientSyncProgress && patientSyncProgress.total > 0 ? Math.round(patientSyncProgress.current / patientSyncProgress.total * 100) : 0) + '%'"></div>
+              </div>
+              <div class="flex items-center gap-4 text-[10px] text-gray-400 mt-1.5">
+                <span x-text="'Updated: ' + (patientSyncProgress ? patientSyncProgress.updated : 0)"></span>
+                <span x-show="patientSyncProgress && patientSyncProgress.errors > 0" class="text-red-500 font-semibold" x-text="'Errors: ' + patientSyncProgress.errors"></span>
+                <span x-text="patientSyncProgress && patientSyncProgress.total > 0 ? Math.round(patientSyncProgress.current / patientSyncProgress.total * 100) + '%' : '0%'"></span>
+              </div>
+            </div>
+
+            <!-- Result -->
+            <div x-show="syncSelectedResult" class="p-3 rounded-lg border text-sm font-medium flex items-start gap-2"
+                 :class="syncSelectedResult && syncSelectedResult.success ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'">
+              <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <template x-if="syncSelectedResult && syncSelectedResult.success">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </template>
+                <template x-if="!syncSelectedResult || !syncSelectedResult.success">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </template>
+              </svg>
+              <span x-text="syncSelectedMessage"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -2057,6 +2220,31 @@
         syncStudentEmail: '',
         syncProgress: null,
         syncPollTimer: null,
+
+        // Selective Patient Sync
+        syncHnInput: '',
+        syncingSelected: false,
+        syncSelectedResult: null,
+        syncSelectedMessage: '',
+
+        // Patient Sync Progress
+        patientSyncProgress: null,
+        patientSyncPollTimer: null,
+
+        // Instructor Sync Progress
+        syncInstructorEmailInput: '',
+        syncingSelectedInstructors: false,
+        instructorSyncProgress: null,
+        instructorSyncPollTimer: null,
+        instructorSyncResult: null,
+
+        get parsedInstructorEmails() {
+          if (!this.syncInstructorEmailInput || !this.syncInstructorEmailInput.trim()) return [];
+          return this.syncInstructorEmailInput
+            .split(/[\n,]+/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0 && s.includes('@'));
+        },
         
         init() {
           this.loadInitData();
@@ -2085,20 +2273,45 @@
           this.$watch('caseTypes', () => this.filterTypeOfCases());
         },
 
+        get parsedHns() {
+          if (!this.syncHnInput || !this.syncHnInput.trim()) return [];
+          return this.syncHnInput
+            .split(/[\n,]+/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+        },
+
+        startPatientSyncPolling() {
+          this.stopPatientSyncPolling();
+          this.patientSyncPollTimer = setInterval(() => {
+            google.script.run
+              .withSuccessHandler(prog => { if (prog) this.patientSyncProgress = prog; })
+              .adminGetSyncPatientsProgress();
+          }, 2500);
+        },
+
+        stopPatientSyncPolling() {
+          if (this.patientSyncPollTimer) { clearInterval(this.patientSyncPollTimer); this.patientSyncPollTimer = null; }
+        },
+
         syncPatients() {
           this.syncing = true;
           this.syncResult = null;
           this.syncResultMessage = 'Starting sync...';
+          this.patientSyncProgress = null;
+          this.startPatientSyncPolling();
           
           google.script.run
             .withSuccessHandler(res => {
+              this.stopPatientSyncPolling();
               this.syncing = false;
+              this.patientSyncProgress = null;
               this.syncResult = res;
               if (res.success) {
                  this.syncResultMessage = `Success! Created: ${res.stats.created || 0}, Updated: ${res.stats.updated || 0}, Errors: ${res.stats.errors || 0}`;
                  if (res.warning) {
-                   this.warningType = 'error';
-                   this.warningMessage = "Completed with Fallback Warnings:\n" + res.warning;
+                   this.warningType = 'warning';
+                   this.warningMessage = "Completed with warnings:\n" + res.warning;
                    this.warningOpen = true;
                  }
               } else {
@@ -2109,6 +2322,7 @@
               }
             })
             .withFailureHandler(err => {
+              this.stopPatientSyncPolling();
               this.syncing = false;
               this.syncResult = { success: false };
               this.syncResultMessage = `Error: ${err.message}`;
@@ -2117,6 +2331,48 @@
               this.warningOpen = true;
             })
             .adminSyncPatients();
+        },
+
+        syncSelectedPatients() {
+          const hnList = this.parsedHns;
+          if (!hnList || hnList.length === 0) return;
+          this.syncingSelected = true;
+          this.syncSelectedResult = null;
+          this.syncSelectedMessage = `Syncing ${hnList.length} patient(s)...`;
+          this.patientSyncProgress = null;
+          this.startPatientSyncPolling();
+
+          google.script.run
+            .withSuccessHandler(res => {
+              this.stopPatientSyncPolling();
+              this.syncingSelected = false;
+              this.patientSyncProgress = null;
+              this.syncSelectedResult = res;
+              if (res.success) {
+                this.syncSelectedMessage = `Done! Updated: ${res.stats.updated || 0}, Errors: ${res.stats.errors || 0}`;
+                if (res.warning) {
+                  this.warningType = 'warning';
+                  this.warningMessage = 'Sync completed with warnings:\n' + res.warning;
+                  this.warningOpen = true;
+                }
+              } else {
+                this.syncSelectedMessage = `Failed: ${res.error}`;
+                this.warningType = 'error';
+                this.warningMessage = 'Sync Failed:\n' + res.error;
+                this.warningOpen = true;
+              }
+            })
+            .withFailureHandler(err => {
+              this.stopPatientSyncPolling();
+              this.syncingSelected = false;
+              this.patientSyncProgress = null;
+              this.syncSelectedResult = { success: false };
+              this.syncSelectedMessage = `Error: ${err.message}`;
+              this.warningType = 'error';
+              this.warningMessage = 'System Error:\n' + err.message;
+              this.warningOpen = true;
+            })
+            .adminSyncSelectedPatients(hnList);
         },
 
         verifyHash() {
@@ -2193,11 +2449,15 @@
         syncInstructors() {
           this.syncing = true;
           this.syncResult = null;
-          this.syncResultMessage = 'Starting sync...';
+          this.syncResultMessage = 'Starting full sync...';
+          this.instructorSyncProgress = null;
+          this.startInstructorSyncPolling();
 
           google.script.run
             .withSuccessHandler(res => {
+              this.stopInstructorSyncPolling();
               this.syncing = false;
+              this.instructorSyncProgress = null;
               this.syncResult = res;
               if (res.success) {
                  // Refresh list
@@ -2217,7 +2477,9 @@
               }
             })
             .withFailureHandler(err => {
+              this.stopInstructorSyncPolling();
               this.syncing = false;
+              this.instructorSyncProgress = null;
               this.syncResult = { success: false };
               this.syncResultMessage = `Error: ${err.message}`;
               this.warningType = 'error';
@@ -2225,6 +2487,62 @@
               this.warningOpen = true;
             })
             .adminSyncInstructors();
+        },
+
+        syncSelectedInstructors() {
+          const emails = this.parsedInstructorEmails;
+          if (emails.length === 0) return;
+          
+          this.syncingSelectedInstructors = true;
+          this.instructorSyncResult = null;
+          this.instructorSyncProgress = null;
+          this.startInstructorSyncPolling();
+
+          google.script.run
+            .withSuccessHandler(res => {
+              this.stopInstructorSyncPolling();
+              this.syncingSelectedInstructors = false;
+              this.instructorSyncProgress = null;
+              this.instructorSyncResult = res;
+              if (res.success) {
+                this.loadInstructors();
+                if (res.stats.warnings && res.stats.warnings.length > 0) {
+                  this.warningType = 'notice';
+                  this.warningMessage = "Sync Warnings:\n" + res.stats.warnings.join('\n');
+                  this.warningOpen = true;
+                }
+              } else {
+                this.warningType = 'error';
+                this.warningMessage = "Sync Failed:\n" + res.error;
+                this.warningOpen = true;
+              }
+            })
+            .withFailureHandler(err => {
+              this.stopInstructorSyncPolling();
+              this.syncingSelectedInstructors = false;
+              this.instructorSyncProgress = null;
+              this.instructorSyncResult = { success: false, error: err.message };
+              this.warningType = 'error';
+              this.warningMessage = "System Error:\n" + err.message;
+              this.warningOpen = true;
+            })
+            .adminSyncSelectedInstructors(emails);
+        },
+
+        startInstructorSyncPolling() {
+          this.stopInstructorSyncPolling();
+          this.instructorSyncPollTimer = setInterval(() => {
+            google.script.run
+              .withSuccessHandler(prog => { if (prog) this.instructorSyncProgress = prog; })
+              .adminGetSyncInstructorsProgress();
+          }, 2500);
+        },
+
+        stopInstructorSyncPolling() {
+          if (this.instructorSyncPollTimer) {
+            clearInterval(this.instructorSyncPollTimer);
+            this.instructorSyncPollTimer = null;
+          }
         },
         
         loadData() {

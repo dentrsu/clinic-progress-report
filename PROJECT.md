@@ -31,6 +31,10 @@ A dedicated interface for administrators to manage users.
   - **Treatment Plans**: Dedicated page for viewing/managing treatment records.
     - **Verification Workflow**: Students can request email verification for 'Completed' records (automatically shifts to 'Pending Verification'). Supports re-requests if 'Rejected'.
   - **Requirement Vault**: Per-division progress tracking with RSU/CDA tables and radar chart. Tracks both 'Verified' and 'Estimated' status (Completed/Pending/Rejected).
+  - **N/A Progress Distribution Calculation**:
+    - Choose the **Whole Division** view as an administrator.
+    - Select the dropdown filters (e.g., Year 4) to narrow the student list.
+    - **Verify**: The progress distribution bars accurately compute an **"N/A"** baseline for each requirement. The N/A segment represents the minimum requirement multiplied by the number of currently filtered students who have no submitted records for that component.
 - **Instructor Portal**:
   - View assigned students (team leader view).
   - Student detail modal with patient list and requirement vault link.
@@ -46,7 +50,37 @@ A dedicated interface for administrators to manage users.
   - **Verify Hash Tab**: Validate student verification proof hashes (SHA-256).
   - System Health Check.
 - **Nightly Backup**: All Supabase tables are automatically synced to Google Sheets at midnight via a GAS time-based trigger.
+- **Patient Synchronization**:
+  - **Full Sync**: Manual or scheduled import of all patient records from the configured `PATIENT_SHEET_ID` Google Sheet.
+  - **Targeted Sync**: Admin and Students can sync specific Hospital Numbers (HNs) for faster updates.
+  - **Auto-Verification**: Student-triggered syncs automatically verify if the patient is assigned to the current user and provide feedback.
+- **Progress Tracking**: Real-time progress bars in the Admin Console for long-running sync processes.
 - **Security**: Access restricted to users with `role: admin`.
+
+---
+
+## 9. Patient Synchronization
+
+Follow these steps to verify the patient data synchronization tools.
+
+1. **Admin: Full Sync**
+   - Go to **Admin Console** → **Patients** tab.
+   - Click **"Sync All Patients"**.
+   - **Verify**: A progress bar appears showing the current HN, total count, and updated record count.
+   - **Verify**: Check the browser console or toast message for final results (Created/Updated stats).
+
+2. **Admin: Targeted Sync**
+   - In the **Patients** tab, enter one or more HNs into the **"Sync Selected Patients by HN"** textarea.
+   - Click **"Sync X Patient(s)"**.
+   - **Verify**: Only the specified HNs are processed. The progress bar updates accordingly.
+
+3. **Student: Personal Sync**
+   - Log in as a **student**.
+   - At the top of the **Patient List**, enter an HN in the sync strip and click **"Sync"**.
+   - **Case A (Assigned)**: Sync an HN that matches your student email in the Master Sheet.
+     - **Verify**: Success message appears and the patient card is added/updated in your list.
+   - **Case B (Unassigned)**: Sync an HN not assigned to you.
+     - **Verify**: Success message confirms the database update, but an amber warning informs you that the patient is not yet assigned to you.
 
 ---
 
@@ -172,6 +206,7 @@ In the Apps Script editor (`script.google.com`), go to **Project Settings → Sc
 | `SUPABASE_URL`        | `https://your-project.supabase.co`            |
 | `SUPABASE_KEY`        | Your Supabase **service_role** key            |
 | `FALLBACK_SHEET_ID`   | Google Spreadsheet ID for fallback            |
+| `PATIENT_SHEET_ID`    | Google Sheet ID containing patient master records |
 | `VERIFICATION_SECRET` | Random secret for verification hash (SHA-256) |
 
 > ⚠️ **Never commit keys to version control.** They live only in Script Properties.

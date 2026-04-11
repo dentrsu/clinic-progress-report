@@ -205,3 +205,39 @@ Follow these steps to verify recent UI improvements and precise dashboard tracki
    - Choose the **Whole Division** view as an administrator.
    - Select the dropdown filters (e.g., Year 4) to narrow the student list.
    - **Verify**: The progress distribution bars accurately compute an **"N/A"** baseline for each requirement. The N/A segment represents the minimum requirement multiplied by the number of currently filtered students who have no submitted records for that component.
+
+---
+
+## 9. Patient Synchronization
+
+Follow these steps to verify the patient data synchronization tools.
+
+1. **Admin: Full Sync**
+   - Go to **Admin Console** → **Patients** tab.
+   - Click **"Sync All Patients"**.
+   - **Verify**: A progress bar appears showing the current HN, total count, and updated record count.
+   - **Verify**: Check the browser console or toast message for final results (Created/Updated stats).
+
+2. **Admin: Targeted Sync**
+   - In the **Patients** tab, enter one or more HNs into the **"Sync Selected Patients by HN"** textarea.
+   - Click **"Sync X Patient(s)"**.
+   - **Verify**: Only the specified HNs are processed. The progress bar updates accordingly.
+
+3. **Student: Personal Sync**
+   - Log in as a **student**.
+   - At the top of the **Patient List**, enter an HN in the sync strip and click **"Sync"**.
+   - **Case A (Assigned)**: Sync an HN that matches your student email in the Master Sheet.
+     - **Verify**: Success message appears and the patient card is added/updated in your list.
+   - **Case B (Unassigned)**: Sync an HN not assigned to you.
+     - **Verify**: Success message confirms the database update, but an amber warning informs you that the patient is not yet assigned to you.
+
+### Instructor Synchronization
+- **Sync All**: The "Sync Instructors" button now displays a real-time progress bar showing the email being processed and the current count.
+- **Sync Selected**: A new section in the Instructors tab allows entering specific emails (comma or line separated) to sync only those instructors.
+- **Selective Progress**: Includes a separate progress bar and result display for selective sync operations.
+
+#### Verification
+1. Open Admin Console > Instructors tab.
+2. Observe the "Sync All Instructors" button with its new progress bar support.
+3. Use the "Sync Selected Instructors by Email" textarea to sync specific accounts.
+4. Verify progress updates and final statistics/warnings.

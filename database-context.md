@@ -427,6 +427,23 @@ Example: Class II records [2,2,3,3] = 10 total, minimum = 6 →
 
 ---
 
+### J. Patient Data Synchronization
+
+The system maintains a primary patient database in Supabase, but clinical master data resides in an external Google Sheet (`PATIENT_SHEET_ID`).
+
+#### Sync Mechanism
+- **Matching Logic**: Synchronization is done primarily by **Hospital Number (HN)**. If an HN exists in Supabase, the record is updated; otherwise, a new record is created.
+- **Student Assignment**:
+  - The Master Sheet contains columns for assigned student emails (e.g., `student_id_1`).
+  - During sync, the system resolves these emails to internal `student_id` (UUIDs) by looking up the `users` and `students` tables.
+  - If a student email is not found or the profile is missing, the assignment is skipped, and a warning is logged.
+- **Triggers**:
+  - **Admin**: Full sync of all rows or targeted sync of specified HNs.
+  - **Student**: Targeted sync of specified HNs for high-priority updates.
+- **Progress Tracking**: Long-running syncs (especially full imports) use a `CacheService` backed polling mechanism to report real-time progress to the UI.
+
+---
+
 ### H. Periodontics (PERIO) Division — Vault Aggregation Rules
 
 PERIO uses derived aggregation requirements that cannot be expressed by standard `aggregation_config` types alone. Logic is split between pass-1 (for standard types) and `DIVISION_PROCESSORS['PERIO']` in `Code.gs`.
