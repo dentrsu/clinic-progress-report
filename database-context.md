@@ -9,6 +9,9 @@ The system manages dental students, clinical instructors, and patient treatment 
 - **Catalog:** Defines what treatments exist (`treatment_catalog`) and the mandatory steps for each (`treatment_steps`).
 - **Execution:** Tracks the actual clinical work performed by students (`treatment_records`).
 
+### Data Persistence & Backup
+As the **Source of Truth**, Supabase holds all live clinical data. The system employs a **Three-Layer Backup Strategy** (Sheets, Drive ZIP, and Server Restic) for disaster recovery. For technical details on the recovery procedures and storage locations, refer to [PROJECT.md](file:///c:/Users/oddha/OneDrive/Documents/Antigravity/clinic-progress-report/PROJECT.md).
+
 ---
 
 ## 2. Entity Relationship Model (DDL)
@@ -584,7 +587,9 @@ URL params: `&token=<32hex>&issued_at=<ISO>&cd=<32hex>`
 
 TTL: 7 days. Old emails without `token`/`cd` fall through for backward compatibility.
 
-### Admin verification — two modes
+### Hash verification — two modes
+
+Both functions are accessible to **admin, instructor, and student** roles.
 
 #### DB-assisted (`adminVerifyHash`)
 
@@ -595,7 +600,7 @@ Call `adminVerifyHash(verifiedAt, recordId, hash)` — fetches the current recor
 
 #### Standalone (`adminVerifyHashFromEmail`) — no DB access required
 
-Route: `?page=verify` (accessible to admin and instructor roles). A form-based page where the admin copies all fields directly from the email. No DB is queried — the hash is recomputed purely from the supplied inputs.
+Route: `?page=verify` (accessible to admin, instructor, and student roles). A form-based page where the user copies all fields directly from the email. No DB is queried — the hash is recomputed purely from the supplied inputs.
 
 Call `adminVerifyHashFromEmail(params)` with **all 15 fields**:
 

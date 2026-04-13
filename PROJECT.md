@@ -8,12 +8,18 @@ A web application for tracking dental student clinical progress at Rangsit Unive
 
 ```
 Browser UI  →  GAS Web App  →  SupabaseProvider  →  Supabase (Single Source of Truth)
-                                BackupScheduler   →  Google Sheets (Nightly Backup)
+                                └─ BackupScheduler  →  1. Google Sheets (Failover)
+                                                    →  2. Google Drive ZIP (Point-in-Time)
+Server Shell →  backup.sh   →  rclone + Restic     →  3. Google Drive Repo (Full Dump)
 ```
 
-- **Frontend**: HtmlService + Tailwind CSS (CDN) + Alpine.js
-- **Backend**: Google Apps Script acts as a **Backend-for-Frontend** (BFF).
-- **Data Strategy**: All reads and writes go directly to Supabase. A nightly scheduled trigger (`BackupScheduler.gs`) syncs all tables to Google Sheets for disaster recovery.
+### Data Strategy & Multi-Layer Backup
+
+The system follows a **Three-Layer Backup Strategy** to ensure zero data loss and rapid recovery:
+
+1.  **Failover Layer (Google Sheets)**: A nightly trigger (`runAllBackups`) mirrors all Supabase tables to a Google Spreadsheet. This provides a human-readable, instant-access recovery point if the primary database is unreachable.
+2.  **Archive Layer (Google Drive ZIP)**: The same trigger produces individual JSON dumps of every table, compresses them into a ZIP archive, and stores them in the `backup-tracker` folder on Google Drive. It maintains daily, weekly, and monthly rotations.
+3.  **Infrastructure Layer (Server Restic)**: A shell script on the Supabase host runs a full `pg_dumpall`, which is then encrypted and deduplicated via **Restic** before being pushed to a dedicated repository on Google Drive (`dentrsu-tracker`). This captured everything—including Auth schemas, functions, and RLS policies.
 
 ---
 
@@ -31,6 +37,7 @@ A dedicated interface for administrators to manage users.
   - **Treatment Plans**: Dedicated page for viewing/managing treatment records.
     - **Verification Workflow**: Students can request email verification for 'Completed' records (automatically shifts to 'Pending Verification'). Supports re-requests if 'Rejected'.
   - **Requirement Vault**: Per-division progress tracking with RSU/CDA tables and radar chart. Tracks both 'Verified' and 'Estimated' status (Completed/Pending/Rejected).
+  - **Verify Email Proof**: Students can access the standalone hash verifier (`?page=verify`) to validate verification proof emails.
   - **N/A Progress Distribution Calculation**:
     - Choose the **Whole Division** view as an administrator.
     - Select the dropdown filters (e.g., Year 4) to narrow the student list.
@@ -38,7 +45,7 @@ A dedicated interface for administrators to manage users.
 - **Instructor Portal**:
   - View assigned students (team leader view).
   - Student detail modal with patient list and requirement vault link.
-  - **Verify Treatment Hash**: Collapsible section to validate a student's verification proof by recomputing the SHA-256 hash.
+  - **Verify Treatment Hash**: Collapsible section to validate a student's verification proof by recomputing the HMAC-SHA256 hash.
 - **Advisor Portal** (`?page=advisor`):
   - View advisee students filtered by the instructor's assigned division.
   - Student detail modal with embedded division-specific requirement progress (RSU & CDA tables).
@@ -47,7 +54,8 @@ A dedicated interface for administrators to manage users.
   - Manage Users (Students/Instructors).
   - **System Announcements**: Broadcast messages to specific user roles (Students, Instructors, or Both) with scheduled start/end dates. Users can dismiss announcements so they don't load again.
   - **Academic ID Support**: Manage Real-world Student IDs.
-  - **Verify Hash Tab**: Validate student verification proof hashes (SHA-256).
+  - **Verify Hash Tab**: Validate student verification proof hashes (HMAC-SHA256).
+  - **Email Send Controls**: Separate toggles for verification request emails (to instructors) and verification result emails (to students).
   - System Health Check.
 - **Nightly Backup**: All Supabase tables are automatically synced to Google Sheets at midnight via a GAS time-based trigger.
 - **Patient Synchronization**:
@@ -136,9 +144,12 @@ Access is restricted to **@rsu.ac.th** Google accounts only.
 
 ---
 
-## Nightly Backup
+## Backup & Disaster Recovery
 
-A scheduled trigger runs `backupAllTablesToSheets()` daily at midnight:
+A scheduled trigger runs `runAllBackups()` daily at midnight, executing both the Sheets and Drive ZIP backups.
+
+### 1. Google Sheets (Failover)
+Standard spreadsheet with dedicated tabs for each table. Managed via `backupAllTablesToSheets()`.
 
 | Table               | Backed Up |
 | ------------------- | --------- |
@@ -151,8 +162,19 @@ A scheduled trigger runs `backupAllTablesToSheets()` daily at midnight:
 | `treatment_phases`  | ✅        |
 | `treatment_records` | ✅        |
 
-- Each table is written to a dedicated sheet in the fallback spreadsheet.
-- Pagination handles tables with >1000 rows.
+### 2. Google Drive ZIP (Point-in-Time)
+JSON dumps compressed into ZIP files. Stored in folder: **`backup-tracker`**.
+
+- **`backup-daily.zip`**: Latest nightly snapshot.
+- **`backup-weekly.zip`**: Sunday archive.
+- **`backup-monthly.zip`**: 1st of month archive.
+
+### 3. Server Restic (Infrastructure)
+Encrypted, deduplicated repository for full server recovery. Stored in folder: **`dentrsu-tracker`**.
+- Includes: `auth` schema, triggers, functions, and RLS policies.
+- Tool: `restic` via `rclone`.
+
+### Trigger Management
 - Run `setupNightlyBackupTrigger()` once from the GAS editor to activate.
 - Run `removeNightlyBackupTrigger()` to deactivate.
 

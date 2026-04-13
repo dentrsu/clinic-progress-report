@@ -683,6 +683,7 @@ function studentRequestEmailVerification(recordId, instructorId) {
       subject:
         "Verification Request: " + treatmentName + " for HN " + patientHn,
       htmlBody: htmlBody,
+      purpose: "request",
     });
 
     // Update record status to 'pending verification' and store instructor_id
@@ -717,14 +718,31 @@ function _isDevMode() {
 /**
  * Wrapper around MailApp.sendEmail that, in dev mode, prefixes the subject
  * with "[ทดสอบระบบ]" and injects a prominent warning banner at the top of
- * the HTML body. Also checks if email verification sends are allowed.
- * @param {{ to: string, subject: string, htmlBody: string }} opts
+ * the HTML body. Also checks per-purpose email toggles.
+ * @param {{ to: string, subject: string, htmlBody: string, purpose?: string }} opts
+ *   purpose: "request" (verification request to instructor / confirmation to student)
+ *            "result"  (verification result notification to student)
+ *            omitted   → checks legacy ALLOW_EMAIL_SEND for backward compat
  */
 function _devMailSend(opts) {
-  var isEmailAllowed =
-    PropertiesService.getScriptProperties().getProperty("ALLOW_EMAIL_SEND");
-  if (isEmailAllowed === "false") {
-    Logger.log("Email sending is disabled by admin. Skipping: " + opts.subject);
+  var props = PropertiesService.getScriptProperties();
+  var purpose = opts.purpose || "";
+  var allowed = true;
+
+  if (purpose === "request") {
+    var val = props.getProperty("ALLOW_EMAIL_REQUEST");
+    if (val === "false") allowed = false;
+  } else if (purpose === "result") {
+    var val = props.getProperty("ALLOW_EMAIL_RESULT");
+    if (val === "false") allowed = false;
+  } else {
+    // Legacy fallback for any _devMailSend call without purpose
+    var val = props.getProperty("ALLOW_EMAIL_SEND");
+    if (val === "false") allowed = false;
+  }
+
+  if (!allowed) {
+    Logger.log("Email sending is disabled (" + (purpose || "global") + "). Skipping: " + opts.subject);
     return;
   }
 
@@ -770,33 +788,54 @@ function adminSetDevMode(enabled) {
   return { success: true, devMode: enabled };
 }
 
-/** Read Email Send setting (admin only). Default is true if not explicitly false. */
+/** Read Email Send settings (admin only). Returns both request and result toggles. */
 function adminGetEmailVerificationMode() {
   var user = getCurrentUser();
   if (!user.allowed) throw new Error("Access Denied");
   var profile = getUserProfile(user.email);
   if (!profile.found || profile.role !== "admin")
     throw new Error("Admin only.");
-  var val =
-    PropertiesService.getScriptProperties().getProperty("ALLOW_EMAIL_SEND");
-  return val !== "false";
+  var props = PropertiesService.getScriptProperties();
+  var reqVal = props.getProperty("ALLOW_EMAIL_REQUEST");
+  var resVal = props.getProperty("ALLOW_EMAIL_RESULT");
+  return {
+    emailRequest: reqVal !== "false",
+    emailResult: resVal !== "false",
+  };
 }
 
 /**
- * Set Email Send setting (admin only).
+ * Set Email Request setting (admin only) — controls verification request emails.
  * @param {boolean} enabled
  */
-function adminSetEmailVerificationMode(enabled) {
+function adminSetEmailRequestMode(enabled) {
   var user = getCurrentUser();
   if (!user.allowed) throw new Error("Access Denied");
   var profile = getUserProfile(user.email);
   if (!profile.found || profile.role !== "admin")
     throw new Error("Admin only.");
   PropertiesService.getScriptProperties().setProperty(
-    "ALLOW_EMAIL_SEND",
+    "ALLOW_EMAIL_REQUEST",
     enabled ? "true" : "false",
   );
-  return { success: true, emailVerificationMode: enabled };
+  return { success: true, emailRequest: enabled };
+}
+
+/**
+ * Set Email Result setting (admin only) — controls verification result emails.
+ * @param {boolean} enabled
+ */
+function adminSetEmailResultMode(enabled) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (!profile.found || profile.role !== "admin")
+    throw new Error("Admin only.");
+  PropertiesService.getScriptProperties().setProperty(
+    "ALLOW_EMAIL_RESULT",
+    enabled ? "true" : "false",
+  );
+  return { success: true, emailResult: enabled };
 }
 
 // ─── Verification Secret ─────────────────────────────────────────────────────
@@ -1157,9 +1196,9 @@ function adminVerifyHashFromEmail(params) {
   if (
     !profile.found ||
     !profile.active ||
-    (profile.role !== "admin" && profile.role !== "instructor")
+    (profile.role !== "admin" && profile.role !== "instructor" && profile.role !== "student")
   ) {
-    throw new Error("Access Denied: Admin or instructor only.");
+    throw new Error("Access Denied");
   }
 
   var trimmed = (params.hash || "").trim();
@@ -1244,9 +1283,9 @@ function adminVerifyHash(verifiedAt, recordId, hash) {
   if (
     !profile.found ||
     !profile.active ||
-    (profile.role !== "admin" && profile.role !== "instructor")
+    (profile.role !== "admin" && profile.role !== "instructor" && profile.role !== "student")
   ) {
-    throw new Error("Access Denied: Admin or instructor only.");
+    throw new Error("Access Denied");
   }
   var trimmed = (hash || "").trim();
 
@@ -1521,6 +1560,7 @@ function processEmailVerification(e) {
               " (HN " +
               pHn +
               ")",
+            purpose: "result",
             htmlBody:
               "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px;'>" +
               "<h2 style='color:#1a365d;border-bottom:2px solid #e2e8f0;padding-bottom:10px;'>Treatment " +
@@ -1775,6 +1815,28 @@ function doGet(e) {
     return t
       .evaluate()
       .setTitle("Oracle Analytics Guide — DentRSU Tracker")
+      .setFaviconUrl(favicon)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
+  if (page === "oracle-infographic") {
+    var t = HtmlService.createTemplateFromFile("oracle-infographic");
+    t.appUrl = url;
+    return t
+      .evaluate()
+      .setTitle("How Oracle Predicts — DentRSU Tracker")
+      .setFaviconUrl(favicon)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag("viewport", "width=device-width, initial-scale=1");
+  }
+
+  if (page === "backup") {
+    var t = HtmlService.createTemplateFromFile("backup");
+    t.appUrl = url;
+    return t
+      .evaluate()
+      .setTitle("Backup & Recovery — DentRSU Tracker")
       .setFaviconUrl(favicon)
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag("viewport", "width=device-width, initial-scale=1");
@@ -3957,14 +4019,22 @@ function studentGetOracleDashboard(studentId) {
     throw new Error("Access Denied: You can only view your own dashboard.");
   }
 
-  // Ensure the latest data is calculated and saved to the database
-  SupabaseProvider.refreshOracleSnapshot(targetId);
+  // Fetch existing snapshot + explanations + recommendations in one parallel batch
+  var dashboard = SupabaseProvider.getOracleDashboardBatch(targetId);
 
-  return {
-    snapshot: SupabaseProvider.getOracleStudentSnapshot(targetId),
-    explanations: SupabaseProvider.getOracleStudentExplanations(targetId),
-    recommendations: SupabaseProvider.getOracleStudentRecommendations(targetId),
-  };
+  // Only refresh if snapshot is stale (>5 min old) or missing
+  var needsRefresh = true;
+  if (dashboard.snapshot && dashboard.snapshot.last_calculated_at) {
+    var snapshotAge = Date.now() - new Date(dashboard.snapshot.last_calculated_at).getTime();
+    needsRefresh = snapshotAge > 5 * 60 * 1000; // 5 minutes
+  }
+
+  if (needsRefresh) {
+    SupabaseProvider.refreshOracleSnapshot(targetId);
+    dashboard = SupabaseProvider.getOracleDashboardBatch(targetId);
+  }
+
+  return dashboard;
 }
 
 /**
@@ -4452,6 +4522,7 @@ function instructorBulkUpdateRecordStatus(payload) {
           sum.items.length +
           " Treatment Record(s) " +
           (action === "verified" ? "Verified" : "Rejected"),
+        purpose: "result",
         htmlBody:
           "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;" +
           "padding:20px;border:1px solid #e0e0e0;border-radius:8px;'>" +
@@ -6813,12 +6884,20 @@ function instructorVerifyTreatmentRecord(recordId) {
     var verifierId = profile.user_id;
     var verifiedAt = new Date().toISOString();
 
-    SupabaseProvider.updateTreatmentRecord(recordId, {
+    var updates = {
       status: "verified",
       verified_by: verifierId,
       verified_at: verifiedAt,
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    // Ensure completed_at is set if it was missed
+    var existingRecord = SupabaseProvider.getTreatmentRecord(recordId);
+    if (existingRecord && !existingRecord.completed_at) {
+      updates.completed_at = verifiedAt;
+    }
+
+    SupabaseProvider.updateTreatmentRecord(recordId, updates);
 
     // Notify student with verification proof
     try {
@@ -6913,6 +6992,7 @@ function instructorVerifyTreatmentRecord(recordId) {
           _devMailSend({
             to: student.user.email,
             subject: "Treatment Verified: " + treatName + " (HN " + pHn + ")",
+            purpose: "result",
             htmlBody:
               "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px;'>" +
               "<h2 style='color:#1a365d;border-bottom:2px solid #e2e8f0;padding-bottom:10px;'>Treatment Verified ✅</h2>" +
@@ -7025,6 +7105,7 @@ function studentCreateTreatmentRecord(hn, form) {
         form.perio_exams && typeof form.perio_exams === "object"
           ? form.perio_exams
           : null,
+      completed_at: (form.status === "completed" || form.status === "pending verification") ? new Date().toISOString() : null,
       // treatment_order: set below
     };
 
@@ -7105,6 +7186,14 @@ function studentUpdateTreatmentRecord(recordId, form) {
           : null,
       updated_at: new Date().toISOString(),
     };
+
+    // Set completed_at if transitioning to a finished state for the first time
+    if (updates.status === "completed" || updates.status === "pending verification") {
+      var existingRow = SupabaseProvider.getTreatmentRecord(recordId);
+      if (existingRow && !existingRow.completed_at) {
+        updates.completed_at = new Date().toISOString();
+      }
+    }
 
     var record = SupabaseProvider.updateTreatmentRecord(recordId, updates);
     return { success: true, record: record };
@@ -7532,6 +7621,7 @@ function studentSubmitRotateRequirement(form) {
         ") — " +
         studentName,
       htmlBody: htmlBody,
+      purpose: "request",
     });
 
     // Send confirmation copy to student
@@ -7583,6 +7673,7 @@ function studentSubmitRotateRequirement(form) {
           divCode +
           ")",
         htmlBody: studentHtmlBody,
+        purpose: "request",
       });
     }
 
@@ -7863,6 +7954,7 @@ function studentUpdateAndRequestRotateVerification(payload) {
         ") — " +
         studentName,
       htmlBody: htmlBody,
+      purpose: "request",
     });
 
     if (studentEmail) {
@@ -7913,6 +8005,7 @@ function studentUpdateAndRequestRotateVerification(payload) {
           divCode +
           ")",
         htmlBody: studentHtmlBody,
+        purpose: "request",
       });
     }
 
