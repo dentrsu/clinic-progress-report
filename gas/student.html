@@ -210,7 +210,7 @@
             <div class="mt-2 flex justify-center">
               <a href="<?= appUrl ?>?page=vault" target="_blank"
                  title="View your requirement completion progress across all divisions"
-                 class="group inline-flex items-center gap-1.5 bg-gradient-to-r from-gold to-yellow-600 text-white px-4 py-1.5 rounded-full text-base font-semibold shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+                 class="group inline-flex items-center gap-1.5 bg-gradient-to-r from-indigo-500 to-sky-600 text-white px-4 py-1.5 rounded-full text-base font-semibold shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
                 <svg class="w-3.5 h-3.5 transition-transform group-hover:scale-110 duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                 Requirement Vault
               </a>
@@ -283,16 +283,6 @@
 
       <!-- Footer: data source indicator -->
       <div class="px-6 py-3 bg-gray-50 rounded-b-2xl border-t border-gray-100 flex flex-col gap-3">
-        
-        <!-- Back to Lobby -->
-        <div class="w-full">
-           <button type="button" @click="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}"
-              title="Close this window"
-              class="flex items-center justify-center gap-2 w-full py-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition shadow-sm">
-             <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-             <span>Close</span>
-           </button>
-        </div>
         
         <!-- Admin Link -->
         <div x-show="profile.role === 'admin'" class="w-full">
@@ -1064,6 +1054,9 @@
         profile: {},
         initials: '',
         errorMessage: '',
+        // Announcement state
+        doNotShowAgain: false,
+        currentAnnouncementId: null,
 
         init() {
           this.state = 'loading';
@@ -1108,6 +1101,13 @@
                      this.loadPatients();
                      this.loadTypeOfCases();
                      this.loadOracleDashboard();
+                  }
+
+                  // Announcement
+                  if (profile.announcement) {
+                    this._showAnnouncement(profile.announcement);
+                  } else {
+                    this._fetchAnnouncement();
                   }
                 })
                 .withFailureHandler((err) => {
@@ -1874,10 +1874,71 @@
                 this.showErrorModal(err.message || "Submission failed.");
              })
              .studentSubmitRotateRequirement(this.rotateForm);
+        },
+
+        // ─── Announcements ────────────────────────────────────────────
+        _showAnnouncement(ann) {
+          if (!ann) return;
+          var el = document.getElementById('ann-modal');
+          if (!el) return;
+          document.getElementById('ann-modal-title').textContent = ann.title;
+          document.getElementById('ann-modal-content').textContent = ann.content;
+          this.currentAnnouncementId = ann.id;
+          this.doNotShowAgain = false;
+          el.style.display = 'flex';
+        },
+
+        _fetchAnnouncement() {
+          google.script.run
+            .withSuccessHandler((ann) => {
+              if (ann) this._showAnnouncement(ann);
+            })
+            .withFailureHandler((err) => {
+              console.warn('[Announcement] error:', err.message);
+            })
+            .getActiveAnnouncement();
+        },
+
+        dismissAnnouncement() {
+          var el = document.getElementById('ann-modal');
+          if (el) el.style.display = 'none';
+          if (this.doNotShowAgain && this.currentAnnouncementId) {
+            google.script.run
+              .withFailureHandler((err) => { console.error('[Announcement] dismiss error:', err.message); })
+              .saveAnnouncementDismissal(this.currentAnnouncementId);
+          }
+          this.currentAnnouncementId = null;
+          this.doNotShowAgain = false;
         }
       };
     }
   </script>
+  <!-- Announcement Modal -->
+  <div id="ann-modal" class="fixed inset-0 z-100 flex items-center justify-center p-4" style="display:none;">
+    <div class="fixed inset-0 bg-navy/20 backdrop-blur-sm" @click="dismissAnnouncement()"></div>
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative z-10 animate-fade-in">
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gold/10 mb-4">
+          <svg class="w-6 h-6 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.952 9.168-4.883a1 1 0 011 .25v12.266a1 1 0 01-1 .25C16.457 10.952 12.932 9 8.832 9H7a3.988 3.988 0 01-1.564-.317z"/>
+          </svg>
+        </div>
+        <h3 id="ann-modal-title" class="text-lg font-bold text-navy mb-2"></h3>
+        <p id="ann-modal-content" class="text-sm text-gray-500 whitespace-pre-line"></p>
+        <div class="mt-6">
+          <div class="flex items-center justify-center mb-4">
+            <input type="checkbox" id="doNotShowAgain" x-model="doNotShowAgain" class="h-4 w-4 text-navy focus:ring-navy border-gray-300 rounded">
+            <label for="doNotShowAgain" class="ml-2 block text-sm text-gray-900">Do not show again</label>
+          </div>
+          <button @click="dismissAnnouncement()" class="px-6 py-2 bg-navy text-white rounded-lg text-sm font-medium hover:bg-navy-light transition shadow-sm">
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Mobile tap tooltip — shows title text as a bottom toast on touch
     (function () {

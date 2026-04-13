@@ -38,6 +38,8 @@ A dedicated interface for administrators to manage users.
     - **Verification Workflow**: Students can request email verification for 'Completed' records (automatically shifts to 'Pending Verification'). Supports re-requests if 'Rejected'.
   - **Requirement Vault**: Per-division progress tracking with RSU/CDA tables and radar chart. Tracks both 'Verified' and 'Estimated' status (Completed/Pending/Rejected).
   - **Verify Email Proof**: Students can access the standalone hash verifier (`?page=verify`) to validate verification proof emails.
+  - **Announcements**: Receives system announcements with dismissal support (same as landing page).
+  - **Auto-Redirect**: Students are automatically redirected from the landing page to the Student Portal.
   - **N/A Progress Distribution Calculation**:
     - Choose the **Whole Division** view as an administrator.
     - Select the dropdown filters (e.g., Year 4) to narrow the student list.

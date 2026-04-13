@@ -477,7 +477,13 @@
                     this.profile = profile;
                     this.initials = this._getInitials(profile.name);
                     this.state = 'authenticated';
-                    
+
+                    // Auto-redirect students to the Student Portal
+                    if (profile.role === 'student') {
+                      window.top.location.href = '<?= appUrl ?>?page=student';
+                      return;
+                    }
+
                     console.log('[Announcement] profile.announcement from getUserProfile:', profile.announcement);
                     if (profile.announcement) {
                       this._showAnnouncement(profile.announcement);
