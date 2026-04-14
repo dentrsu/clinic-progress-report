@@ -39,6 +39,18 @@
                     return this.divisions.filter(d => d.name === this.selectedDivision);
                 },
 
+                get overallAveragePercent() {
+                    if (!this.divisions.length) return 0;
+                    const perDivision = this.divisions.map(d => {
+                        const rsu = d.rsu_completion_pct || 0;
+                        const cda = d.cda_completion_pct || 0;
+                        const avg = (rsu + cda) / (cda > 0 ? 2 : 1);
+                        return Math.min(avg, 100);
+                    });
+                    const sum = perDivision.reduce((a, b) => a + b, 0);
+                    return Math.round(sum / perDivision.length);
+                },
+
                 init() {
                     this.fetchData();
                 },
@@ -252,6 +264,9 @@
                     <h2 class="text-lg font-bold text-navy flex items-center gap-2">
                         <span class="w-2 h-6 bg-navy rounded-full"></span>
                         Overall Progression
+                        <span class="text-sm font-bold px-2 py-0.5 rounded-full"
+                              :class="overallAveragePercent >= 100 ? 'bg-emerald-100 text-emerald-700' : overallAveragePercent >= 60 ? 'bg-blue-100 text-blue-700' : overallAveragePercent >= 30 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'"
+                              x-text="overallAveragePercent + '% avg'"></span>
                     </h2>
                     <div class="flex items-center gap-4 text-xs font-semibold text-gray-400 uppercase tracking-widest">
                         <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-navy inline-block"></span>RSU</span>
@@ -377,6 +392,9 @@
                         <h2 class="text-lg font-bold text-navy flex items-center gap-2">
                             <span class="w-2 h-6 bg-navy rounded-full"></span>
                             <span x-text="division.name"></span>
+                            <span class="text-sm font-bold px-2 py-0.5 rounded-full"
+                                  :class="(() => { const avg = Math.min(Math.round(((division.rsu_completion_pct || 0) + (division.cda_completion_pct || 0)) / (division.cda_completion_pct > 0 ? 2 : 1)), 100); return avg >= 100 ? 'bg-emerald-100 text-emerald-700' : avg >= 60 ? 'bg-blue-100 text-blue-700' : avg >= 30 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'; })()"
+                                  x-text="(() => { const avg = Math.min(Math.round(((division.rsu_completion_pct || 0) + (division.cda_completion_pct || 0)) / (division.cda_completion_pct > 0 ? 2 : 1)), 100); return avg + '%'; })()"></span>
                         </h2>
                         <span class="text-xs font-bold text-gray-400 uppercase tracking-widest" x-text="division.requirements.length + ' Requirements'"></span>
                     </div>

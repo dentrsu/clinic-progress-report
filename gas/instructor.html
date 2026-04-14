@@ -117,8 +117,11 @@
 
     <!-- Students Grid -->
     <div>
-      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 px-1">Active Team (Filtered by Year &
-        Assignments)</h2>
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 px-1 flex items-center gap-2">
+        <span>Active Team</span>
+        <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100"
+              x-text="students.filter(s => isActiveStatus(s.status)).length"></span>
+      </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         <template x-for="s in students" :key="s.student_id">
           <div @click="openModal(s)"
@@ -355,6 +358,20 @@
                     </svg>
                   </button>
                   <div x-show="showOracleForecast" x-collapse class="space-y-3 px-2 pt-3 pb-2 mt-1 border-t border-gray-200">
+                    <div class="flex items-center gap-3 pb-2 border-b border-gray-100">
+                      <a href="<?= appUrl ?>?page=oracle-guide" target="_blank"
+                         class="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+                         title="How does the Oracle work?">
+                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                         How it works
+                      </a>
+                      <a href="<?= appUrl ?>?page=oracle-infographic" target="_blank"
+                         class="flex items-center gap-1 text-xs text-purple-500 hover:text-purple-700 transition-colors"
+                         title="Visual infographic of Oracle methodology">
+                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+                         Infographic
+                      </a>
+                    </div>
                     <div>
                       <label class="block text-xs font-medium text-gray-600 mb-1">วันสิ้นสุดการปฏิบัติงานคลินิก (Clinical End Date):</label>
                       <input type="date" x-model="clinicalEndDate" class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-800">
