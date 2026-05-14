@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Backup & Recovery — DentRSU Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 100%);
+    color: #e2e8f0;
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Nav ── */
+  .top-nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(15,23,42,.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(148,163,184,.1);
+  }
+  .top-nav a.back {
+    display: flex; align-items: center;
+    color: #fff; text-decoration: none;
+    background: rgba(255,255,255,.08); border-radius: 8px;
+    padding: 6px 12px; font-size: 12px; font-weight: 600;
+    border: 1px solid rgba(255,255,255,.1);
+    transition: background .2s;
+  }
+  .top-nav a.back:hover { background: rgba(255,255,255,.15); }
+  .top-nav .nav-title {
+    flex: 1; text-align: center;
+    font-size: 13px; font-weight: 700; letter-spacing: .02em;
+    color: #94a3b8;
+  }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 0 20px 80px; }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    padding: 48px 20px 36px;
+    position: relative;
+  }
+  .hero::after {
+    content: '';
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100px; height: 2px;
+    background: linear-gradient(90deg, transparent, #38bdf8, transparent);
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(56,189,248,.1);
+    border: 1px solid rgba(56,189,248,.2);
+    color: #7dd3fc;
+    font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    padding: 4px 14px; border-radius: 20px; margin-bottom: 14px;
+  }
+  .hero h1 {
+    font-size: clamp(24px, 4vw, 36px);
+    font-weight: 800;
+    background: linear-gradient(135deg, #e0f2fe, #38bdf8, #0284c7);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.2; margin-bottom: 10px;
+  }
+  .hero p { font-size: 14px; color: #94a3b8; max-width: 520px; margin: 0 auto; }
+
+  /* ── Architecture diagram ── */
+  .arch-container {
+    background: rgba(30,41,59,.5);
+    border: 1px solid rgba(148,163,184,.08);
+    border-radius: 16px;
+    padding: 28px 24px;
+    margin: 32px 0;
+  }
+  .arch-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+    color: #64748b; text-align: center; margin-bottom: 18px;
+  }
+  .arch-grid {
+    display: flex; align-items: center; justify-content: center;
+    gap: 10px; flex-wrap: wrap;
+  }
+  .arch-node {
+    flex: 0 1 140px;
+    background: rgba(15,23,42,.6);
+    border: 1.5px solid;
+    border-radius: 14px;
+    padding: 16px 10px;
+    text-align: center;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .arch-node:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+  .arch-node .an-icon { font-size: 26px; margin-bottom: 8px; }
+  .arch-node .an-title { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+  .arch-node .an-desc { font-size: 10px; color: #94a3b8; line-height: 1.4; }
+
+  .arch-node.n-pg    { border-color: rgba(56,189,248,.3); }
+  .arch-node.n-pg .an-title    { color: #7dd3fc; }
+  .arch-node.n-sheet { border-color: rgba(52,211,153,.3); }
+  .arch-node.n-sheet .an-title { color: #6ee7b7; }
+  .arch-node.n-drive { border-color: rgba(167,139,250,.3); }
+  .arch-node.n-drive .an-title { color: #c4b5fd; }
+  .arch-node.n-dump  { border-color: rgba(251,146,60,.3); }
+  .arch-node.n-dump .an-title  { color: #fdba74; }
+  .arch-node.n-git   { border-color: rgba(148,163,184,.2); }
+  .arch-node.n-git .an-title   { color: #cbd5e1; }
+
+  .arch-connector {
+    color: #475569; font-size: 18px;
+    display: flex; align-items: center;
+  }
+  @media (max-width: 640px) {
+    .arch-grid { flex-direction: column; }
+    .arch-connector { transform: rotate(90deg); }
+    .arch-node { flex: 0 1 auto; width: 100%; max-width: 200px; }
+  }
+
+  /* ── Section headers ── */
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin: 36px 0 16px;
+  }
+  .section-num {
+    width: 36px; height: 36px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+    font-size: 14px; font-weight: 800; color: #fff;
+  }
+  .section-num.s1  { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+  .section-num.s1b { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+  .section-num.s1c { background: linear-gradient(135deg, #f97316, #ea580c); }
+  .section-num.s2  { background: linear-gradient(135deg, #10b981, #059669); }
+  .section-num.s3  { background: linear-gradient(135deg, #64748b, #475569); }
+  .section-title { font-size: 16px; font-weight: 700; color: #f1f5f9; }
+  .section-subtitle { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+  /* ── Card ── */
+  .card {
+    background: rgba(30,41,59,.5);
+    border: 1px solid rgba(148,163,184,.08);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin: 12px 0;
+    transition: border-color .3s;
+  }
+  .card:hover { border-color: rgba(148,163,184,.15); }
+  .card p { color: #94a3b8; font-size: 13px; }
+  .card h3 {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: #64748b; margin: 18px 0 10px;
+  }
+  .card h3:first-child { margin-top: 0; }
+  .card code {
+    background: rgba(148,163,184,.1); padding: 1px 6px; border-radius: 4px;
+    font-size: 12px; color: #7dd3fc;
+  }
+
+  /* ── Tables ── */
+  table.info {
+    width: 100%; border-collapse: collapse;
+    font-size: 12px; margin: 10px 0;
+  }
+  table.info th {
+    text-align: left; padding: 8px 10px;
+    background: rgba(15,23,42,.5); color: #64748b;
+    border-bottom: 1px solid rgba(148,163,184,.1);
+    font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.info td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(148,163,184,.05);
+    color: #cbd5e1;
+  }
+  table.info td:first-child { font-weight: 600; color: #e2e8f0; }
+  table.info .yes { color: #34d399; font-weight: 700; }
+  table.info .no  { color: #f87171; font-weight: 700; }
+
+  /* ── Backed-up tables grid ── */
+  .table-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+    gap: 6px; margin: 10px 0;
+  }
+  .table-chip {
+    background: rgba(15,23,42,.5);
+    border: 1px solid rgba(148,163,184,.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    transition: border-color .2s;
+  }
+  .table-chip:hover { border-color: rgba(56,189,248,.2); }
+  .table-chip .tc-name { font-weight: 700; color: #e2e8f0; font-family: monospace; font-size: 12px; }
+  .table-chip .tc-key { font-size: 10px; color: #475569; margin-top: 2px; }
+  .table-chip.oracle { border-color: rgba(167,139,250,.15); }
+  .table-chip.oracle .tc-name { color: #c4b5fd; }
+
+  /* ── Rotation cards ── */
+  .rotation-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px; margin: 12px 0;
+  }
+  @media (max-width: 600px) { .rotation-grid { grid-template-columns: 1fr; } }
+  .rotation-card {
+    background: rgba(15,23,42,.5);
+    border: 1px solid rgba(148,163,184,.08);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    transition: border-color .2s, transform .2s;
+  }
+  .rotation-card:hover { border-color: rgba(148,163,184,.2); transform: translateY(-1px); }
+  .rotation-card .rc-icon { font-size: 28px; margin-bottom: 8px; }
+  .rotation-card .rc-file { font-family: monospace; font-size: 13px; font-weight: 700; color: #e2e8f0; }
+  .rotation-card .rc-schedule { font-size: 11px; color: #94a3b8; margin-top: 6px; }
+  .rotation-card .rc-note { font-size: 10px; color: #475569; margin-top: 4px; }
+
+  /* ── Circuit breaker flow ── */
+  .cb-flow {
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; margin: 14px 0; justify-content: center;
+  }
+  .cb-state {
+    padding: 10px 16px; border-radius: 10px;
+    font-size: 12px; font-weight: 700; text-align: center;
+    border: 1.5px solid;
+  }
+  .cb-state.closed { background: rgba(16,185,129,.08); border-color: rgba(52,211,153,.3); color: #6ee7b7; }
+  .cb-state.half   { background: rgba(250,204,21,.06); border-color: rgba(250,204,21,.25); color: #fde68a; }
+  .cb-state.open   { background: rgba(239,68,68,.06); border-color: rgba(248,113,113,.25); color: #fca5a5; }
+  .cb-label { font-size: 11px; font-weight: 400; display: block; margin-top: 2px; opacity: .7; }
+  .cb-arrow { color: #475569; font-size: 14px; }
+
+  /* ── Recovery scenarios ── */
+  .scenario-list { margin: 12px 0; }
+  .scenario {
+    display: flex; gap: 14px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    background: rgba(30,41,59,.4);
+    border: 1px solid rgba(148,163,184,.05);
+    transition: border-color .2s;
+  }
+  .scenario:hover { border-color: rgba(148,163,184,.12); }
+  .scenario .sc-icon {
+    width: 40px; height: 40px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px; font-size: 18px;
+  }
+  .sc-icon.auto   { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.15); }
+  .sc-icon.manual { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.15); }
+  .sc-icon.git    { background: rgba(148,163,184,.06); border: 1px solid rgba(148,163,184,.1); }
+  .scenario .sc-title { font-size: 13px; font-weight: 700; color: #f1f5f9; }
+  .scenario .sc-desc { font-size: 12px; color: #94a3b8; margin-top: 3px; line-height: 1.5; }
+
+  /* ── Callouts ── */
+  .callout {
+    display: flex; gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 12px; margin: 14px 0;
+    line-height: 1.6;
+    border: 1px solid;
+  }
+  .callout .c-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .callout.info { background: rgba(56,189,248,.04); border-color: rgba(56,189,248,.15); color: #7dd3fc; }
+  .callout.warn { background: rgba(251,191,36,.04); border-color: rgba(251,191,36,.15); color: #fcd34d; }
+  .callout.tip  { background: rgba(52,211,153,.04); border-color: rgba(52,211,153,.15); color: #6ee7b7; }
+
+  /* ── Gaps ── */
+  .gap-list { list-style: none; padding: 0; margin: 10px 0; }
+  .gap-list li {
+    padding: 8px 12px 8px 36px;
+    position: relative;
+    font-size: 12px; color: #94a3b8;
+    border-bottom: 1px solid rgba(148,163,184,.05);
+    line-height: 1.5;
+  }
+  .gap-list li::before {
+    content: '!';
+    position: absolute; left: 10px; top: 9px;
+    width: 16px; height: 16px;
+    background: rgba(239,68,68,.1); color: #f87171;
+    border: 1px solid rgba(239,68,68,.2);
+    border-radius: 4px;
+    font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ── Code blocks ── */
+  .code-block {
+    background: rgba(15,23,42,.7);
+    border: 1px solid rgba(148,163,184,.1);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 12px; color: #c4b5fd;
+    line-height: 1.8;
+    overflow-x: auto;
+    margin: 10px 0;
+  }
+  .code-block .cm { color: #475569; }
+  .code-block .kw { color: #7dd3fc; }
+  .code-block .val { color: #34d399; }
+
+  /* ── Quick ref grid ── */
+  .ref-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px; margin: 12px 0;
+  }
+  .ref-card {
+    background: rgba(15,23,42,.5);
+    border: 1px solid rgba(148,163,184,.08);
+    border-radius: 10px;
+    padding: 14px;
+    transition: border-color .2s;
+  }
+  .ref-card:hover { border-color: rgba(148,163,184,.15); }
+  .ref-card .rf-file { font-family: monospace; font-size: 12px; font-weight: 700; color: #7dd3fc; }
+  .ref-card .rf-desc { font-size: 11px; color: #64748b; margin-top: 4px; }
+
+  /* ── Ordered steps ── */
+  .steps { counter-reset: step; margin: 10px 0; padding: 0; list-style: none; }
+  .steps li {
+    counter-increment: step;
+    padding: 6px 0 6px 32px;
+    position: relative;
+    font-size: 12px; color: #cbd5e1;
+    line-height: 1.6;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 6px;
+    width: 20px; height: 20px;
+    background: rgba(56,189,248,.1); color: #7dd3fc;
+    border: 1px solid rgba(56,189,248,.2);
+    border-radius: 6px;
+    font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 32px 20px;
+    font-size: 11px; color: #334155;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { background: #fff; color: #1a202c; }
+    .top-nav { display: none; }
+    .card { background: #fff; border-color: #e2e8f0; }
+    .hero h1 { -webkit-text-fill-color: #0284c7; }
+    .page { padding-top: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <a href="<?= appUrl ?>?page=admin" class="back">
+    <svg style="width:14px;height:14px;margin-right:5px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Admin Console
+  </a>
+  <span class="nav-title">Backup & Recovery Architecture</span>
+  <div style="width:100px;"></div>
+</nav>
+
+<!-- ════ Hero ════ -->
+<section class="hero">
+  <div class="hero-badge">System Architecture</div>
+  <h1>Backup & Recovery</h1>
+  <p>How the DentRSU Clinic Progress Tracker protects data across four independent backup layers &mdash; Google Sheets, Drive ZIP, Restic snapshots, and Git &mdash; with automatic failover.</p>
+</section>
+
+<div class="page">
+
+  <!-- ════ Architecture Overview ════ -->
+  <div class="arch-container">
+    <div class="arch-label">Data Protection Architecture</div>
+    <div class="arch-grid">
+      <div class="arch-node n-pg">
+        <div class="an-icon">&#x1F5C4;</div>
+        <div class="an-title">Supabase</div>
+        <div class="an-desc">Primary PostgreSQL<br/>All reads & writes</div>
+      </div>
+      <div class="arch-connector">&#x2194;</div>
+      <div class="arch-node n-sheet">
+        <div class="an-icon">&#x1F4CA;</div>
+        <div class="an-title">Google Sheets</div>
+        <div class="an-desc">Nightly backup<br/>Failover target</div>
+      </div>
+      <div class="arch-connector">&#x2194;</div>
+      <div class="arch-node n-drive">
+        <div class="an-icon">&#x1F4E6;</div>
+        <div class="an-title">Google Drive</div>
+        <div class="an-desc">JSON archives<br/>D / W / M rotation</div>
+      </div>
+      <div class="arch-connector">&#x2194;</div>
+      <div class="arch-node n-dump">
+        <div class="an-icon">&#x1F6E1;</div>
+        <div class="an-title">Restic</div>
+        <div class="an-desc">pg_dumpall &rarr; gzip<br/>Google Drive repo</div>
+      </div>
+      <div class="arch-connector">&#x2194;</div>
+      <div class="arch-node n-git">
+        <div class="an-icon">&#x1F4BE;</div>
+        <div class="an-title">Git</div>
+        <div class="an-desc">Source code<br/>SQL migrations</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ Layer 1a: Sheets ════ -->
+  <div class="section-header">
+    <div class="section-num s1">1a</div>
+    <div>
+      <div class="section-title">Nightly Backup: Supabase &rarr; Google Sheets</div>
+      <div class="section-subtitle">GAS trigger &bull; Midnight daily &bull; Failover-ready</div>
+    </div>
+  </div>
+  <div class="card">
+    <p><code>BackupScheduler.gs</code> reads all tables from Supabase via REST API and writes each to a separate sheet in the fallback spreadsheet. This data powers the automatic failover system.</p>
+
+    <h3>Backed-up Tables (18)</h3>
+    <div class="table-grid">
+      <div class="table-chip"><div class="tc-name">users</div><div class="tc-key">user_id</div></div>
+      <div class="table-chip"><div class="tc-name">students</div><div class="tc-key">student_id</div></div>
+      <div class="table-chip"><div class="tc-name">instructors</div><div class="tc-key">instructor_id</div></div>
+      <div class="table-chip"><div class="tc-name">divisions</div><div class="tc-key">division_id</div></div>
+      <div class="table-chip"><div class="tc-name">floors</div><div class="tc-key">floor_id</div></div>
+      <div class="table-chip"><div class="tc-name">treatment_phases</div><div class="tc-key">phase_id</div></div>
+      <div class="table-chip"><div class="tc-name">treatment_catalog</div><div class="tc-key">treatment_id</div></div>
+      <div class="table-chip"><div class="tc-name">treatment_steps</div><div class="tc-key">step_id</div></div>
+      <div class="table-chip"><div class="tc-name">requirement_list</div><div class="tc-key">requirement_id</div></div>
+      <div class="table-chip"><div class="tc-name">type_of_case</div><div class="tc-key">id</div></div>
+      <div class="table-chip"><div class="tc-name">patients</div><div class="tc-key">patient_id</div></div>
+      <div class="table-chip"><div class="tc-name">treatment_records</div><div class="tc-key">record_id</div></div>
+      <div class="table-chip"><div class="tc-name">announcements</div><div class="tc-key">id</div></div>
+      <div class="table-chip"><div class="tc-name">announcement_dismissals</div><div class="tc-key">user_email</div></div>
+      <div class="table-chip oracle"><div class="tc-name">oracle.cohort_calendar</div><div class="tc-key">cohort_year</div></div>
+      <div class="table-chip oracle"><div class="tc-name">oracle.snapshots</div><div class="tc-key">student_id</div></div>
+      <div class="table-chip oracle"><div class="tc-name">oracle.explanations</div><div class="tc-key">id</div></div>
+      <div class="table-chip oracle"><div class="tc-name">oracle.recommendations</div><div class="tc-key">id</div></div>
+    </div>
+
+    <h3>Configuration</h3>
+    <table class="info">
+      <tr><td>Schedule</td><td>Midnight daily (GAS time-based trigger)</td></tr>
+      <tr><td>Setup</td><td>Run <code>setupNightlyBackupTrigger()</code> once from GAS editor</td></tr>
+      <tr><td>Manual run</td><td><code>backupAllTablesToSheets()</code></td></tr>
+      <tr><td>Pagination</td><td>1,000 rows per batch; auto-paginated</td></tr>
+      <tr><td>Oracle schema</td><td><code>Accept-Profile: oracle</code> header</td></tr>
+    </table>
+
+    <div class="callout warn">
+      <span class="c-icon">&#x26A0;</span>
+      <span><strong>Data loss window:</strong> Up to 24 hours. Full snapshot &mdash; no incremental replication.</span>
+    </div>
+  </div>
+
+  <!-- ════ Layer 1b: Drive ZIP ════ -->
+  <div class="section-header">
+    <div class="section-num s1b">1b</div>
+    <div>
+      <div class="section-title">Drive Backup: JSON Dump &rarr; ZIP &rarr; Google Drive</div>
+      <div class="section-subtitle">GAS trigger &bull; Daily / Weekly / Monthly rotation</div>
+    </div>
+  </div>
+  <div class="card">
+    <p>All tables are dumped as JSON, zipped, and saved to a <code>backup-tracker</code> folder in Google Drive. Three rotation files overwrite themselves on schedule:</p>
+
+    <div class="rotation-grid">
+      <div class="rotation-card">
+        <div class="rc-icon">&#x1F4C6;</div>
+        <div class="rc-file">backup-daily.zip</div>
+        <div class="rc-schedule">Every night at midnight</div>
+        <div class="rc-note">Always the freshest</div>
+      </div>
+      <div class="rotation-card">
+        <div class="rc-icon">&#x1F4C5;</div>
+        <div class="rc-file">backup-weekly.zip</div>
+        <div class="rc-schedule">Every Sunday</div>
+        <div class="rc-note">Survives daily overwrites</div>
+      </div>
+      <div class="rotation-card">
+        <div class="rc-icon">&#x1F4C2;</div>
+        <div class="rc-file">backup-monthly.zip</div>
+        <div class="rc-schedule">1st of each month</div>
+        <div class="rc-note">Longest retention</div>
+      </div>
+    </div>
+
+    <h3>ZIP Contents</h3>
+    <p>One <code>.json</code> file per table (18 total) + <code>_manifest.json</code> with timestamp, row counts, and error log.</p>
+
+    <h3>Recovery Steps</h3>
+    <ol class="steps">
+      <li>Download the ZIP from <code>backup-tracker</code> in Google Drive</li>
+      <li>Extract JSON files</li>
+      <li>Re-create schema by running SQL migrations in order</li>
+      <li>Import each JSON into its Supabase table</li>
+      <li>Oracle snapshots regenerate on next <code>oracle_refresh_student()</code></li>
+    </ol>
+
+    <div class="callout tip">
+      <span class="c-icon">&#x1F4A1;</span>
+      <span><strong>Retention:</strong> On a Wednesday you have 3 recovery points &mdash; today's daily, last Sunday's weekly, and the 1st of the month.</span>
+    </div>
+  </div>
+
+  <!-- ════ Layer 1c: Restic + pg_dumpall ════ -->
+  <div class="section-header">
+    <div class="section-num s1c">1c</div>
+    <div>
+      <div class="section-title">Server Backup: Restic + pg_dumpall (Self-Hosted Supabase)</div>
+      <div class="section-subtitle">Cron &bull; 02:00 daily &bull; Full PostgreSQL dump &rarr; gzip &rarr; Google Drive via Restic</div>
+    </div>
+  </div>
+  <div class="card">
+    <p><code>backup.sh</code> on the Supabase server runs <code>pg_dumpall</code> from the <code>supabase-db</code> Docker container, compresses with gzip, and uploads to a Restic repository on Google Drive (<code>gdrive:dentrsu-tracker</code>). This is the <strong>most complete</strong> backup &mdash; it captures everything including auth schema, RLS policies, functions, triggers, and all databases.</p>
+
+    <h3>How It Works</h3>
+    <div style="display:flex;flex-direction:column;gap:6px;margin:14px 0;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:28px;height:28px;border-radius:8px;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#7dd3fc;flex-shrink:0;">1</div>
+        <div style="font-size:12px;color:#cbd5e1;"><code>pg_dumpall</code> dumps all databases from <code>supabase-db</code> Docker container</div>
+      </div>
+      <div style="text-align:center;color:#475569;font-size:14px;">&#x25BC;</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:28px;height:28px;border-radius:8px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#6ee7b7;flex-shrink:0;">2</div>
+        <div style="font-size:12px;color:#cbd5e1;">Compressed with <code>gzip</code> to reduce size (~2.3 MiB)</div>
+      </div>
+      <div style="text-align:center;color:#475569;font-size:14px;">&#x25BC;</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:28px;height:28px;border-radius:8px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#c4b5fd;flex-shrink:0;">3</div>
+        <div style="font-size:12px;color:#cbd5e1;">Uploaded to Restic repository on Google Drive (<code>gdrive:dentrsu-tracker</code>)</div>
+      </div>
+      <div style="text-align:center;color:#475569;font-size:14px;">&#x25BC;</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:28px;height:28px;border-radius:8px;background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fdba74;flex-shrink:0;">4</div>
+        <div style="font-size:12px;color:#cbd5e1;">Repository integrity verified &bull; Local dump cleaned up</div>
+      </div>
+    </div>
+
+    <h3>Retention Policy (Managed by Restic)</h3>
+    <div class="rotation-grid">
+      <div class="rotation-card" style="border-color:rgba(251,146,60,.15);">
+        <div class="rc-icon">&#x1F4C6;</div>
+        <div class="rc-file">7 daily</div>
+        <div class="rc-schedule">Last 7 days kept</div>
+        <div class="rc-note">Fine-grained recent history</div>
+      </div>
+      <div class="rotation-card" style="border-color:rgba(251,146,60,.15);">
+        <div class="rc-icon">&#x1F4C5;</div>
+        <div class="rc-file">4 weekly</div>
+        <div class="rc-schedule">Last 4 weeks kept</div>
+        <div class="rc-note">Covers the past month</div>
+      </div>
+      <div class="rotation-card" style="border-color:rgba(251,146,60,.15);">
+        <div class="rc-icon">&#x1F4C2;</div>
+        <div class="rc-file">12 monthly</div>
+        <div class="rc-schedule">Last 12 months kept</div>
+        <div class="rc-note">Full year of recovery points</div>
+      </div>
+    </div>
+
+    <h3>Restic + pg_dumpall vs GAS Backups</h3>
+    <table class="info">
+      <thead><tr><th>Data</th><th>Restic (Server)</th><th>GAS (Sheets/Drive)</th></tr></thead>
+      <tbody>
+        <tr><td>Public schema tables</td><td class="yes">Yes</td><td class="yes">Yes (18 tables)</td></tr>
+        <tr><td>Oracle schema tables</td><td class="yes">Yes</td><td class="yes">Yes (4 tables)</td></tr>
+        <tr><td>Auth schema (users, sessions)</td><td class="yes">Yes</td><td class="no">No</td></tr>
+        <tr><td>RLS policies</td><td class="yes">Yes</td><td class="no">No</td></tr>
+        <tr><td>Functions &amp; triggers</td><td class="yes">Yes</td><td class="no">No</td></tr>
+        <tr><td>Indexes &amp; constraints</td><td class="yes">Yes</td><td class="no">No</td></tr>
+        <tr><td>Enums &amp; custom types</td><td class="yes">Yes</td><td class="no">No</td></tr>
+        <tr><td>Deduplication</td><td class="yes">Yes (Restic)</td><td class="no">No</td></tr>
+        <tr><td>Encryption at rest</td><td class="yes">Yes (Restic)</td><td class="no">No</td></tr>
+        <tr><td>Version history</td><td class="yes">23 snapshots</td><td class="yes">3 files (D/W/M)</td></tr>
+        <tr><td>Auto failover</td><td class="no">No</td><td class="yes">Yes</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Configuration</h3>
+    <table class="info">
+      <tr><td>Backup script</td><td><code>backup.sh</code> on the Supabase server</td></tr>
+      <tr><td>Cron schedule</td><td><code>0 2 * * *</code> (02:00 daily)</td></tr>
+      <tr><td>Docker container</td><td><code>supabase-db</code></td></tr>
+      <tr><td>Restic repository</td><td><code>gdrive:dentrsu-tracker</code> (Google Drive via rclone)</td></tr>
+      <tr><td>Snapshot size</td><td>~2.3 MiB (gzipped)</td></tr>
+      <tr><td>Backup log</td><td>Server log (check with <code>journalctl</code> or cron mail)</td></tr>
+      <tr><td>First backup</td><td>2026-03-25 at 22:34</td></tr>
+    </table>
+
+    <h3>Restore Commands</h3>
+    <div class="code-block">
+<span class="cm"># List all snapshots</span>
+restic <span class="kw">-r</span> rclone:gdrive:dentrsu-tracker <span class="val">snapshots</span>
+
+<span class="cm"># Restore latest snapshot to a directory</span>
+restic <span class="kw">-r</span> rclone:gdrive:dentrsu-tracker <span class="val">restore latest</span> <span class="kw">--target</span> /tmp/restore
+
+<span class="cm"># Restore a specific snapshot by ID</span>
+restic <span class="kw">-r</span> rclone:gdrive:dentrsu-tracker <span class="val">restore 0ceb4568</span> <span class="kw">--target</span> /tmp/restore
+
+<span class="cm"># Decompress and apply to PostgreSQL</span>
+gunzip <span class="kw">-c</span> /tmp/restore/*.sql.gz | docker exec <span class="kw">-i</span> supabase-db psql <span class="kw">-U</span> postgres
+
+<span class="cm"># Verify repository integrity</span>
+restic <span class="kw">-r</span> rclone:gdrive:dentrsu-tracker <span class="val">check</span>
+    </div>
+
+    <div class="callout tip">
+      <span class="c-icon">&#x1F4A1;</span>
+      <span><strong>Schedule offset:</strong> Restic runs at 02:00, GAS runs at midnight &mdash; two independent snapshots 2 hours apart, stored in different systems (Google Drive Restic repo vs Google Sheets/Drive ZIP).</span>
+    </div>
+
+    <div class="callout warn">
+      <span class="c-icon">&#x26A0;</span>
+      <span><strong>Known issue:</strong> Duplicate log entries observed on 2026-03-26, suggesting the cron job may have fired twice. Ensure only one cron entry exists (<code>crontab -l | grep backup</code>) and consider adding a lock file (<code>flock</code>) to prevent concurrent runs.</span>
+    </div>
+  </div>
+
+  <!-- ════ Layer 2: Circuit Breaker ════ -->
+  <div class="section-header">
+    <div class="section-num s2">2</div>
+    <div>
+      <div class="section-title">Automatic Failover: Circuit Breaker</div>
+      <div class="section-subtitle">Zero-downtime switching between Supabase and Google Sheets</div>
+    </div>
+  </div>
+  <div class="card">
+    <p><code>FailoverProvider.gs</code> wraps all data access. If Supabase goes down, the app switches to Sheets automatically and keeps running.</p>
+
+    <h3>Circuit States</h3>
+    <div class="cb-flow">
+      <div class="cb-state closed">CLOSED<span class="cb-label">Supabase</span></div>
+      <div class="cb-arrow">&rarr; 3 fails &rarr;</div>
+      <div class="cb-state open">OPEN<span class="cb-label">Sheets</span></div>
+      <div class="cb-arrow">&rarr; 60s &rarr;</div>
+      <div class="cb-state half">HALF-OPEN<span class="cb-label">Testing</span></div>
+      <div class="cb-arrow">&rarr; OK &rarr;</div>
+      <div class="cb-state closed">CLOSED<span class="cb-label">Restored</span></div>
+    </div>
+
+    <h3>Operation Modes</h3>
+    <table class="info">
+      <thead><tr><th>Operation</th><th>Normal (Closed)</th><th>Failover (Open)</th></tr></thead>
+      <tbody>
+        <tr><td>Reads</td><td>Supabase &rarr; Sheets fallback</td><td>Sheets directly</td></tr>
+        <tr><td>Writes</td><td>Supabase first, mirror to Sheets</td><td>Sheets only</td></tr>
+        <tr><td>Auth</td><td>Supabase Auth</td><td>UUID generated locally</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout info">
+      <span class="c-icon">&#x2139;</span>
+      <span><strong>Maintenance Mode:</strong> Admin toggle forces circuit open &rarr; all traffic to Sheets. Use for planned database work.</span>
+    </div>
+  </div>
+
+  <!-- ════ Layer 3: Git ════ -->
+  <div class="section-header">
+    <div class="section-num s3">3</div>
+    <div>
+      <div class="section-title">Source Code & Schema: Git Repository</div>
+      <div class="section-subtitle">Version-controlled code, templates, and migration history</div>
+    </div>
+  </div>
+  <div class="card">
+    <table class="info">
+      <tr><td>GAS Code</td><td><code>gas/*.gs</code> &mdash; server-side functions</td></tr>
+      <tr><td>HTML Templates</td><td><code>gas/*.html</code> &mdash; all UI pages</td></tr>
+      <tr><td>SQL Migrations</td><td><code>migrations/*.sql</code> &mdash; chronological schema changes</td></tr>
+      <tr><td>Server Backup</td><td><code>backup.sh</code> on Supabase server + Restic to <code>gdrive:dentrsu-tracker</code></td></tr>
+      <tr><td>Schema Reference</td><td><code>database-context.md</code> &mdash; full DDL + business rules</td></tr>
+    </table>
+    <p>To rebuild from scratch: deploy Supabase, run migrations in order, restore data from any backup layer.</p>
+  </div>
+
+  <!-- ════ Recovery Scenarios ════ -->
+  <div class="section-header" style="margin-top:40px;">
+    <div class="section-num" style="background:linear-gradient(135deg,#f43f5e,#e11d48);">!</div>
+    <div><div class="section-title">Recovery Scenarios</div></div>
+  </div>
+  <div class="scenario-list">
+    <div class="scenario">
+      <div class="sc-icon auto">&#x26A1;</div>
+      <div>
+        <div class="sc-title">Supabase Temporary Outage</div>
+        <div class="sc-desc"><strong>Automatic.</strong> Circuit breaker switches to Sheets within 3 failed requests. Users keep working. Auto-resets when Supabase recovers.</div>
+      </div>
+    </div>
+    <div class="scenario">
+      <div class="sc-icon manual">&#x1F527;</div>
+      <div>
+        <div class="sc-title">Supabase Data Loss</div>
+        <div class="sc-desc"><strong>Manual.</strong> Best: <code>restic restore latest</code> from <code>gdrive:dentrsu-tracker</code> &rarr; <code>gunzip | psql</code> (full schema + data + auth). Alternative: restore from Drive ZIP or Sheets backup + re-run SQL migrations.</div>
+      </div>
+    </div>
+    <div class="scenario">
+      <div class="sc-icon auto">&#x2699;</div>
+      <div>
+        <div class="sc-title">Planned Maintenance</div>
+        <div class="sc-desc"><strong>Admin action.</strong> Enable Maintenance Mode &rarr; traffic routes to Sheets. Perform work. Disable when done.</div>
+      </div>
+    </div>
+    <div class="scenario">
+      <div class="sc-icon auto">&#x1F4CA;</div>
+      <div>
+        <div class="sc-title">Sheets Corrupted</div>
+        <div class="sc-desc"><strong>Self-healing.</strong> Next nightly backup overwrites Sheets from Supabase. Or run <code>backupAllTablesToSheets()</code> manually.</div>
+      </div>
+    </div>
+    <div class="scenario">
+      <div class="sc-icon git">&#x1F4BE;</div>
+      <div>
+        <div class="sc-title">Bad Code Deploy</div>
+        <div class="sc-desc"><strong>Git revert.</strong> Roll back to previous commit and redeploy to Apps Script.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ Known Limitations ════ -->
+  <div class="section-header" style="margin-top:36px;">
+    <div class="section-num" style="background:linear-gradient(135deg,#64748b,#475569);">&#x26A0;</div>
+    <div><div class="section-title">Known Limitations</div></div>
+  </div>
+  <div class="card">
+    <ul class="gap-list">
+      <li><strong>No point-in-time recovery</strong> &mdash; All backups are full snapshots. Changes between backups can be lost.</li>
+      <li><strong>No automated reconciliation</strong> &mdash; Writes on Sheets during failover are not synced back to Supabase.</li>
+      <li><strong>Oracle snapshots are derivable</strong> &mdash; If lost, they regenerate on next <code>oracle_refresh_student()</code>. No manual restore needed.</li>
+    </ul>
+  </div>
+
+  <!-- ════ Quick Reference ════ -->
+  <div class="section-header" style="margin-top:36px;">
+    <div class="section-num" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);">&#x2261;</div>
+    <div><div class="section-title">Quick Reference: Key Files</div></div>
+  </div>
+  <div class="ref-grid">
+    <div class="ref-card">
+      <div class="rf-file">BackupScheduler.gs</div>
+      <div class="rf-desc">Sheets + Drive backup + triggers</div>
+    </div>
+    <div class="ref-card">
+      <div class="rf-file">backup.sh (server)</div>
+      <div class="rf-desc">pg_dumpall + gzip + Restic upload</div>
+    </div>
+    <div class="ref-card">
+      <div class="rf-file">restic (CLI)</div>
+      <div class="rf-desc">Snapshot restore from Google Drive</div>
+    </div>
+    <div class="ref-card">
+      <div class="rf-file">FailoverProvider.gs</div>
+      <div class="rf-desc">Circuit breaker + failover</div>
+    </div>
+    <div class="ref-card">
+      <div class="rf-file">SheetsProvider.gs</div>
+      <div class="rf-desc">Sheets data access layer</div>
+    </div>
+    <div class="ref-card">
+      <div class="rf-file">SupabaseProvider.gs</div>
+      <div class="rf-desc">Primary REST API access</div>
+    </div>
+    <div class="ref-card">
+      <div class="rf-file">Config.gs</div>
+      <div class="rf-desc">Script Properties + constants</div>
+    </div>
+  </div>
+
+  <div class="callout info" style="margin-top:20px;">
+    <span class="c-icon">&#x1F511;</span>
+    <span><strong>Required Script Properties:</strong> <code>SUPABASE_URL</code>, <code>SUPABASE_KEY</code>, <code>FALLBACK_SHEET_ID</code> &mdash; GAS Editor &rarr; Project Settings &rarr; Script Properties.</span>
+  </div>
+
+</div>
+
+<div class="footer">
+  Backup & Recovery Architecture &mdash; DentRSU Clinic Progress Tracker
+</div>
+
+</body>
+</html>

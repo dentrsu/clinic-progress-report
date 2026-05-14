@@ -61,10 +61,10 @@ begin
   from public.treatment_records tr
   where tr.student_id = p_student_id;
 
-  -- 4) Verified velocity: total verified units over last 4/8 weeks 
+  -- 4) Velocity: total units completed (or verified) over last 4/8 weeks 
   select
-    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '4 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0),
-    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '8 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0)
+    coalesce(sum(case when tr.status in ('verified','pending verification','completed') and coalesce(tr.completed_at, tr.verified_at) >= (v_now - interval '4 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0),
+    coalesce(sum(case when tr.status in ('verified','pending verification','completed') and coalesce(tr.completed_at, tr.verified_at) >= (v_now - interval '8 weeks') then coalesce(tr.rsu_units, 0) else 0 end), 0)
   into v_verified_4w, v_verified_8w
   from public.treatment_records tr
   where tr.student_id = p_student_id;

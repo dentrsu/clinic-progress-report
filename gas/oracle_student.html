@@ -9,17 +9,27 @@
 
 <!-- Empty State -->
 <div x-show="!oracleLoading && oracleData && !oracleData.snapshot" class="mt-8 animate-fade-in" style="animation-delay: 200ms">
-  <div class="flex items-center gap-2 mb-2 px-1">
-     <svg class="w-5 h-5 text-indigo-600 shrink-0 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-     </svg>
-     <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider">Oracle Progress Intelligence</h3>
-     <a :href="window.APP_URL + '?page=oracle-guide'" target="_blank"
-        class="ml-1 flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
-        title="How does the Oracle work?">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
-        How it works
-     </a>
+  <div class="mb-2 px-1">
+     <div class="flex items-center gap-2">
+       <svg class="w-5 h-5 text-indigo-600 shrink-0 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+       </svg>
+       <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider">Oracle Progress Intelligence</h3>
+     </div>
+     <div class="flex items-center gap-3 mt-1 pl-7">
+       <a :href="window.APP_URL + '?page=oracle-guide'" target="_blank"
+          class="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+          title="How does the Oracle work?">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+          How it works
+       </a>
+       <a :href="window.APP_URL + '?page=oracle-infographic'" target="_blank"
+          class="flex items-center gap-1 text-xs text-purple-500 hover:text-purple-700 transition-colors"
+          title="Visual infographic of Oracle methodology">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+          Infographic
+       </a>
+     </div>
   </div>
   <div class="bg-gray-50 rounded-2xl p-6 text-center border border-gray-200 border-dashed">
     <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-gray-100">
@@ -34,17 +44,27 @@
 <template x-if="oracleData && oracleData.snapshot">
 <div class="mt-8 space-y-6 animate-fade-in" style="animation-delay: 200ms">
   
-  <div class="flex items-center gap-2 mb-2 px-1">
-     <svg class="w-5 h-5 text-indigo-600 shrink-0 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-     </svg>
-     <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider">Oracle Progress Intelligence</h3>
-     <a :href="window.APP_URL + '?page=oracle-guide'" target="_blank"
-        class="ml-1 flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
-        title="How does the Oracle work?">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
-        How it works
-     </a>
+  <div class="mb-2 px-1">
+     <div class="flex items-center gap-2">
+       <svg class="w-5 h-5 text-indigo-600 shrink-0 drop-shadow-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+       </svg>
+       <h3 class="text-sm font-bold text-gray-800 uppercase tracking-wider">Oracle Progress Intelligence</h3>
+     </div>
+     <div class="flex items-center gap-3 mt-1 pl-7">
+       <a :href="window.APP_URL + '?page=oracle-guide'" target="_blank"
+          class="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+          title="How does the Oracle work?">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+          How it works
+       </a>
+       <a :href="window.APP_URL + '?page=oracle-infographic'" target="_blank"
+          class="flex items-center gap-1 text-xs text-purple-500 hover:text-purple-700 transition-colors"
+          title="Visual infographic of Oracle methodology">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+          Infographic
+       </a>
+     </div>
   </div>
 
   <!-- Summary Card -->
@@ -96,41 +116,6 @@
          </p>
          <p class="font-bold text-lg" x-text="oracleData.snapshot.forecast_completion_date ? formatDate(oracleData.snapshot.forecast_completion_date) : 'Analyzing...'"></p>
       </div>
-    </div>
-  </div>
-
-  <!-- Explanations & Bottlenecks -->
-  <div x-show="oracleData.explanations && oracleData.explanations.length > 0" class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2 flex items-center gap-2">
-       <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-       Key Factors & Bottlenecks
-    </h4>
-    <div class="space-y-4">
-      <template x-for="exp in oracleData.explanations" :key="exp.factor_name">
-         <div class="flex items-start gap-3 group">
-           <div class="shrink-0 mt-0.5 transition-transform group-hover:scale-110">
-             <template x-if="exp.impact_score < 0">
-               <div class="w-6 h-6 rounded-full bg-red-50 flex items-center justify-center border border-red-100 ring-4 ring-white shadow-sm">
-                 <svg class="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
-               </div>
-             </template>
-             <template x-if="exp.impact_score > 0">
-               <div class="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100 ring-4 ring-white shadow-sm">
-                 <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
-               </div>
-             </template>
-             <template x-if="exp.impact_score == 0">
-               <div class="w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center border border-gray-200 ring-4 ring-white shadow-sm">
-                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14"/></svg>
-               </div>
-             </template>
-           </div>
-           <div>
-             <h5 class="text-sm font-bold text-gray-800" x-text="exp.factor_name"></h5>
-             <p class="text-[0.75rem] text-gray-500 leading-relaxed mt-0.5" x-text="exp.description"></p>
-           </div>
-         </div>
-      </template>
     </div>
   </div>
 

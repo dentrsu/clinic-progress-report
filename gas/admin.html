@@ -32,7 +32,7 @@
       <span class="font-semibold tracking-tight">Admin Console</span>
     </div>
     <div class="flex items-center gap-4">
-      <a href="<?= appUrl ?>" class="text-sm text-gray-300 hover:text-white transition">Back to Home</a>
+      
     </div>
   </nav>
 
@@ -1215,6 +1215,173 @@
                 </template>
               </svg>
               <span x-text="syncSelectedMessage"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collapsible: Sheet Schema & Sync Behavior Reference -->
+        <div x-data="{ open: false }" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <button @click="open = !open"
+                  class="w-full flex items-center justify-between px-6 py-3 text-left hover:bg-gray-50 transition">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span class="text-sm font-semibold text-gray-700">Patient Sheet Schema &amp; Sync Behavior</span>
+              <span class="text-[10px] uppercase tracking-wider text-gray-400 font-medium">Reference</span>
+            </div>
+            <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+
+          <div x-show="open" x-transition class="px-6 pb-6 pt-2 border-t border-gray-100 space-y-5 text-sm text-gray-600">
+
+            <!-- Direction -->
+            <div>
+              <h3 class="text-xs font-bold text-navy uppercase tracking-wider mb-1">Direction</h3>
+              <p>
+                One-way: <strong>Google Sheet → Supabase</strong>.
+                Sheet is the source of truth for the columns listed below; Supabase is the destination the app reads from.
+                Fields edited inside the app (e.g. complexity, type_of_case, milestone dates) are <em>not</em> in this schema and are preserved by sync.
+              </p>
+            </div>
+
+            <!-- Header lookup -->
+            <div>
+              <h3 class="text-xs font-bold text-navy uppercase tracking-wider mb-1">Header lookup</h3>
+              <p>Columns are matched by <strong>header name</strong> in row 1 (case-insensitive, whitespace-trimmed). Column order can change freely.</p>
+            </div>
+
+            <!-- Required columns -->
+            <div>
+              <h3 class="text-xs font-bold text-navy uppercase tracking-wider mb-2">Required columns</h3>
+              <p class="text-xs text-gray-500 mb-2">If any of these are missing in row 1, the sync aborts immediately with an error listing the headers found.</p>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs border border-gray-200 rounded">
+                  <thead class="bg-gray-50 text-gray-500 uppercase tracking-wider">
+                    <tr>
+                      <th class="px-3 py-2 text-left font-semibold">Header</th>
+                      <th class="px-3 py-2 text-left font-semibold">Supabase column</th>
+                      <th class="px-3 py-2 text-left font-semibold">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-semibold text-navy">HN</td>
+                      <td class="px-3 py-2 font-mono">hn</td>
+                      <td class="px-3 py-2 text-gray-500">Unique key. Conflict target for upsert — typos create new rows.</td>
+                    </tr>
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-semibold text-navy">Name</td>
+                      <td class="px-3 py-2 font-mono">name</td>
+                      <td class="px-3 py-2 text-gray-500">Empty cell is preserved (does not overwrite existing DB value).</td>
+                    </tr>
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-semibold text-navy">Status</td>
+                      <td class="px-3 py-2 font-mono">status</td>
+                      <td class="px-3 py-2 text-gray-500">Empty cell preserved. Unknown value → field skipped + warning. Sheet value of <code class="bg-gray-100 px-1 rounded">Full Chart</code> never overwrites an existing record (prevents stale-sheet regression). <strong>New records</strong> (HN not in DB) without a valid sheet status default to <code class="bg-gray-100 px-1 rounded">Full Chart</code>.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Optional columns -->
+            <div>
+              <h3 class="text-xs font-bold text-navy uppercase tracking-wider mb-2">Optional columns</h3>
+              <p class="text-xs text-gray-500 mb-2">Missing headers are reported as warnings; sync continues but those fields are skipped.</p>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs border border-gray-200 rounded">
+                  <thead class="bg-gray-50 text-gray-500 uppercase tracking-wider">
+                    <tr>
+                      <th class="px-3 py-2 text-left font-semibold">Header</th>
+                      <th class="px-3 py-2 text-left font-semibold">Supabase column</th>
+                      <th class="px-3 py-2 text-left font-semibold">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-semibold text-navy">Tel</td>
+                      <td class="px-3 py-2 font-mono">tel</td>
+                      <td class="px-3 py-2 text-gray-500">Empty cell preserved.</td>
+                    </tr>
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-semibold text-navy">Note</td>
+                      <td class="px-3 py-2 font-mono">note</td>
+                      <td class="px-3 py-2 text-gray-500">Empty cell preserved.</td>
+                    </tr>
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-semibold text-navy">Birthdate</td>
+                      <td class="px-3 py-2 font-mono">birthdate</td>
+                      <td class="px-3 py-2 text-gray-500">Only written if the cell is an actual Date value (not text).</td>
+                    </tr>
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-semibold text-navy">TeamLeaderEmail</td>
+                      <td class="px-3 py-2 font-mono">instructor_id</td>
+                      <td class="px-3 py-2 text-gray-500">Resolved via users.email → instructors.user_id → instructor_id. Unresolved → warning, field skipped.</td>
+                    </tr>
+                    <tr>
+                      <td class="px-3 py-2 font-mono font-semibold text-navy">StudentEmail</td>
+                      <td class="px-3 py-2 font-mono">student_id_1</td>
+                      <td class="px-3 py-2 text-gray-500">Only <code class="bg-gray-100 px-1 rounded">student_id_1</code> is set from the sheet; slots 2–5 are managed inside the app.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Status allow-list -->
+            <div>
+              <h3 class="text-xs font-bold text-navy uppercase tracking-wider mb-2">Status allow-list</h3>
+              <p class="text-xs text-gray-500 mb-2">Mirrors the <code class="bg-gray-100 px-1 rounded">patient_status</code> enum in Supabase. Match is case-insensitive. Empty or unknown values do <em>not</em> overwrite the DB — unknown values also generate a warning.</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Waiting to Be Assigned</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Active</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Full Chart</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Treatment Plan</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">First Treatment Plan</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Treatment Plan Approved</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Initial Treatment</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Treatment in Progress</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Completed Case</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Inactive</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Discharged</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Orthodontic</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Recall</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Cancelled</span>
+                <span class="px-2 py-0.5 rounded bg-gray-100 text-xs font-mono text-gray-700">Waiting in Recall Lists</span>
+              </div>
+            </div>
+
+            <!-- Behavior notes -->
+            <div>
+              <h3 class="text-xs font-bold text-navy uppercase tracking-wider mb-2">Behavior notes</h3>
+              <ul class="list-disc list-inside space-y-1 text-xs text-gray-600">
+                <li><strong>Upsert by HN:</strong> existing row → merged; missing row → created. HN typos create duplicates.</li>
+                <li><strong>Empty-cell guard</strong> applies to <code class="bg-gray-100 px-1 rounded">Name</code>, <code class="bg-gray-100 px-1 rounded">Tel</code>, <code class="bg-gray-100 px-1 rounded">Note</code>, <code class="bg-gray-100 px-1 rounded">Status</code> — blank cells don't overwrite existing DB values.</li>
+                <li><strong>Unknown status</strong> (non-empty cell whose value isn't in the allow-list) is skipped with a warning naming the HN — DB value preserved, no silent reset.</li>
+                <li><strong>First-time insert default:</strong> if an HN is not yet in Supabase and the sheet's <code class="bg-gray-100 px-1 rounded">Status</code> cell is empty/unknown, the new row is created with status <code class="bg-gray-100 px-1 rounded">Full Chart</code>. Updates to existing HNs never overwrite an empty status. <code class="bg-gray-100 px-1 rounded">stats.created</code> reports the count of brand-new rows per run.</li>
+                <li><strong>"Full Chart" suppression:</strong> a sheet status of <code class="bg-gray-100 px-1 rounded">Full Chart</code> is treated as if the cell were empty when updating an existing record — never written through. Rationale: <code class="bg-gray-100 px-1 rounded">Full Chart</code> is the initial state; once a patient has progressed in Supabase, a stale "Full Chart" in the sheet shouldn't regress them. To force a record back to <code class="bg-gray-100 px-1 rounded">Full Chart</code>, edit it inside the app, not via sync.</li>
+                <li><strong>Fail-fast:</strong> missing required header aborts the sync before any write occurs.</li>
+                <li><strong>Permissions:</strong> Sync All is admin-only; Sync Selected (by HN) is callable by any authenticated user (used by the student portal).</li>
+                <li><strong>Progress cache</strong> key <code class="bg-gray-100 px-1 rounded">SYNC_PATIENTS_PROGRESS</code> is shared between Sync All and Sync Selected — avoid running both at the same time.</li>
+              </ul>
+            </div>
+
+            <!-- Code pointers -->
+            <div class="pt-3 border-t border-gray-100">
+              <h3 class="text-xs font-bold text-navy uppercase tracking-wider mb-2">Code pointers</h3>
+              <ul class="text-xs text-gray-500 space-y-1 font-mono">
+                <li>Code.gs <code class="bg-gray-100 px-1 rounded">_buildPatientSheetSchema()</code> — header validation</li>
+                <li>Code.gs <code class="bg-gray-100 px-1 rounded">_buildPatientPayloadFromRow()</code> — payload + lookups</li>
+                <li>Code.gs <code class="bg-gray-100 px-1 rounded">adminSyncPatients()</code> — full sync (admin)</li>
+                <li>Code.gs <code class="bg-gray-100 px-1 rounded">adminSyncSelectedPatients(hnList)</code> — selective sync</li>
+                <li>SupabaseProvider.gs <code class="bg-gray-100 px-1 rounded">upsertPatient()</code> — POST <code class="bg-gray-100 px-1 rounded">/rest/v1/patients?on_conflict=hn</code></li>
+                <li>SupabaseProvider.gs <code class="bg-gray-100 px-1 rounded">listAllPatientHns()</code> / <code class="bg-gray-100 px-1 rounded">listExistingHnsIn()</code> — pre-load existing HNs for new-vs-existing detection</li>
+              </ul>
             </div>
           </div>
         </div>

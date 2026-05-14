@@ -67,10 +67,11 @@ begin
       (p.tp_approved_at is null and p.chart_full_at is not null and (v_now::date - p.chart_full_at::date) > 30)
     );
 
-  -- 5) Verified velocity: total verified duration over last 4/8 weeks 
+  -- 5) Verified velocity: total verified duration over last 4/8 weeks
+  --    Uses complete_date (when student finished) with verified_at as fallback
   select
-    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '4 weeks') then (coalesce(tr.rsu_units, 0) + coalesce(tr.cda_units, 0)) * coalesce(r.est_work_duration, 1.0) else 0 end), 0),
-    coalesce(sum(case when tr.status = 'verified' and tr.verified_at >= (v_now - interval '8 weeks') then (coalesce(tr.rsu_units, 0) + coalesce(tr.cda_units, 0)) * coalesce(r.est_work_duration, 1.0) else 0 end), 0)
+    coalesce(sum(case when tr.status = 'verified' and coalesce(tr.complete_date, tr.verified_at) >= (v_now - interval '4 weeks') then (coalesce(tr.rsu_units, 0) + coalesce(tr.cda_units, 0)) * coalesce(r.est_work_duration, 1.0) else 0 end), 0),
+    coalesce(sum(case when tr.status = 'verified' and coalesce(tr.complete_date, tr.verified_at) >= (v_now - interval '8 weeks') then (coalesce(tr.rsu_units, 0) + coalesce(tr.cda_units, 0)) * coalesce(r.est_work_duration, 1.0) else 0 end), 0)
   into v_verified_4w, v_verified_8w
   from public.treatment_records tr
   left join public.requirement_list r on tr.requirement_id = r.requirement_id

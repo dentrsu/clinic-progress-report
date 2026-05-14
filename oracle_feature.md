@@ -45,27 +45,31 @@ verified_completion_pct =
 
 ---
 
-## Part 2: Verified Velocity (30-Day)
+## Part 2: Completion Velocity (30-Day)
 
 ### What it measures
 
-How many RSU units (specifically `rsu_units`) were verified within **the last 4 weeks** and **the last 8 weeks**.
+How many RSU units (specifically `rsu_units`) were **completed** (or verified) within **the last 4 weeks** and **the last 8 weeks**. Records with status `verified`, `pending verification`, or `completed` all count toward velocity.
 
 ### The Formula
 
 ```
-v_verified_4w = SUM(rsu_units) WHERE status='verified'
-                AND verified_at >= NOW() - 4 weeks
+v_verified_4w = SUM(rsu_units)
+                WHERE status IN ('verified', 'pending verification', 'completed')
+                AND COALESCE(completed_at, verified_at) >= NOW() - 4 weeks
 
-v_verified_8w = SUM(rsu_units) WHERE status='verified'
-                AND verified_at >= NOW() - 8 weeks
+v_verified_8w = SUM(rsu_units)
+                WHERE status IN ('verified', 'pending verification', 'completed')
+                AND COALESCE(completed_at, verified_at) >= NOW() - 8 weeks
 ```
 
 The **displayed 30-day velocity** shown on the dashboard (`velocity_30d`) is directly mapped from `v_verified_4w`.
 
-### Why `verified_at` — not `created_at`?
+### Why `completed_at` — not `created_at` or `verified_at` alone?
 
-A student may create a record (submit a case) months before it gets verified. Using `created_at` would attribute that progress to the past, making the velocity appear zero even if recent verifications happened. Using `verified_at` correctly attributes progress to the moment it was **confirmed as real, locked-in progress**.
+A student may create a record months before it is completed. Using `created_at` would attribute that progress to the past. Using only `verified_at` would penalise students who are waiting on instructor approval.
+
+`COALESCE(completed_at, verified_at)` uses the **completion date first**, falling back to the verification date for older records that lack a completion timestamp. This way, velocity reflects when the student actually **finished the work**, not when the instructor got around to approving it.
 
 ### Why two windows (4w and 8w)?
 
@@ -80,7 +84,7 @@ Both are measured to give the forecast a stable base (see Part 3).
 > Velocity is based on RSU units only, not CDA units. Students in divisions where CDA is the primary metric may see their velocity underrepresented.
 
 > [!NOTE]
-> Velocity resets toward zero if no verifications happen. A student who worked hard for 2 months but then paused will see their velocity declining week-over-week, which is intentional — it reflects current momentum, not historical achievement.
+> Velocity resets toward zero if no completions happen. A student who worked hard for 2 months but then paused will see their velocity declining week-over-week, which is intentional — it reflects current momentum, not historical achievement.
 
 ---
 
@@ -88,7 +92,7 @@ Both are measured to give the forecast a stable base (see Part 3).
 
 ### How it thinks
 
-The Oracle asks: _"If you keep moving at your current verified speed, when will you reach 100%?"_
+The Oracle asks: _"If you keep completing work at your current speed, when will you reach 100%?"_
 
 ### The Formula (Step by Step)
 
@@ -143,21 +147,24 @@ This matches the displayed date of **1/7/2569** (July 1, 2026 BE).
 
 ### Why this is a heuristic, not a prediction
 
-The model **assumes velocity is constant**. In reality:
+The model **assumes completion velocity is constant**. In reality:
 
 - Students work in bursts before deadlines.
 - Some requirements take longer than others.
-- Instructor availability affects verification speed.
+- Work pace varies with clinic schedules and exam periods.
 
 The model doesn't know any of this. It linearly projects the current momentum forward.
+
+> [!NOTE]
+> The progress score (denominator) counts only **verified** records, while velocity counts **completed + pending + verified** records. This means the forecast assumes the student will keep completing work at the current pace **and** that completed work will eventually be verified.
 
 ### Cautions
 
 > [!CAUTION]
-> If no records have been verified in the last 4 or 8 weeks, `v_monthly_velocity = 0`, and the system **cannot generate a forecast**. The display will show "Analyzing..." This is by design — a forecast with zero velocity would extrapolate to infinity, which is meaningless.
+> If no records have been completed or verified in the last 4 or 8 weeks, `v_monthly_velocity = 0`, and the system **cannot generate a forecast**. The display will show "Analyzing..." This is by design — a forecast with zero velocity would extrapolate to infinity, which is meaningless.
 
 > [!WARNING]
-> The forecast assumes the student maintains **exactly the same rate** of verified work. A sudden pause (illness, exams) will cause the forecast date to shift forward significantly on the next recalculation.
+> The forecast assumes the student maintains **exactly the same rate** of completed work. A sudden pause (illness, exams) will cause the forecast date to shift forward significantly on the next recalculation.
 
 > [!NOTE]
 > The forecast recalculates every time a treatment record is created, updated, or verified. It is not a static projection — it updates in near real-time.
@@ -232,7 +239,7 @@ Recommendations are prioritized actions based on detected risks:
 > **Progress Score uses system-wide requirements as the denominator.** If not all requirements have minimum RSU/CDA values set, the denominator may be underestimated, inflating the score.
 
 > [!WARNING]
-> **Velocity excludes CDA units.** Students in CDA-heavy divisions see lower velocity figures. A future enhancement should weight RSU + CDA proportionally.
+> **Velocity counts RSU units only.** Students in CDA-heavy divisions see lower velocity figures. A future enhancement should weight RSU + CDA proportionally.
 
 > [!NOTE]
 > **All calculations are re-run from scratch on each refresh.** There is no historical trend line, weighted average, or seasonal adjustment. The model is a precise snapshot of the current moment.
@@ -246,8 +253,8 @@ Recommendations are prioritized actions based on detected risks:
 
 | Situation                                | Trust Level | Why                                                      |
 | ---------------------------------------- | ----------- | -------------------------------------------------------- |
-| Active student, consistent verifications | ✅ High     | Velocity is stable, forecast is meaningful               |
+| Active student, consistent completions   | ✅ High     | Velocity is stable, forecast is meaningful               |
 | First few weeks with only 1–2 records    | ⚠️ Low      | Too little data; forecast is a rough estimate            |
-| Student returning after a long pause     | ⚠️ Medium   | Velocity will be zero until new verifications accumulate |
+| Student returning after a long pause     | ⚠️ Medium   | Velocity recovers as soon as new records are completed   |
 | CDA-heavy division                       | ⚠️ Low      | RSU-only velocity undercounts real progress              |
 | Near graduation deadline                 | ✅ High     | Risk score and deadline logic are accurate               |

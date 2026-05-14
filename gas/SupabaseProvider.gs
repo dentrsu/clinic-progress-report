@@ -116,6 +116,28 @@ var SupabaseProvider = (function () {
   }
 
   /**
+   * Parallel GET helper for the oracle schema (like _getAll but with Accept-Profile).
+   * @param {string[]} paths — array of REST paths
+   * @returns {Array[]} — array of parsed results, same order as paths
+   */
+  function _oracleGetAll(paths) {
+    var baseUrl = getSupabaseUrl();
+    var hdrs = _headers();
+    hdrs["Accept-Profile"] = "oracle";
+    var requests = paths.map(function (p) {
+      return { url: baseUrl + p, method: "get", headers: hdrs, muteHttpExceptions: true };
+    });
+    var responses = UrlFetchApp.fetchAll(requests);
+    return responses.map(function (resp, i) {
+      var code = resp.getResponseCode();
+      if (code < 200 || code >= 300) {
+        throw new Error("Supabase GET " + paths[i] + " returned " + code + ": " + resp.getContentText());
+      }
+      return JSON.parse(resp.getContentText());
+    });
+  }
+
+  /**
    * POST helper for the oracle schema.
    */
   function _oraclePost(path, payload) {
@@ -1063,6 +1085,42 @@ var SupabaseProvider = (function () {
     },
 
     /**
+     * Returns every existing HN as a flat array of strings (no other fields
+     * fetched). Used by patient sync to distinguish first-time inserts from
+     * updates so a different default status can be applied to new records.
+     * NOTE: PostgREST default page size may apply — if patients grows past a
+     * few thousand, switch this to a paginated loop using Range headers.
+     */
+    listAllPatientHns: function () {
+      var rows = _get("/rest/v1/patients?select=hn&limit=10000");
+      return (rows || [])
+        .map(function (r) {
+          return r && r.hn ? r.hn : null;
+        })
+        .filter(Boolean);
+    },
+
+    /**
+     * Returns the subset of HNs from the input list that already exist in DB.
+     * Targeted variant of listAllPatientHns for selected-HN sync — avoids
+     * fetching unrelated HNs when only a handful are being synced.
+     */
+    listExistingHnsIn: function (hnList) {
+      if (!hnList || !hnList.length) return [];
+      var encoded = hnList
+        .map(function (h) {
+          return encodeURIComponent(String(h));
+        })
+        .join(",");
+      var rows = _get("/rest/v1/patients?select=hn&hn=in.(" + encoded + ")");
+      return (rows || [])
+        .map(function (r) {
+          return r && r.hn ? r.hn : null;
+        })
+        .filter(Boolean);
+    },
+
+    /**
      * Create public.patients record.
      * @param {Object} patient
      * @returns {Object}
@@ -1546,6 +1604,47 @@ var SupabaseProvider = (function () {
           description: r.message,
         };
       });
+    },
+
+    /**
+     * Fetch snapshot + explanations + recommendations in one parallel batch.
+     * @param {string} studentId
+     * @returns {{ snapshot: object|null, explanations: Array, recommendations: Array }}
+     */
+    getOracleDashboardBatch: function (studentId) {
+      if (!studentId) return { snapshot: null, explanations: [], recommendations: [] };
+      var paths = [
+        "/rest/v1/student_progress_snapshots?student_id=eq." + studentId,
+        "/rest/v1/explanation_factors?student_id=eq." + studentId + "&order=display_order.asc",
+        "/rest/v1/recommendations?student_id=eq." + studentId + "&order=priority_rank.asc",
+      ];
+      var results = _oracleGetAll(paths);
+      var snapRows = results[0] || [];
+      var explRows = results[1] || [];
+      var recRows = results[2] || [];
+
+      var snapshot = null;
+      if (snapRows.length > 0) {
+        var s = snapRows[0];
+        snapshot = {
+          ...s,
+          progress_score: s.verified_completion_pct ? Math.round(s.verified_completion_pct * 100) : 0,
+          velocity_30d: s.verified_velocity_4w || 0,
+          forecast_completion_date: s.forecast_completion_month,
+          last_calculated_at: s.snapshot_at,
+          risk_level: { green: "On Track", yellow: "At Risk", orange: "High Risk", red: "Critical" }[s.risk_level] || s.risk_level,
+        };
+      }
+
+      var explanations = explRows.map(function (e) {
+        return { ...e, factor_name: e.factor_label, description: e.factor_code, impact_score: e.severity * -1 };
+      });
+
+      var recommendations = recRows.map(function (r) {
+        return { ...r, action_type: r.recommendation_type, description: r.message };
+      });
+
+      return { snapshot: snapshot, explanations: explanations, recommendations: recommendations };
     },
 
     /**

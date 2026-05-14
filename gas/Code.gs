@@ -5255,6 +5255,219 @@ function studentListTypeOfCases() {
  * Syncs patient data from a configured Google Sheet to the active data source.
  * (Admin only).
  */
+// Mirrors public.patient_status enum in Supabase. Keep in sync with
+// database-context.md → CREATE TYPE patient_status. Mismatches cause either
+// silent data corruption (unknown value resets row) or upsert failures
+// (value not in DB enum), so any change here MUST match the DB migration.
+var _PATIENT_VALID_STATUSES = [
+  "Waiting to Be Assigned",
+  "Active",
+  "Full Chart",
+  "Treatment Plan",
+  "First Treatment Plan",
+  "Treatment Plan Approved",
+  "Initial Treatment",
+  "Treatment in Progress",
+  "Completed Case",
+  "Inactive",
+  "Discharged",
+  "Orthodontic",
+  "Recall",
+  "Cancelled",
+  "Waiting in Recall Lists",
+];
+
+/**
+ * Build a header→column-index map for the patient sheet and validate required
+ * columns. Header matching is case-insensitive and trimmed. Throws if any
+ * required header is missing — the error lists the headers actually found in
+ * row 1 so the operator can fix the sheet or aliases without guessing.
+ * @param {Array} headers Row 0 of the sheet.
+ * @return {{COL: Object, warnings: string[]}} COL maps logical field → index.
+ */
+function _buildPatientSheetSchema(headers) {
+  var idx = {};
+  for (var h = 0; h < headers.length; h++) {
+    var key = String(headers[h] == null ? "" : headers[h])
+      .trim()
+      .toLowerCase();
+    if (key) idx[key] = h;
+  }
+
+  var schema = {
+    hn: { aliases: ["HN"], required: true },
+    name: { aliases: ["Name"], required: true },
+    status: { aliases: ["Status"], required: true },
+    tel: { aliases: ["Tel"], required: false },
+    tlEmail: { aliases: ["TeamLeaderEmail"], required: false },
+    stEmail: { aliases: ["StudentEmail"], required: false },
+    birthdate: { aliases: ["Birthdate"], required: false },
+    note: { aliases: ["Note"], required: false },
+  };
+
+  var COL = {};
+  var missing = [];
+  var warnings = [];
+  Object.keys(schema).forEach(function (field) {
+    var spec = schema[field];
+    var found = -1;
+    for (var i = 0; i < spec.aliases.length; i++) {
+      var k = spec.aliases[i].toLowerCase();
+      if (idx[k] !== undefined) {
+        found = idx[k];
+        break;
+      }
+    }
+    if (found === -1) {
+      if (spec.required) missing.push(spec.aliases[0]);
+      else warnings.push("Optional column not in sheet: " + spec.aliases[0]);
+    } else {
+      COL[field] = found;
+    }
+  });
+
+  if (missing.length) {
+    var present = headers
+      .map(function (h) {
+        return String(h == null ? "" : h).trim();
+      })
+      .filter(Boolean);
+    throw new Error(
+      "Patient sheet missing required headers: " +
+        missing.join(", ") +
+        ". Headers found in row 1: " +
+        (present.join(", ") || "(none)"),
+    );
+  }
+
+  return { COL: COL, warnings: warnings };
+}
+
+/**
+ * Build a Supabase upsert payload for one patient row.
+ * Empty-cell guard: blank name/tel/note/status cells are NOT included in the
+ * payload, so existing DB values are preserved rather than reset.
+ * Unknown status (non-empty cell whose value isn't in the DB enum) is also
+ * skipped and recorded as a warning — never silently coerced to a default.
+ * "Full Chart" from the sheet is suppressed (treated as if the cell were
+ * empty) because it is the initial state for new records; writing it onto an
+ * existing patient would regress them. The new-record default below still
+ * sets "Full Chart" for first-time inserts that lack a valid sheet status.
+ * Returns null if the row has no HN (caller should skip).
+ */
+function _buildPatientPayloadFromRow(
+  row,
+  COL,
+  emailMap,
+  instructorMap,
+  stats,
+  existingHnSet,
+) {
+  var hn = String(row[COL.hn] == null ? "" : row[COL.hn]).trim();
+  if (!hn) return null;
+
+  var payload = { hn: hn, updated_at: new Date().toISOString() };
+
+  var rawStatus = String(row[COL.status] == null ? "" : row[COL.status]).trim();
+  if (rawStatus !== "") {
+    var status = _PATIENT_VALID_STATUSES.find(function (s) {
+      return s.toLowerCase() === rawStatus.toLowerCase();
+    });
+    if (status) {
+      // "Full Chart" is reserved for the new-record default path; never
+      // propagated from sheet → DB on update. This avoids regressing a
+      // patient whose chart has progressed but whose sheet row is stale.
+      if (status !== "Full Chart") {
+        payload.status = status;
+      }
+    } else {
+      if (!stats.warnings) stats.warnings = [];
+      if (stats.warnings.length < 10)
+        stats.warnings.push(
+          "Unknown status for HN " + hn + ': "' + rawStatus + '" — field skipped, DB value preserved',
+        );
+    }
+  }
+
+  // First-time-only default: if this HN isn't in the DB yet AND no valid
+  // status survived the block above (empty cell, unknown value, or the
+  // suppressed "Full Chart" case), seed the new row with "Full Chart".
+  // existingHnSet === null means pre-load failed → skip the default
+  // (graceful degradation rather than guessing wrong).
+  if (
+    payload.status === undefined &&
+    existingHnSet &&
+    !existingHnSet[hn]
+  ) {
+    payload.status = "Full Chart";
+  }
+
+  function setIfPresent(field, colIdx) {
+    if (colIdx === undefined) return;
+    var v = String(row[colIdx] == null ? "" : row[colIdx]).trim();
+    if (v !== "") payload[field] = v;
+  }
+  setIfPresent("name", COL.name);
+  setIfPresent("tel", COL.tel);
+  setIfPresent("note", COL.note);
+
+  if (COL.birthdate !== undefined) {
+    var bd = row[COL.birthdate];
+    if (bd instanceof Date) payload.birthdate = bd;
+  }
+
+  if (COL.tlEmail !== undefined) {
+    var tlEmail = String(row[COL.tlEmail] == null ? "" : row[COL.tlEmail])
+      .trim()
+      .toLowerCase();
+    if (tlEmail && emailMap[tlEmail]) {
+      var tlUserId = emailMap[tlEmail];
+      if (instructorMap[tlUserId]) {
+        payload.instructor_id = instructorMap[tlUserId];
+      }
+    }
+  }
+
+  if (COL.stEmail !== undefined) {
+    var stEmail = String(row[COL.stEmail] == null ? "" : row[COL.stEmail])
+      .trim()
+      .toLowerCase();
+    if (stEmail) {
+      if (emailMap[stEmail]) {
+        var stUserId = emailMap[stEmail];
+        var studentData = SupabaseProvider.getStudentByUserId(stUserId);
+        if (studentData && studentData.student_id) {
+          payload.student_id_1 = studentData.student_id;
+        } else {
+          console.log(
+            "Sync Warning: Student Profile NOT FOUND for User: " +
+              stEmail +
+              " (ID: " +
+              stUserId +
+              ")",
+          );
+          if (!stats.warnings) stats.warnings = [];
+          if (stats.warnings.length < 10)
+            stats.warnings.push(
+              "Skipped Student Assignment: Profile missing for " + stEmail,
+            );
+        }
+      } else {
+        console.log(
+          "Sync Warning: Student Email NOT FOUND in System: " + stEmail,
+        );
+        if (!stats.warnings) stats.warnings = [];
+        if (stats.warnings.length < 10)
+          stats.warnings.push(
+            "Skipped Student Assignment: Email not found " + stEmail,
+          );
+      }
+    }
+  }
+
+  return payload;
+}
+
 function adminSyncPatients() {
   _assertAdmin();
 
@@ -5278,32 +5491,52 @@ function adminSyncPatients() {
       };
     }
 
-    // Pre-fetch Users/Instructors for Lookup
+    var schema;
+    try {
+      schema = _buildPatientSheetSchema(data[0]);
+    } catch (schemaErr) {
+      return { success: false, error: schemaErr.message };
+    }
+    var COL = schema.COL;
+
     var allUsers = SupabaseProvider.listUsers() || [];
     var allInstructors = SupabaseProvider.listInstructors() || [];
 
-    // Maps
-    var emailMap = {}; // email -> user_id
+    var emailMap = {};
     allUsers.forEach(function (u) {
       if (u.email) emailMap[u.email.toLowerCase()] = u.user_id;
     });
 
-    var instructorMap = {}; // user_id -> instructor_id
+    var instructorMap = {};
     allInstructors.forEach(function (i) {
       instructorMap[i.user_id] = i.instructor_id;
     });
 
     var stats = { created: 0, updated: 0, errors: 0 };
+    if (schema.warnings.length) stats.warnings = schema.warnings.slice();
 
-    // Data starts at row 2 (index 1)
-    // Columns:
-    // A(0): HN, B(1): Name, C(2): Tel, D(3): TeamLeaderEmail, E(4): StudentEmail
-    // L(11): Birthdate, P(15): Status, Q(16): Note
+    // Pre-load existing HNs so we can apply a different default status
+    // ("Full Chart") only on first-time inserts. Null on failure → graceful
+    // degradation: the new-record default is skipped, behavior matches
+    // pre-feature for that sync run.
+    var existingHnSet = {};
+    try {
+      var existingHns = SupabaseProvider.listAllPatientHns();
+      existingHns.forEach(function (h) {
+        existingHnSet[h] = true;
+      });
+    } catch (preErr) {
+      Logger.log("Failed to pre-load existing HNs: " + preErr.message);
+      if (!stats.warnings) stats.warnings = [];
+      stats.warnings.push(
+        "Could not pre-check existing HNs — new-record default (Full Chart) disabled for this run",
+      );
+      existingHnSet = null;
+    }
 
-    // Count non-empty HN rows for progress tracking
     var totalRows = 0;
     for (var p = 1; p < data.length; p++) {
-      if (String(data[p][0]).trim()) totalRows++;
+      if (String(data[p][COL.hn]).trim()) totalRows++;
     }
 
     var patientCache = CacheService.getScriptCache();
@@ -5324,15 +5557,14 @@ function adminSyncPatients() {
     for (var i = 1; i < data.length; i++) {
       try {
         var row = data[i];
-        var hn = String(row[0]).trim();
+        var hn = String(row[COL.hn] || "").trim();
         if (!hn) continue;
 
-        stats.updated++; // increment before upsert so progress is accurate
         patientCache.put(
           "SYNC_PATIENTS_PROGRESS",
           JSON.stringify({
             status: "running",
-            current: stats.updated,
+            current: stats.updated + stats.errors,
             total: totalRows,
             updated: stats.updated,
             errors: stats.errors,
@@ -5341,90 +5573,23 @@ function adminSyncPatients() {
           }),
           300,
         );
-        stats.updated--; // revert — will re-increment after successful upsert
 
-        // Normalize Status
-        var rawStatus = String(row[15]).trim();
-        var validStatuses = [
-          "Active",
-          "Full Chart",
-          "Treatment Plan",
-          "First Treatment Plan",
-          "Treatment Plan Approved",
-          "Initial Treatment",
-          "Inactive",
-          "Discharged",
-          "Orthodontic Treatment",
-          "Waiting in Recall Lists",
-        ];
-
-        // Simple case-insensitive match
-        var status = validStatuses.find(
-          (s) => s.toLowerCase() === rawStatus.toLowerCase(),
+        var patientPayload = _buildPatientPayloadFromRow(
+          row,
+          COL,
+          emailMap,
+          instructorMap,
+          stats,
+          existingHnSet,
         );
-        if (!status) status = "Waiting to Be Assigned"; // Default
+        if (!patientPayload) continue;
 
-        var patientPayload = {
-          hn: hn,
-          name: String(row[1]).trim(),
-          tel: String(row[2]).trim(),
-          birthdate: row[11] instanceof Date ? row[11] : null,
-          status: status,
-          note: String(row[16]).trim(),
-          updated_at: new Date().toISOString(),
-        };
-
-        // Lookup Team Leader
-        var tlEmail = String(row[3]).trim().toLowerCase();
-        if (tlEmail && emailMap[tlEmail]) {
-          var tlUserId = emailMap[tlEmail];
-          if (instructorMap[tlUserId]) {
-            patientPayload.instructor_id = instructorMap[tlUserId];
-          }
-        }
-
-        // Lookup Student
-        var stEmail = String(row[4]).trim().toLowerCase();
-        if (stEmail) {
-          if (emailMap[stEmail]) {
-            var stUserId = emailMap[stEmail];
-            var studentData = SupabaseProvider.getStudentByUserId(stUserId);
-
-            if (studentData && studentData.student_id) {
-              patientPayload.student_id_1 = studentData.student_id;
-              // console.log("Mapped Student: " + stEmail + " -> " + studentData.student_id);
-            } else {
-              console.log(
-                "Sync Warning: Student Profile NOT FOUND for User: " +
-                  stEmail +
-                  " (ID: " +
-                  stUserId +
-                  ")",
-              );
-              if (!stats.warnings) stats.warnings = [];
-              if (stats.warnings.length < 10)
-                stats.warnings.push(
-                  "Skipped Student Assignment: Profile missing for " + stEmail,
-                );
-            }
-          } else {
-            console.log(
-              "Sync Warning: Student Email NOT FOUND in System: " + stEmail,
-            );
-            if (!stats.warnings) stats.warnings = [];
-            if (stats.warnings.length < 10)
-              stats.warnings.push(
-                "Skipped Student Assignment: Email not found " + stEmail,
-              );
-          }
-        }
-
-        // Check Existence - DEPRECATED in favor of Upsert
-
-        // Use UPSERT
         SupabaseProvider.upsertPatient(patientPayload);
         stats.updated++;
-        // Update progress after each successful upsert
+        if (existingHnSet && !existingHnSet[hn]) {
+          stats.created++;
+          existingHnSet[hn] = true;
+        }
         patientCache.put(
           "SYNC_PATIENTS_PROGRESS",
           JSON.stringify({
@@ -5444,7 +5609,6 @@ function adminSyncPatients() {
       }
     }
 
-    // Format a helpful message if fallback occurred OR we have data warnings
     var warningMsg = "";
     if (stats.supabaseErrors && stats.supabaseErrors.length > 0) {
       warningMsg +=
@@ -5452,14 +5616,6 @@ function adminSyncPatients() {
     }
     if (stats.warnings && stats.warnings.length > 0) {
       warningMsg += "Data Warnings: " + stats.warnings.join(", ");
-    }
-
-    if (warningMsg) {
-      return {
-        success: true,
-        stats: stats,
-        warning: warningMsg,
-      };
     }
 
     patientCache.put(
@@ -5475,6 +5631,8 @@ function adminSyncPatients() {
       }),
       60,
     );
+
+    if (warningMsg) return { success: true, stats: stats, warning: warningMsg };
     return { success: true, stats: stats };
   } catch (e) {
     Logger.log("adminSyncPatients error: " + e.message);
@@ -5511,7 +5669,6 @@ function adminSyncSelectedPatients(hnList) {
     return { success: false, error: "No HNs provided for selection." };
   }
 
-  // Normalize target HNs
   var targetHns = {};
   for (var i = 0; i < hnList.length; i++) {
     targetHns[String(hnList[i]).trim()] = true;
@@ -5537,24 +5694,47 @@ function adminSyncSelectedPatients(hnList) {
       };
     }
 
-    // Pre-fetch Users/Instructors for Lookup
+    var schema;
+    try {
+      schema = _buildPatientSheetSchema(data[0]);
+    } catch (schemaErr) {
+      return { success: false, error: schemaErr.message };
+    }
+    var COL = schema.COL;
+
     var allUsers = SupabaseProvider.listUsers() || [];
     var allInstructors = SupabaseProvider.listInstructors() || [];
 
-    // Maps
-    var emailMap = {}; // email -> user_id
+    var emailMap = {};
     allUsers.forEach(function (u) {
       if (u.email) emailMap[u.email.toLowerCase()] = u.user_id;
     });
 
-    var instructorMap = {}; // user_id -> instructor_id
+    var instructorMap = {};
     allInstructors.forEach(function (i) {
       instructorMap[i.user_id] = i.instructor_id;
     });
 
-    var stats = { updated: 0, errors: 0, skipped: 0 };
+    var stats = { created: 0, updated: 0, errors: 0, skipped: 0 };
+    if (schema.warnings.length) stats.warnings = schema.warnings.slice();
 
-    // Track which HNs we actually found
+    // Pre-check which of the requested HNs already exist (targeted IN query).
+    // Null on failure → graceful degradation, new-record default disabled.
+    var existingHnSet = {};
+    try {
+      var existingHns = SupabaseProvider.listExistingHnsIn(hnList);
+      existingHns.forEach(function (h) {
+        existingHnSet[h] = true;
+      });
+    } catch (preErr) {
+      Logger.log("Failed to pre-load existing HNs: " + preErr.message);
+      if (!stats.warnings) stats.warnings = [];
+      stats.warnings.push(
+        "Could not pre-check existing HNs — new-record default (Full Chart) disabled for this run",
+      );
+      existingHnSet = null;
+    }
+
     var foundHns = {};
     var selTotal = hnList.length;
     var selDone = 0;
@@ -5577,94 +5757,28 @@ function adminSyncSelectedPatients(hnList) {
     for (var i = 1; i < data.length; i++) {
       try {
         var row = data[i];
-        var hn = String(row[0]).trim();
+        var hn = String(row[COL.hn] || "").trim();
         if (!hn) continue;
-
-        // Skip if not in our target list
-        if (!targetHns[hn]) {
-          continue;
-        }
+        if (!targetHns[hn]) continue;
 
         foundHns[hn] = true;
 
-        // Normalize Status
-        var rawStatus = String(row[15]).trim();
-        var validStatuses = [
-          "Active",
-          "Full Chart",
-          "Treatment Plan",
-          "First Treatment Plan",
-          "Treatment Plan Approved",
-          "Initial Treatment",
-          "Inactive",
-          "Discharged",
-          "Orthodontic Treatment",
-          "Waiting in Recall Lists",
-        ];
-
-        // Simple case-insensitive match
-        var status = validStatuses.find(
-          (s) => s.toLowerCase() === rawStatus.toLowerCase(),
+        var patientPayload = _buildPatientPayloadFromRow(
+          row,
+          COL,
+          emailMap,
+          instructorMap,
+          stats,
+          existingHnSet,
         );
-        if (!status) status = "Waiting to Be Assigned"; // Default
+        if (!patientPayload) continue;
 
-        var patientPayload = {
-          hn: hn,
-          name: String(row[1]).trim(),
-          tel: String(row[2]).trim(),
-          birthdate: row[11] instanceof Date ? row[11] : null,
-          status: status,
-          note: String(row[16]).trim(),
-          updated_at: new Date().toISOString(),
-        };
-
-        // Lookup Team Leader
-        var tlEmail = String(row[3]).trim().toLowerCase();
-        if (tlEmail && emailMap[tlEmail]) {
-          var tlUserId = emailMap[tlEmail];
-          if (instructorMap[tlUserId]) {
-            patientPayload.instructor_id = instructorMap[tlUserId];
-          }
-        }
-
-        // Lookup Student
-        var stEmail = String(row[4]).trim().toLowerCase();
-        if (stEmail) {
-          if (emailMap[stEmail]) {
-            var stUserId = emailMap[stEmail];
-            var studentData = SupabaseProvider.getStudentByUserId(stUserId);
-
-            if (studentData && studentData.student_id) {
-              patientPayload.student_id_1 = studentData.student_id;
-            } else {
-              console.log(
-                "Sync Warning: Student Profile NOT FOUND for User: " +
-                  stEmail +
-                  " (ID: " +
-                  stUserId +
-                  ")",
-              );
-              if (!stats.warnings) stats.warnings = [];
-              if (stats.warnings.length < 10)
-                stats.warnings.push(
-                  "Skipped Student Assignment: Profile missing for " + stEmail,
-                );
-            }
-          } else {
-            console.log(
-              "Sync Warning: Student Email NOT FOUND in System: " + stEmail,
-            );
-            if (!stats.warnings) stats.warnings = [];
-            if (stats.warnings.length < 10)
-              stats.warnings.push(
-                "Skipped Student Assignment: Email not found " + stEmail,
-              );
-          }
-        }
-
-        // Use UPSERT
         SupabaseProvider.upsertPatient(patientPayload);
         stats.updated++;
+        if (existingHnSet && !existingHnSet[hn]) {
+          stats.created++;
+          existingHnSet[hn] = true;
+        }
         selDone++;
         selCache.put(
           "SYNC_PATIENTS_PROGRESS",
@@ -5685,7 +5799,6 @@ function adminSyncSelectedPatients(hnList) {
       }
     }
 
-    // Check if any requested HNs were not found in the sheet
     Object.keys(targetHns).forEach(function (reqHn) {
       if (!foundHns[reqHn]) {
         if (!stats.warnings) stats.warnings = [];
@@ -5693,7 +5806,6 @@ function adminSyncSelectedPatients(hnList) {
       }
     });
 
-    // Format a helpful message if fallback occurred OR we have data warnings
     var warningMsg = "";
     if (stats.supabaseErrors && stats.supabaseErrors.length > 0) {
       warningMsg +=
@@ -5701,14 +5813,6 @@ function adminSyncSelectedPatients(hnList) {
     }
     if (stats.warnings && stats.warnings.length > 0) {
       warningMsg += "Data Warnings: " + stats.warnings.join(", ");
-    }
-
-    if (warningMsg) {
-      return {
-        success: true,
-        stats: stats,
-        warning: warningMsg,
-      };
     }
 
     selCache.put(
@@ -5724,6 +5828,8 @@ function adminSyncSelectedPatients(hnList) {
       }),
       60,
     );
+
+    if (warningMsg) return { success: true, stats: stats, warning: warningMsg };
     return { success: true, stats: stats };
   } catch (e) {
     Logger.log("adminSyncSelectedPatients error: " + e.message);

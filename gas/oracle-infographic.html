@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Oracle Analytics — How It Predicts</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #1a365d;
+    --purple: #6b46c1;
+    --purple-light: #f3ebff;
+    --green: #38a169;
+    --yellow: #d69e2e;
+    --orange: #dd6b20;
+    --red: #e53e3e;
+    --blue: #3182ce;
+    --gray-50: #f7fafc;
+    --gray-100: #edf2f7;
+    --gray-200: #e2e8f0;
+    --gray-500: #718096;
+    --gray-700: #2d3748;
+    --gray-900: #1a202c;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+    color: #e2e8f0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    text-align: center;
+    padding: 60px 24px 40px;
+    position: relative;
+  }
+  .hero::after {
+    content: '';
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 3px;
+    background: linear-gradient(90deg, transparent, #a78bfa, transparent);
+  }
+  .hero-badge {
+    display: inline-block;
+    background: rgba(167,139,250,.15);
+    border: 1px solid rgba(167,139,250,.3);
+    color: #c4b5fd;
+    font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+    padding: 4px 14px; border-radius: 20px; margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 800;
+    background: linear-gradient(135deg, #e9d5ff, #a78bfa, #7c3aed);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.15; margin-bottom: 12px;
+  }
+  .hero p {
+    font-size: 15px; color: #94a3b8; max-width: 560px; margin: 0 auto; line-height: 1.6;
+  }
+
+  /* ── Container ── */
+  .container {
+    max-width: 900px; margin: 0 auto; padding: 0 20px 80px;
+  }
+
+  /* ── Pipeline Flow ── */
+  .pipeline {
+    display: flex; flex-direction: column; gap: 0; margin: 48px 0 0;
+  }
+
+  /* ── Connector line between stages ── */
+  .connector {
+    display: flex; align-items: center; justify-content: center;
+    height: 48px; position: relative;
+  }
+  .connector::before {
+    content: '';
+    width: 2px; height: 100%;
+    background: linear-gradient(180deg, rgba(167,139,250,.4), rgba(167,139,250,.15));
+    position: absolute;
+  }
+  .connector .pulse {
+    width: 10px; height: 10px;
+    background: #a78bfa;
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+    z-index: 1;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: .6; }
+    50% { transform: scale(1.6); opacity: 1; }
+  }
+
+  /* ── Stage Card ── */
+  .stage {
+    background: rgba(30,27,75,.6);
+    border: 1px solid rgba(167,139,250,.15);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: border-color .3s, box-shadow .3s;
+  }
+  .stage:hover {
+    border-color: rgba(167,139,250,.35);
+    box-shadow: 0 0 30px rgba(124,58,237,.1);
+  }
+  .stage-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 20px 24px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .stage-num {
+    width: 40px; height: 40px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 12px;
+    font-size: 16px; font-weight: 800;
+    color: #fff;
+  }
+  .stage-num.s1 { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+  .stage-num.s2 { background: linear-gradient(135deg, #10b981, #059669); }
+  .stage-num.s3 { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+  .stage-num.s4 { background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .stage-num.s5 { background: linear-gradient(135deg, #ef4444, #dc2626); }
+
+  .stage-title-wrap { flex: 1; }
+  .stage-title {
+    font-size: 17px; font-weight: 700; color: #f1f5f9;
+  }
+  .stage-subtitle {
+    font-size: 12px; color: #94a3b8; margin-top: 2px;
+  }
+
+  .stage-toggle {
+    width: 28px; height: 28px;
+    background: rgba(167,139,250,.1);
+    border: 1px solid rgba(167,139,250,.2);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .3s, background .3s;
+    color: #a78bfa; font-size: 14px;
+    flex-shrink: 0;
+  }
+  .stage.open .stage-toggle { transform: rotate(180deg); background: rgba(167,139,250,.2); }
+
+  /* ── Stage Body (collapsible) ── */
+  .stage-body {
+    max-height: 0; overflow: hidden;
+    transition: max-height .4s ease, padding .3s;
+    padding: 0 24px;
+  }
+  .stage.open .stage-body {
+    max-height: 5000px;
+    padding: 0 24px 24px;
+  }
+
+  /* ── Formula Box ── */
+  .formula-box {
+    background: rgba(15,23,42,.7);
+    border: 1px solid rgba(167,139,250,.2);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 14px 0;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #c4b5fd;
+    overflow-x: auto;
+  }
+  .formula-box .keyword { color: #f472b6; }
+  .formula-box .num { color: #34d399; }
+  .formula-box .comment { color: #64748b; font-style: italic; }
+
+  /* ── Diagram: mini flow ── */
+  .mini-flow {
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; margin: 16px 0;
+  }
+  .mini-flow .node {
+    background: rgba(59,130,246,.12);
+    border: 1px solid rgba(59,130,246,.3);
+    color: #93c5fd;
+    padding: 6px 12px; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .mini-flow .node.active { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.4); color: #6ee7b7; }
+  .mini-flow .node.highlight { background: rgba(139,92,246,.15); border-color: rgba(139,92,246,.4); color: #c4b5fd; }
+  .mini-flow .arrow { color: #475569; font-size: 16px; }
+
+  /* ── Interactive Simulator ── */
+  .simulator {
+    background: rgba(15,23,42,.5);
+    border: 1px solid rgba(167,139,250,.15);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 18px 0;
+  }
+  .simulator h4 {
+    font-size: 13px; font-weight: 700; color: #a78bfa;
+    margin-bottom: 14px; text-transform: uppercase; letter-spacing: .05em;
+  }
+  .sim-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 10px; flex-wrap: wrap;
+  }
+  .sim-row label {
+    font-size: 12px; color: #94a3b8; min-width: 140px;
+  }
+  .sim-row input[type="range"] {
+    flex: 1; min-width: 120px;
+    accent-color: #8b5cf6;
+  }
+  .sim-row .val {
+    font-size: 13px; font-weight: 700; color: #e9d5ff;
+    min-width: 60px; text-align: right;
+  }
+  .sim-result {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: 14px; font-weight: 600;
+    text-align: center;
+    transition: background .3s, color .3s;
+  }
+
+  /* ── Risk gauge ── */
+  .risk-gauge {
+    display: flex; gap: 3px; margin: 16px 0 8px; height: 28px; border-radius: 8px; overflow: hidden;
+  }
+  .risk-gauge .segment {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: rgba(255,255,255,.85);
+    transition: opacity .3s;
+    opacity: .35;
+  }
+  .risk-gauge .segment.active { opacity: 1; }
+  .risk-gauge .g { background: #38a169; }
+  .risk-gauge .y { background: #d69e2e; }
+  .risk-gauge .o { background: #dd6b20; }
+  .risk-gauge .r { background: #e53e3e; }
+
+  /* ── Penalty table ── */
+  .penalty-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 12px;
+  }
+  .penalty-table th {
+    text-align: left;
+    padding: 8px 10px;
+    color: #94a3b8;
+    border-bottom: 1px solid rgba(148,163,184,.15);
+    font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .penalty-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(148,163,184,.08);
+    color: #cbd5e1;
+  }
+  .penalty-table td:last-child { font-weight: 700; color: #fbbf24; text-align: center; }
+
+  /* ── Caution box ── */
+  .caution {
+    display: flex; gap: 10px;
+    background: rgba(251,191,36,.06);
+    border: 1px solid rgba(251,191,36,.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 14px 0;
+    font-size: 12px; line-height: 1.55; color: #fcd34d;
+  }
+  .caution .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── Info box ── */
+  .info-box {
+    display: flex; gap: 10px;
+    background: rgba(59,130,246,.06);
+    border: 1px solid rgba(59,130,246,.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 14px 0;
+    font-size: 12px; line-height: 1.55; color: #93c5fd;
+  }
+  .info-box .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* ── Summary cards ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; margin: 20px 0;
+  }
+  .summary-card {
+    background: rgba(30,27,75,.5);
+    border: 1px solid rgba(167,139,250,.12);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .summary-card .sc-icon { font-size: 28px; margin-bottom: 8px; }
+  .summary-card .sc-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; }
+  .summary-card .sc-value { font-size: 20px; font-weight: 800; color: #e9d5ff; margin-top: 4px; }
+
+  /* ── Walkthrough animation ── */
+  .walkthrough {
+    position: relative;
+    background: rgba(15,23,42,.5);
+    border: 1px solid rgba(167,139,250,.15);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 18px 0;
+  }
+  .wt-step {
+    display: none;
+    animation: fadeSlide .4s ease;
+  }
+  .wt-step.active { display: block; }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .wt-step h4 { font-size: 14px; font-weight: 700; color: #c4b5fd; margin-bottom: 8px; }
+  .wt-step p { font-size: 13px; color: #cbd5e1; line-height: 1.6; }
+  .wt-step .calc {
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 13px; color: #34d399;
+    background: rgba(52,211,153,.06);
+    padding: 10px 14px; border-radius: 8px; margin: 10px 0;
+  }
+  .wt-nav {
+    display: flex; gap: 8px; justify-content: center; margin-top: 16px;
+  }
+  .wt-nav button {
+    background: rgba(167,139,250,.1);
+    border: 1px solid rgba(167,139,250,.25);
+    color: #c4b5fd;
+    padding: 6px 16px; border-radius: 8px;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    transition: background .2s;
+  }
+  .wt-nav button:hover { background: rgba(167,139,250,.2); }
+  .wt-nav button:disabled { opacity: .3; cursor: not-allowed; }
+  .wt-dots {
+    display: flex; gap: 6px; justify-content: center; margin-top: 10px;
+  }
+  .wt-dots .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: rgba(167,139,250,.2);
+    transition: background .3s;
+  }
+  .wt-dots .dot.active { background: #a78bfa; }
+
+  /* ── Example cards ── */
+  .example-card {
+    background: rgba(15,23,42,.5);
+    border: 1px solid rgba(167,139,250,.15);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin: 16px 0;
+  }
+  .example-card .ex-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    color: #a78bfa; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .example-card .ex-label .ex-badge {
+    background: rgba(167,139,250,.15); border: 1px solid rgba(167,139,250,.3);
+    padding: 2px 8px; border-radius: 4px; font-size: 10px;
+  }
+  .ex-data-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .ex-data-item {
+    background: rgba(30,27,75,.5);
+    border: 1px solid rgba(148,163,184,.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .ex-data-item .ed-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+  .ex-data-item .ed-value { font-size: 15px; font-weight: 700; color: #e9d5ff; margin-top: 2px; }
+  .ex-data-item .ed-detail { font-size: 10px; color: #94a3b8; margin-top: 1px; }
+  .ex-calc-step {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(148,163,184,.06);
+    font-size: 12px;
+  }
+  .ex-calc-step:last-child { border-bottom: none; }
+  .ex-calc-step .step-num {
+    width: 22px; height: 22px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; font-size: 10px; font-weight: 800;
+    background: rgba(167,139,250,.12); color: #c4b5fd;
+  }
+  .ex-calc-step .step-formula {
+    flex: 1;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 12px; color: #c4b5fd;
+  }
+  .ex-calc-step .step-result {
+    font-weight: 800; color: #34d399; font-size: 13px; white-space: nowrap;
+  }
+  .ex-result-box {
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 700;
+  }
+  .ex-result-box.green  { background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.2); color: #6ee7b7; }
+  .ex-result-box.purple { background: rgba(139,92,246,.1); border: 1px solid rgba(139,92,246,.2); color: #c4b5fd; }
+  .ex-result-box.yellow { background: rgba(214,158,46,.1); border: 1px solid rgba(214,158,46,.2); color: #fcd34d; }
+  .ex-result-box.red    { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2); color: #fca5a5; }
+
+  /* ── Record timeline ── */
+  .record-timeline {
+    display: flex; flex-direction: column; gap: 6px;
+    margin: 12px 0;
+  }
+  .rec-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; padding: 6px 10px;
+    background: rgba(30,27,75,.4);
+    border-radius: 6px;
+    border-left: 3px solid;
+  }
+  .rec-row.verified   { border-color: #38a169; }
+  .rec-row.pending    { border-color: #d69e2e; }
+  .rec-row.completed  { border-color: #3b82f6; }
+  .rec-row .rec-date  { color: #94a3b8; min-width: 70px; font-family: monospace; font-size: 11px; }
+  .rec-row .rec-name  { color: #cbd5e1; flex: 1; }
+  .rec-row .rec-rsu   { color: #6ee7b7; font-weight: 700; min-width: 50px; text-align: right; }
+  .rec-row .rec-status { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; min-width: 60px; text-align: center; }
+  .rec-row.verified .rec-status  { background: rgba(56,161,105,.15); color: #68d391; }
+  .rec-row.pending .rec-status   { background: rgba(214,158,46,.15); color: #fcd34d; }
+  .rec-row.completed .rec-status { background: rgba(59,130,246,.15); color: #93c5fd; }
+
+  /* ── Scenario comparison ── */
+  .scenario-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px; margin: 16px 0;
+  }
+  .scenario-card {
+    background: rgba(30,27,75,.4);
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid rgba(148,163,184,.08);
+    transition: border-color .3s;
+  }
+  .scenario-card:hover { border-color: rgba(167,139,250,.25); }
+  .scenario-card .sc-name {
+    font-size: 13px; font-weight: 700; color: #f1f5f9; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .scenario-card .sc-avatar {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #fff;
+  }
+  .scenario-card .sc-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 0; font-size: 11px;
+  }
+  .scenario-card .sc-row .label { color: #94a3b8; }
+  .scenario-card .sc-row .value { color: #e9d5ff; font-weight: 600; }
+
+  /* ── Big diagram ── */
+  .arch-diagram {
+    margin: 20px 0;
+    padding: 24px;
+    background: rgba(15,23,42,.4);
+    border: 1px solid rgba(167,139,250,.12);
+    border-radius: 14px;
+  }
+  .arch-row {
+    display: flex; align-items: stretch; gap: 12px; margin-bottom: 12px;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .arch-box {
+    flex: 1; min-width: 140px; max-width: 200px;
+    background: rgba(59,130,246,.08);
+    border: 1px solid rgba(59,130,246,.2);
+    border-radius: 10px;
+    padding: 14px; text-align: center;
+  }
+  .arch-box .ab-icon { font-size: 20px; margin-bottom: 6px; }
+  .arch-box .ab-title { font-size: 11px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: .04em; }
+  .arch-box .ab-desc { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+  .arch-box.output { background: rgba(139,92,246,.1); border-color: rgba(139,92,246,.25); }
+  .arch-box.output .ab-title { color: #c4b5fd; }
+  .arch-arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: #475569; font-size: 20px; width: 100%; padding: 4px 0;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 32px 20px;
+    font-size: 11px; color: #475569;
+  }
+
+  /* Print/PDF styles */
+  @media print {
+    body { background: #fff; color: #1a202c; }
+    .stage { border-color: #e2e8f0; background: #fff; break-inside: avoid; }
+    .stage-body { max-height: none !important; padding-bottom: 16px !important; }
+    .formula-box { background: #f7fafc; border-color: #e2e8f0; color: #4a5568; }
+    .hero h1 { -webkit-text-fill-color: #6b46c1; }
+    .connector .pulse { animation: none; }
+  }
+
+  /* Mobile */
+  @media (max-width: 600px) {
+    .hero { padding: 40px 16px 30px; }
+    .container { padding: 0 12px 60px; }
+    .stage-header { padding: 16px; }
+    .stage.open .stage-body { padding: 0 16px 20px; }
+    .simulator { padding: 14px; }
+    .arch-box { min-width: 110px; }
+  }
+</style>
+</head>
+<body>
+
+<script>window.APP_URL = "<?= appUrl ?>";</script>
+
+<!-- ── Sticky nav bar ── -->
+<nav style="position:sticky;top:0;z-index:50;background:#1a365d;display:flex;align-items:center;gap:12px;padding:10px 20px;box-shadow:0 2px 8px rgba(0,0,0,.25);">
+  <span style="flex:1;text-align:center;font-size:13px;font-weight:700;color:#fff;letter-spacing:.02em;">How Oracle Analytics Predicts</span>
+  <button style="display:flex;align-items:center;color:#fff;text-decoration:none;background:rgba(255,255,255,.12);border:none;cursor:pointer;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;font-family:inherit;" onclick="if(typeof google!=='undefined'&&google.script&&google.script.host&&typeof google.script.host.close==='function') google.script.host.close(); try{window.top.close();}catch(e){} try{window.close();}catch(e){}">
+    Close
+    <svg style="width:14px;height:14px;margin-left:5px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+  </button>
+</nav>
+
+<!-- ════════════════════ HERO ════════════════════ -->
+<section class="hero">
+  <div class="hero-badge">Interactive Methodology Guide</div>
+  <h1>How Oracle Analytics Predicts Your Completion Date</h1>
+  <p>A rule-based heuristic engine that monitors treatment records and uses structured math to forecast when a student will finish all clinical requirements.</p>
+</section>
+
+<!-- ════════════════════ MAIN ════════════════════ -->
+<div class="container">
+
+  <!-- ── Architecture Overview ── -->
+  <div class="arch-diagram">
+    <div class="arch-row">
+      <div class="arch-box">
+        <div class="ab-icon">&#x1F4CB;</div>
+        <div class="ab-title">Treatment Records</div>
+        <div class="ab-desc">Student creates & completes clinical work</div>
+      </div>
+      <div class="arch-box">
+        <div class="ab-icon">&#x2705;</div>
+        <div class="ab-title">Verification</div>
+        <div class="ab-desc">Instructor verifies each record</div>
+      </div>
+      <div class="arch-box">
+        <div class="ab-icon">&#x1F4CA;</div>
+        <div class="ab-title">Requirements</div>
+        <div class="ab-desc">RSU + CDA minimums &times; est_work_duration</div>
+      </div>
+    </div>
+    <div class="arch-arrow">&#x25BC; feeds into</div>
+    <div class="arch-row">
+      <div class="arch-box output">
+        <div class="ab-icon">&#x1F52E;</div>
+        <div class="ab-title">Oracle Engine</div>
+        <div class="ab-desc">oracle_refresh_student() — PostgreSQL RPC</div>
+      </div>
+    </div>
+    <div class="arch-arrow">&#x25BC; produces</div>
+    <div class="arch-row">
+      <div class="arch-box output">
+        <div class="ab-icon">&#x1F3AF;</div>
+        <div class="ab-title">Progress Score</div>
+        <div class="ab-desc">0-100%</div>
+      </div>
+      <div class="arch-box output">
+        <div class="ab-icon">&#x1F680;</div>
+        <div class="ab-title">Velocity</div>
+        <div class="ab-desc">Weighted units / 30 days</div>
+      </div>
+      <div class="arch-box output">
+        <div class="ab-icon">&#x1F4C5;</div>
+        <div class="ab-title">Forecast Date</div>
+        <div class="ab-desc">Estimated month</div>
+      </div>
+      <div class="arch-box output">
+        <div class="ab-icon">&#x26A0;</div>
+        <div class="ab-title">Risk Level</div>
+        <div class="ab-desc">Green / Yellow / Orange / Red</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ PIPELINE ════════════════════ -->
+  <div class="pipeline">
+
+    <!-- ── STAGE 1: Progress Score ── -->
+    <div class="stage open" onclick="toggleStage(this, event)">
+      <div class="stage-header">
+        <div class="stage-num s1">1</div>
+        <div class="stage-title-wrap">
+          <div class="stage-title">Progress Score (0 &ndash; 100)</div>
+          <div class="stage-subtitle">Where are you now? &mdash; Verified completion percentage</div>
+        </div>
+        <div class="stage-toggle">&#x25B2;</div>
+      </div>
+      <div class="stage-body">
+        <p style="font-size:13px; color:#94a3b8; margin-bottom:14px;">
+          Measures what fraction of total <strong style="color:#c4b5fd;">duration-weighted</strong> required units have been <strong style="color:#6ee7b7;">verified</strong> by an instructor. Each requirement is weighted by <code style="color:#c4b5fd;">est_work_duration</code> so harder/longer requirements count more.
+        </p>
+
+        <div class="mini-flow">
+          <div class="node">Verified (RSU + CDA)</div>
+          <span class="arrow">&#x00D7;</span>
+          <div class="node highlight">est_work_duration</div>
+          <span class="arrow">&#x00F7;</span>
+          <div class="node">Required (RSU + CDA)</div>
+          <span class="arrow">&#x00D7;</span>
+          <div class="node highlight">est_work_duration</div>
+        </div>
+
+        <div class="formula-box">
+<span class="keyword">progress_score</span> = round(verified_completion_pct <span class="keyword">&times;</span> <span class="num">100</span>)
+
+<span class="comment">-- numerator: only VERIFIED records, duration-weighted</span>
+<span class="keyword">ver_total</span> = SUM(
+  (rsu_units + cda_units) <span class="keyword">&times;</span> <span class="num">est_work_duration</span>
+) <span class="keyword">WHERE</span> status = <span class="num">'verified'</span>
+
+<span class="comment">-- denominator: all requirement minimums, duration-weighted</span>
+<span class="keyword">req_total</span> = SUM(
+  (minimum_rsu + minimum_cda) <span class="keyword">&times;</span> <span class="num">est_work_duration</span>
+) <span class="keyword">FROM</span> requirement_list
+
+verified_completion_pct = ver_total <span class="keyword">&divide;</span> req_total
+        </div>
+
+        <div class="info-box">
+          <span class="icon">&#x2139;</span>
+          <span><strong>Why duration-weighting?</strong> A Root Canal (est_work_duration = 3.0) takes 3x longer than a simple Scaling (1.0). Without weighting, completing 10 easy requirements and 10 hard ones would look the same. Duration-weighting reflects actual clinical effort.</span>
+        </div>
+
+        <!-- Example with real numbers -->
+        <div class="example-card" onclick="event.stopPropagation()">
+          <div class="ex-label"><span class="ex-badge">Example</span> Student A &mdash; Duration-Weighted Progress Score</div>
+
+          <p style="font-size:12px;color:#94a3b8;margin-bottom:12px;">Student A has 4 verified records across 3 requirements with different durations:</p>
+
+          <!-- Record breakdown table -->
+          <div style="overflow-x:auto;margin-bottom:14px;">
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr style="border-bottom:1px solid rgba(148,163,184,.15);">
+                  <th style="text-align:left;padding:6px 8px;color:#94a3b8;font-weight:600;">Record (verified)</th>
+                  <th style="text-align:right;padding:6px 8px;color:#94a3b8;font-weight:600;">RSU</th>
+                  <th style="text-align:right;padding:6px 8px;color:#94a3b8;font-weight:600;">CDA</th>
+                  <th style="text-align:right;padding:6px 8px;color:#c4b5fd;font-weight:700;">Duration</th>
+                  <th style="text-align:right;padding:6px 8px;color:#6ee7b7;font-weight:700;">Weighted</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid rgba(148,163,184,.06);">
+                  <td style="padding:6px 8px;color:#cbd5e1;">Composite Class II (OPER)</td>
+                  <td style="text-align:right;padding:6px 8px;color:#cbd5e1;">3.0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#cbd5e1;">0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#c4b5fd;font-weight:600;">1.0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#6ee7b7;font-weight:600;">3.0</td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(148,163,184,.06);">
+                  <td style="padding:6px 8px;color:#cbd5e1;">Root Canal Ant. (ENDO)</td>
+                  <td style="text-align:right;padding:6px 8px;color:#cbd5e1;">5.75</td>
+                  <td style="text-align:right;padding:6px 8px;color:#cbd5e1;">2.0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#c4b5fd;font-weight:600;">3.0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#6ee7b7;font-weight:600;">23.25</td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(148,163,184,.06);">
+                  <td style="padding:6px 8px;color:#cbd5e1;">PFM Crown Prep (PROSTH)</td>
+                  <td style="text-align:right;padding:6px 8px;color:#cbd5e1;">8.0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#cbd5e1;">4.0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#c4b5fd;font-weight:600;">2.5</td>
+                  <td style="text-align:right;padding:6px 8px;color:#6ee7b7;font-weight:600;">30.0</td>
+                </tr>
+                <tr style="border-bottom:1px solid rgba(148,163,184,.06);">
+                  <td style="padding:6px 8px;color:#cbd5e1;">Scaling &amp; Polishing (PERIO)</td>
+                  <td style="text-align:right;padding:6px 8px;color:#cbd5e1;">2.5</td>
+                  <td style="text-align:right;padding:6px 8px;color:#cbd5e1;">0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#c4b5fd;font-weight:600;">1.0</td>
+                  <td style="text-align:right;padding:6px 8px;color:#6ee7b7;font-weight:600;">2.5</td>
+                </tr>
+                <tr style="border-top:1px solid rgba(148,163,184,.15);">
+                  <td style="padding:6px 8px;color:#e9d5ff;font-weight:700;">ver_total</td>
+                  <td colspan="3" style="text-align:right;padding:6px 8px;color:#94a3b8;font-size:10px;">3.0 + 23.25 + 30.0 + 2.5</td>
+                  <td style="text-align:right;padding:6px 8px;color:#6ee7b7;font-weight:800;font-size:14px;">58.75</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p style="font-size:12px;color:#94a3b8;margin-bottom:8px;">System-wide requirement totals (weighted denominator):</p>
+          <div class="ex-data-grid">
+            <div class="ex-data-item">
+              <div class="ed-label">req_total (weighted)</div>
+              <div class="ed-value">520.0</div>
+              <div class="ed-detail">SUM((min_rsu + min_cda) &times; duration) across all requirements</div>
+            </div>
+            <div class="ex-data-item">
+              <div class="ed-label">Unweighted total</div>
+              <div class="ed-value" style="color:#94a3b8;text-decoration:line-through;">350</div>
+              <div class="ed-detail">Old formula without duration &mdash; no longer used</div>
+            </div>
+          </div>
+
+          <div class="ex-calc-step">
+            <div class="step-num">1</div>
+            <div class="step-formula">ver_total = (3+0)&times;1.0 + (5.75+2)&times;3.0 + (8+4)&times;2.5 + (2.5+0)&times;1.0</div>
+            <div class="step-result">= 58.75</div>
+          </div>
+          <div class="ex-calc-step">
+            <div class="step-num">2</div>
+            <div class="step-formula">verified_pct = 58.75 / 520.0</div>
+            <div class="step-result">= 0.1130</div>
+          </div>
+          <div class="ex-calc-step">
+            <div class="step-num">3</div>
+            <div class="step-formula">progress_score = round(0.1130 &times; 100)</div>
+            <div class="step-result">= 11</div>
+          </div>
+          <div class="ex-result-box purple">
+            <div style="font-size:11px;opacity:.7;margin-bottom:2px;">Progress Score</div>
+            <div style="font-size:24px;font-weight:800;">11 / 100</div>
+            <div style="font-size:11px;margin-top:4px;opacity:.7;">Lower than unweighted (18) because remaining requirements have higher durations on average</div>
+          </div>
+
+          <div class="caution" style="margin-top:12px;">
+            <span class="icon">&#x26A0;</span>
+            <span>The Root Canal (duration 3.0) contributes <strong>23.25 weighted units</strong> vs only 7.75 raw units. Without weighting, its difficulty would be invisible.</span>
+          </div>
+        </div>
+
+        <div class="caution">
+          <span class="icon">&#x26A0;</span>
+          <span><strong>Progress Score</strong> counts only <strong>verified</strong> records (ver_total). However, the Oracle also tracks an <strong>estimated</strong> completion percentage (est_total) that includes "pending verification" and "completed" records &mdash; used internally but not displayed as the main score.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="pulse"></div></div>
+
+    <!-- ── STAGE 2: Velocity ── -->
+    <div class="stage" onclick="toggleStage(this, event)">
+      <div class="stage-header">
+        <div class="stage-num s2">2</div>
+        <div class="stage-title-wrap">
+          <div class="stage-title">30-Day Velocity</div>
+          <div class="stage-subtitle">How fast are you moving? &mdash; Duration-weighted units verified recently</div>
+        </div>
+        <div class="stage-toggle">&#x25B2;</div>
+      </div>
+      <div class="stage-body">
+        <p style="font-size:13px; color:#94a3b8; margin-bottom:14px;">
+          Measures how many <strong style="color:#c4b5fd;">duration-weighted units</strong> (RSU + CDA) were <strong style="color:#6ee7b7;">verified</strong> in the <strong style="color:#6ee7b7;">last 4 weeks</strong> and <strong style="color:#6ee7b7;">last 8 weeks</strong>. The key date is <strong style="color:#c4b5fd;">complete_date</strong> &mdash; when the student actually finished the work &mdash; falling back to <code style="color:#94a3b8;">verified_at</code> for older records.
+        </p>
+
+        <div class="mini-flow">
+          <div class="node">(RSU + CDA)</div>
+          <span class="arrow">&#x00D7;</span>
+          <div class="node highlight">est_work_duration</div>
+          <span class="arrow">&#x2192;</span>
+          <div class="node active">complete_date (primary)</div>
+          <span class="arrow">&#x2192;</span>
+          <div class="node">verified_at (fallback)</div>
+          <span class="arrow">&#x2192;</span>
+          <div class="node highlight">4w &amp; 8w windows</div>
+        </div>
+
+        <div class="formula-box">
+<span class="keyword">v_4w</span> = SUM(
+  (rsu_units + cda_units) <span class="keyword">&times;</span> <span class="num">est_work_duration</span>
+)
+  <span class="keyword">WHERE</span> status = <span class="num">'verified'</span>
+  <span class="keyword">AND</span> COALESCE(complete_date, verified_at) >= NOW() - <span class="num">4 weeks</span>
+
+<span class="keyword">v_8w</span> = SUM(
+  (rsu_units + cda_units) <span class="keyword">&times;</span> <span class="num">est_work_duration</span>
+)
+  <span class="keyword">WHERE</span> status = <span class="num">'verified'</span>
+  <span class="keyword">AND</span> COALESCE(complete_date, verified_at) >= NOW() - <span class="num">8 weeks</span>
+        </div>
+
+        <div class="info-box">
+          <span class="icon">&#x2139;</span>
+          <span><strong>Why two windows?</strong> 4-week is sensitive (what's happening now). 8-week is stable (smooths out bursts). The forecast uses whichever is more favorable. Only <strong>verified</strong> records count &mdash; pending and completed are excluded from velocity.</span>
+        </div>
+
+        <!-- Example: real records timeline -->
+        <div class="example-card" onclick="event.stopPropagation()">
+          <div class="ex-label"><span class="ex-badge">Example</span> Student A &mdash; Records Timeline (Today = April 12, 2026)</div>
+          <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;">
+            The date column shows each record's <strong style="color:#c4b5fd;">complete_date</strong> &mdash; when the student finished the work (falls back to <code style="color:#94a3b8;">verified_at</code> if null). Only <strong style="color:#6ee7b7;">verified</strong> records count for velocity. Pending and completed records are <strong>excluded</strong>.
+          </p>
+
+          <div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+            <div style="font-size:10px;font-weight:700;color:#6ee7b7;background:rgba(56,161,105,.1);padding:3px 10px;border-radius:4px;">4-week window: Mar 15 &ndash; Apr 12</div>
+            <div style="font-size:10px;font-weight:700;color:#93c5fd;background:rgba(59,130,246,.1);padding:3px 10px;border-radius:4px;">8-week window: Feb 15 &ndash; Apr 12</div>
+            <div style="font-size:10px;font-weight:700;color:#94a3b8;background:rgba(148,163,184,.08);padding:3px 10px;border-radius:4px;">Pending/Completed = skipped</div>
+          </div>
+
+          <!-- Column header -->
+          <div style="display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b;padding:0 10px 6px;border-bottom:1px solid rgba(148,163,184,.1);margin-bottom:6px;">
+            <span style="min-width:70px;font-family:monospace;">complete_date</span>
+            <span style="flex:1;">Treatment</span>
+            <span style="min-width:40px;text-align:right;">RSU</span>
+            <span style="min-width:35px;text-align:right;">CDA</span>
+            <span style="min-width:30px;text-align:right;">Dur</span>
+            <span style="min-width:55px;text-align:right;color:#6ee7b7;">Weighted</span>
+            <span style="min-width:60px;text-align:center;">Status</span>
+          </div>
+
+          <div class="record-timeline">
+            <div class="rec-row verified">
+              <span class="rec-date">Apr 10</span>
+              <span class="rec-name">Composite Class II (OPER)</span>
+              <span style="min-width:40px;text-align:right;color:#cbd5e1;font-size:11px;">3.0</span>
+              <span style="min-width:35px;text-align:right;color:#cbd5e1;font-size:11px;">0</span>
+              <span style="min-width:30px;text-align:right;color:#c4b5fd;font-size:11px;font-weight:600;">1.0</span>
+              <span style="min-width:55px;text-align:right;color:#6ee7b7;font-weight:700;font-size:11px;">3.0</span>
+              <span class="rec-status">Verified</span>
+            </div>
+            <div class="rec-row pending" style="opacity:.4;">
+              <span class="rec-date">Apr 05</span>
+              <span class="rec-name">Scaling &amp; Polishing (PERIO)</span>
+              <span style="min-width:40px;text-align:right;color:#94a3b8;font-size:11px;">2.5</span>
+              <span style="min-width:35px;text-align:right;color:#94a3b8;font-size:11px;">0</span>
+              <span style="min-width:30px;text-align:right;color:#94a3b8;font-size:11px;">1.0</span>
+              <span style="min-width:55px;text-align:right;color:#94a3b8;font-size:11px;text-decoration:line-through;">2.5</span>
+              <span class="rec-status">Pending</span>
+            </div>
+            <div class="rec-row completed" style="opacity:.4;">
+              <span class="rec-date">Mar 28</span>
+              <span class="rec-name">Amalgam Class I (OPER)</span>
+              <span style="min-width:40px;text-align:right;color:#94a3b8;font-size:11px;">2.0</span>
+              <span style="min-width:35px;text-align:right;color:#94a3b8;font-size:11px;">0</span>
+              <span style="min-width:30px;text-align:right;color:#94a3b8;font-size:11px;">1.0</span>
+              <span style="min-width:55px;text-align:right;color:#94a3b8;font-size:11px;text-decoration:line-through;">2.0</span>
+              <span class="rec-status">Completed</span>
+            </div>
+            <div class="rec-row verified">
+              <span class="rec-date">Mar 20</span>
+              <span class="rec-name">Root Canal Ant. (ENDO)</span>
+              <span style="min-width:40px;text-align:right;color:#cbd5e1;font-size:11px;">5.75</span>
+              <span style="min-width:35px;text-align:right;color:#cbd5e1;font-size:11px;">2.0</span>
+              <span style="min-width:30px;text-align:right;color:#c4b5fd;font-size:11px;font-weight:600;">3.0</span>
+              <span style="min-width:55px;text-align:right;color:#6ee7b7;font-weight:700;font-size:11px;">23.25</span>
+              <span class="rec-status">Verified</span>
+            </div>
+            <div class="rec-row verified">
+              <span class="rec-date">Mar 16</span>
+              <span class="rec-name">PFM Crown Prep (PROSTH)</span>
+              <span style="min-width:40px;text-align:right;color:#cbd5e1;font-size:11px;">8.0</span>
+              <span style="min-width:35px;text-align:right;color:#cbd5e1;font-size:11px;">4.0</span>
+              <span style="min-width:30px;text-align:right;color:#c4b5fd;font-size:11px;font-weight:600;">2.5</span>
+              <span style="min-width:55px;text-align:right;color:#6ee7b7;font-weight:700;font-size:11px;">30.0</span>
+              <span class="rec-status">Verified</span>
+            </div>
+            <div style="border-top:1px dashed rgba(148,163,184,.15);margin:4px 0;padding-top:4px;">
+              <div style="font-size:10px;color:#64748b;text-align:center;">--- 4-week boundary (Mar 15) ---</div>
+            </div>
+            <div class="rec-row verified">
+              <span class="rec-date">Mar 02</span>
+              <span class="rec-name">Composite Class IV (OPER)</span>
+              <span style="min-width:40px;text-align:right;color:#cbd5e1;font-size:11px;">3.5</span>
+              <span style="min-width:35px;text-align:right;color:#cbd5e1;font-size:11px;">0</span>
+              <span style="min-width:30px;text-align:right;color:#c4b5fd;font-size:11px;font-weight:600;">1.0</span>
+              <span style="min-width:55px;text-align:right;color:#6ee7b7;font-weight:700;font-size:11px;">3.5</span>
+              <span class="rec-status">Verified</span>
+            </div>
+            <div class="rec-row verified">
+              <span class="rec-date">Feb 22</span>
+              <span class="rec-name">Gingivectomy (PERIO)</span>
+              <span style="min-width:40px;text-align:right;color:#cbd5e1;font-size:11px;">4.0</span>
+              <span style="min-width:35px;text-align:right;color:#cbd5e1;font-size:11px;">0</span>
+              <span style="min-width:30px;text-align:right;color:#c4b5fd;font-size:11px;font-weight:600;">1.5</span>
+              <span style="min-width:55px;text-align:right;color:#6ee7b7;font-weight:700;font-size:11px;">6.0</span>
+              <span class="rec-status">Verified</span>
+            </div>
+            <div style="border-top:1px dashed rgba(148,163,184,.15);margin:4px 0;padding-top:4px;">
+              <div style="font-size:10px;color:#64748b;text-align:center;">--- 8-week boundary (Feb 15) ---</div>
+            </div>
+            <div class="rec-row verified" style="opacity:.4;">
+              <span class="rec-date">Feb 05</span>
+              <span class="rec-name">Extraction (ORAL SURG)</span>
+              <span style="min-width:40px;text-align:right;color:#94a3b8;font-size:11px;">2.0</span>
+              <span style="min-width:35px;text-align:right;color:#94a3b8;font-size:11px;">0</span>
+              <span style="min-width:30px;text-align:right;color:#94a3b8;font-size:11px;">1.0</span>
+              <span style="min-width:55px;text-align:right;color:#94a3b8;font-size:11px;text-decoration:line-through;">2.0</span>
+              <span class="rec-status">Verified</span>
+            </div>
+          </div>
+
+          <div class="ex-calc-step">
+            <div class="step-num">4w</div>
+            <div class="step-formula">v_4w = 3.0 + 23.25 + 30.0 <span style="color:#64748b;">(verified in window)</span></div>
+            <div class="step-result">= 56.25</div>
+          </div>
+          <div class="ex-calc-step">
+            <div class="step-num">8w</div>
+            <div class="step-formula">v_8w = 56.25 + 3.5 + 6.0</div>
+            <div class="step-result">= 65.75</div>
+          </div>
+          <div class="ex-result-box green">
+            <div style="font-size:11px;opacity:.7;margin-bottom:2px;">30-Day Velocity (weighted units/month)</div>
+            <div style="font-size:24px;font-weight:800;">56.25 weighted units</div>
+            <div style="font-size:11px;margin-top:4px;opacity:.7;">Pending (2.5) and Completed (2.0) records skipped &bull; Feb 05 (2.0) outside 8-week window</div>
+          </div>
+
+          <div class="caution" style="margin-top:12px;">
+            <span class="icon">&#x26A0;</span>
+            <span>The Root Canal alone contributes <strong>23.25</strong> weighted units (41% of the 4-week total) because duration = 3.0. Without weighting, it would only be 7.75 out of 16.75 &mdash; understating the difficulty of the work done.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="pulse"></div></div>
+
+    <!-- ── STAGE 3: Forecast ── -->
+    <div class="stage" onclick="toggleStage(this, event)">
+      <div class="stage-header">
+        <div class="stage-num s3">3</div>
+        <div class="stage-title-wrap">
+          <div class="stage-title">Estimated Completion Date</div>
+          <div class="stage-subtitle">When will you finish? &mdash; Linear projection from current velocity</div>
+        </div>
+        <div class="stage-toggle">&#x25B2;</div>
+      </div>
+      <div class="stage-body">
+        <p style="font-size:13px; color:#94a3b8; margin-bottom:14px;">
+          The Oracle asks: <em>"If you keep completing work at your current speed, when will you reach 100%?"</em>
+        </p>
+
+        <div class="formula-box">
+<span class="comment">-- Step 1: Best monthly velocity (weighted units/month)</span>
+<span class="keyword">monthly_velocity</span> = GREATEST(
+  v_8w / <span class="num">2.0</span>,    <span class="comment">-- 8-week avg (stable)</span>
+  v_4w,            <span class="comment">-- 4-week rate (current)</span>
+  <span class="num">0</span>               <span class="comment">-- floor at zero</span>
+)
+
+<span class="comment">-- Step 2: Remaining work (absolute weighted units)</span>
+<span class="keyword">remaining</span> = req_total - ver_total
+
+<span class="comment">-- Step 3: Months remaining</span>
+<span class="keyword">months_remaining</span> = CEIL( remaining / monthly_velocity )
+
+<span class="comment">-- Step 4: Project the date</span>
+<span class="keyword">forecast_date</span> = date_trunc(<span class="num">'month'</span>, TODAY + months_remaining)
+        </div>
+
+        <div class="info-box">
+          <span class="icon">&#x2139;</span>
+          <span>The forecast uses <strong>absolute weighted units</strong> (req_total &minus; ver_total), not percentages. This means harder requirements (higher duration) naturally require more months to complete.</span>
+        </div>
+
+        <!-- Interactive Walkthrough -->
+        <div class="walkthrough" onclick="event.stopPropagation()">
+          <div class="wt-step active" data-step="0">
+            <h4>Example Walkthrough &mdash; Step 1 of 4</h4>
+            <p>Student A from our earlier examples: <strong>ver_total = 58.75</strong>, <strong>req_total = 520.0</strong>.</p>
+            <p>4-week weighted velocity: <strong>56.25</strong>. 8-week weighted velocity: <strong>65.75</strong>.</p>
+            <div class="calc">
+              monthly_velocity = GREATEST(65.75/2, 56.25, 0)<br/>
+              &nbsp; = GREATEST(32.88, 56.25, 0) = <strong>56.25</strong>
+            </div>
+            <p style="font-size:12px; color:#94a3b8;">The 4-week velocity wins because the recent month had more verifications.</p>
+          </div>
+          <div class="wt-step" data-step="1">
+            <h4>Example Walkthrough &mdash; Step 2 of 4</h4>
+            <p>Calculate remaining work in <strong>absolute weighted units</strong>:</p>
+            <div class="calc">
+              remaining = req_total - ver_total<br/>
+              &nbsp; = 520.0 - 58.75 = <strong>461.25 weighted units</strong>
+            </div>
+            <p style="font-size:12px; color:#94a3b8;">This accounts for the difficulty of remaining requirements through their duration weights.</p>
+          </div>
+          <div class="wt-step" data-step="2">
+            <h4>Example Walkthrough &mdash; Step 3 of 4</h4>
+            <p>How many months at this pace?</p>
+            <div class="calc">
+              months_remaining = CEIL(461.25 / 56.25)<br/>
+              &nbsp; = CEIL(8.2) = <strong>9 months</strong>
+            </div>
+          </div>
+          <div class="wt-step" data-step="3">
+            <h4>Example Walkthrough &mdash; Step 4 of 4</h4>
+            <p>Project from April 2026:</p>
+            <div class="calc">
+              forecast = April 2026 + 9 months = <strong>January 2027</strong>
+            </div>
+            <p style="font-size:12px; color:#6ee7b7; margin-top:8px;">Displayed as <strong>1/1/2570</strong> (Buddhist Era).</p>
+          </div>
+          <div class="wt-nav">
+            <button onclick="wtNav(-1)" id="wt-prev" disabled>&#x25C0; Prev</button>
+            <button onclick="wtNav(1)" id="wt-next">Next &#x25B6;</button>
+          </div>
+          <div class="wt-dots" id="wt-dots">
+            <div class="dot active"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+        </div>
+
+        <!-- Interactive Simulator -->
+        <div class="simulator" onclick="event.stopPropagation()">
+          <h4>Try It Yourself &mdash; Forecast Simulator (Duration-Weighted)</h4>
+          <div class="sim-row">
+            <label>ver_total (weighted)</label>
+            <input type="range" id="sim-ver" min="0" max="500" value="59" oninput="updateSim()"/>
+            <span class="val" id="sim-ver-val">59</span>
+          </div>
+          <div class="sim-row">
+            <label>req_total (weighted)</label>
+            <input type="range" id="sim-req" min="100" max="800" value="520" oninput="updateSim()"/>
+            <span class="val" id="sim-req-val">520</span>
+          </div>
+          <div class="sim-row">
+            <label>v_4w (weighted units)</label>
+            <input type="range" id="sim-v4w" min="0" max="120" value="56" oninput="updateSim()"/>
+            <span class="val" id="sim-v4w-val">56</span>
+          </div>
+          <div class="sim-row">
+            <label>v_8w (weighted units)</label>
+            <input type="range" id="sim-v8w" min="0" max="160" value="66" oninput="updateSim()"/>
+            <span class="val" id="sim-v8w-val">66</span>
+          </div>
+          <div class="sim-result" id="sim-result" style="background:rgba(139,92,246,.1); color:#c4b5fd;">
+            Adjust the sliders above
+          </div>
+        </div>
+
+        <!-- 3-Student Scenario Comparison -->
+        <div class="example-card" onclick="event.stopPropagation()">
+          <div class="ex-label"><span class="ex-badge">Compare</span> Three students, same date (April 2026) &mdash; different outcomes</div>
+
+          <div class="scenario-grid">
+            <!-- Student A: steady worker -->
+            <div class="scenario-card">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">A</div>
+                Steady Worker
+              </div>
+              <div class="sc-row"><span class="label">ver_total</span><span class="value">234.0</span></div>
+              <div class="sc-row"><span class="label">req_total</span><span class="value">520.0</span></div>
+              <div class="sc-row"><span class="label">v_4w (weighted)</span><span class="value">38.0</span></div>
+              <div class="sc-row"><span class="label">v_8w (weighted)</span><span class="value">72.0</span></div>
+              <div style="border-top:1px solid rgba(148,163,184,.08);margin:8px 0;padding-top:8px;">
+                <div style="font-size:10px;color:#94a3b8;">monthly_vel = max(72/2, 38) = <strong style="color:#6ee7b7;">38</strong></div>
+                <div style="font-size:10px;color:#94a3b8;">remaining = 520-234 = 286</div>
+                <div style="font-size:10px;color:#94a3b8;">CEIL(286/38) = <strong style="color:#6ee7b7;">8 mo</strong></div>
+              </div>
+              <div class="ex-result-box green" style="margin-top:8px;font-size:13px;">
+                <div style="font-size:20px;">Dec 2026</div>
+                <div style="font-size:10px;opacity:.7;margin-top:2px;">Steady pace, 8-week average is consistent</div>
+              </div>
+            </div>
+
+            <!-- Student B: recent burst -->
+            <div class="scenario-card">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706);">B</div>
+                Recent Burst
+              </div>
+              <div class="sc-row"><span class="label">ver_total</span><span class="value">156.0</span></div>
+              <div class="sc-row"><span class="label">req_total</span><span class="value">520.0</span></div>
+              <div class="sc-row"><span class="label">v_4w (weighted)</span><span class="value">65.0</span></div>
+              <div class="sc-row"><span class="label">v_8w (weighted)</span><span class="value">70.0</span></div>
+              <div style="border-top:1px solid rgba(148,163,184,.08);margin:8px 0;padding-top:8px;">
+                <div style="font-size:10px;color:#94a3b8;">monthly_vel = max(70/2, 65) = <strong style="color:#6ee7b7;">65</strong></div>
+                <div style="font-size:10px;color:#94a3b8;">remaining = 520-156 = 364</div>
+                <div style="font-size:10px;color:#94a3b8;">CEIL(364/65) = <strong style="color:#6ee7b7;">6 mo</strong></div>
+              </div>
+              <div class="ex-result-box purple" style="margin-top:8px;font-size:13px;">
+                <div style="font-size:20px;">Oct 2026</div>
+                <div style="font-size:10px;opacity:.7;margin-top:2px;">Big 4-week burst lifts forecast</div>
+              </div>
+            </div>
+
+            <!-- Student C: stalled -->
+            <div class="scenario-card">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#ef4444,#dc2626);">C</div>
+                Stalled Student
+              </div>
+              <div class="sc-row"><span class="label">ver_total</span><span class="value">88.4</span></div>
+              <div class="sc-row"><span class="label">req_total</span><span class="value">520.0</span></div>
+              <div class="sc-row"><span class="label">v_4w (weighted)</span><span class="value">0</span></div>
+              <div class="sc-row"><span class="label">v_8w (weighted)</span><span class="value">5.0</span></div>
+              <div style="border-top:1px solid rgba(148,163,184,.08);margin:8px 0;padding-top:8px;">
+                <div style="font-size:10px;color:#94a3b8;">monthly_vel = max(5/2, 0) = <strong style="color:#6ee7b7;">2.5</strong></div>
+                <div style="font-size:10px;color:#94a3b8;">remaining = 520-88.4 = 431.6</div>
+                <div style="font-size:10px;color:#94a3b8;">CEIL(431.6/2.5) = <strong style="color:#fca5a5;">173 mo</strong></div>
+              </div>
+              <div class="ex-result-box red" style="margin-top:8px;font-size:13px;">
+                <div style="font-size:20px;">Aug 2040</div>
+                <div style="font-size:10px;opacity:.7;margin-top:2px;">Near-zero velocity = unrealistic date</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-box">
+            <span class="icon">&#x2139;</span>
+            <span><strong>Student C</strong> shows why stalled velocity produces unrealistic forecasts. The Oracle would show "Analyzing..." if velocity were exactly 0. At 2.5 weighted units/month the math runs but the result (14+ years) signals a problem &mdash; exactly what the Risk Score is designed to catch.</span>
+          </div>
+        </div>
+
+        <div class="caution">
+          <span class="icon">&#x26A0;</span>
+          <span>This is a <strong>linear projection</strong>, not a prediction. It assumes constant velocity. Bursts, pauses, exams, and clinic schedules are not factored in.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="pulse"></div></div>
+
+    <!-- ── STAGE 4: Risk Score ── -->
+    <div class="stage" onclick="toggleStage(this, event)">
+      <div class="stage-header">
+        <div class="stage-num s4">4</div>
+        <div class="stage-title-wrap">
+          <div class="stage-title">Risk Level Assessment</div>
+          <div class="stage-subtitle">How worried should we be? &mdash; Additive penalty system (0&ndash;100)</div>
+        </div>
+        <div class="stage-toggle">&#x25B2;</div>
+      </div>
+      <div class="stage-body">
+        <p style="font-size:13px; color:#94a3b8; margin-bottom:14px;">
+          A <strong>penalty-based</strong> scoring system. Each risk factor adds points independently &mdash; multiple risks compound.
+        </p>
+
+        <table class="penalty-table">
+          <thead>
+            <tr><th>Condition</th><th>Penalty</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>No activity for 30+ days</td><td>+25</td></tr>
+            <tr><td>No activity for 60+ days (cumulative)</td><td>+15</td></tr>
+            <tr><td>10+ records pending verification</td><td>+15</td></tr>
+            <tr><td>Zero verified velocity (8 weeks)</td><td>+25</td></tr>
+            <tr><td>Within 90 days of graduation</td><td>+20</td></tr>
+            <tr><td>Stagnant patients (no chart/TP progress)</td><td>+10 each</td></tr>
+          </tbody>
+        </table>
+
+        <!-- Interactive risk gauge -->
+        <div style="margin:18px 0;" onclick="event.stopPropagation()">
+          <div style="font-size:12px; color:#94a3b8; margin-bottom:8px;">
+            <strong>Interactive:</strong> Toggle risk factors to see the score
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;">
+              <input type="checkbox" class="risk-cb" data-pts="25" onchange="updateRisk()"/> Inactive 30+ days (+25)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;">
+              <input type="checkbox" class="risk-cb" data-pts="15" onchange="updateRisk()"/> Inactive 60+ days (+15)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;">
+              <input type="checkbox" class="risk-cb" data-pts="15" onchange="updateRisk()"/> 10+ pending (+15)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;">
+              <input type="checkbox" class="risk-cb" data-pts="25" onchange="updateRisk()"/> Zero velocity (+25)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;">
+              <input type="checkbox" class="risk-cb" data-pts="20" onchange="updateRisk()"/> Near deadline (+20)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;">
+              <input type="checkbox" class="risk-cb" data-pts="10" onchange="updateRisk()"/> 1 stagnant patient (+10)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1;cursor:pointer;">
+              <input type="checkbox" class="risk-cb" data-pts="10" onchange="updateRisk()"/> 2nd stagnant patient (+10)
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:13px;color:#94a3b8;">Score:</span>
+            <span id="risk-score-display" style="font-size:22px;font-weight:800;color:#38a169;">0</span>
+            <span id="risk-level-display" style="font-size:13px;font-weight:700;padding:3px 10px;border-radius:6px;background:rgba(56,161,105,.15);color:#68d391;">Green &mdash; On Track</span>
+          </div>
+          <div class="risk-gauge" id="risk-gauge">
+            <div class="segment g active">0&ndash;24</div>
+            <div class="segment y">25&ndash;49</div>
+            <div class="segment o">50&ndash;74</div>
+            <div class="segment r">75&ndash;100</div>
+          </div>
+        </div>
+
+        <!-- Concrete risk scenarios -->
+        <div class="example-card" onclick="event.stopPropagation()">
+          <div class="ex-label"><span class="ex-badge">Example</span> Risk scores for the same 3 students</div>
+
+          <div class="scenario-grid">
+            <div class="scenario-card" style="border-left:3px solid #38a169;">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">A</div>
+                Steady Worker
+              </div>
+              <div class="sc-row"><span class="label">Inactive days</span><span class="value">2</span></div>
+              <div class="sc-row"><span class="label">Pending records</span><span class="value">3</span></div>
+              <div class="sc-row"><span class="label">8-week velocity</span><span class="value">28 RSU</span></div>
+              <div class="sc-row"><span class="label">Days to deadline</span><span class="value">420</span></div>
+              <div style="border-top:1px solid rgba(148,163,184,.08);margin:8px 0;padding-top:8px;font-size:11px;">
+                <div style="color:#94a3b8;">Inactive &lt;30d: <span style="color:#64748b;">+0</span></div>
+                <div style="color:#94a3b8;">Pending &lt;10: <span style="color:#64748b;">+0</span></div>
+                <div style="color:#94a3b8;">Velocity &gt;0: <span style="color:#64748b;">+0</span></div>
+                <div style="color:#94a3b8;">Deadline &gt;90d: <span style="color:#64748b;">+0</span></div>
+              </div>
+              <div class="ex-result-box green" style="margin-top:8px;font-size:13px;">
+                Score: <strong>0</strong> &mdash; Green
+              </div>
+            </div>
+
+            <div class="scenario-card" style="border-left:3px solid #d69e2e;">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706);">B</div>
+                Recent Burst
+              </div>
+              <div class="sc-row"><span class="label">Inactive days</span><span class="value">5</span></div>
+              <div class="sc-row"><span class="label">Pending records</span><span class="value">12</span></div>
+              <div class="sc-row"><span class="label">8-week velocity</span><span class="value">26 RSU</span></div>
+              <div class="sc-row"><span class="label">Days to deadline</span><span class="value">85</span></div>
+              <div style="border-top:1px solid rgba(148,163,184,.08);margin:8px 0;padding-top:8px;font-size:11px;">
+                <div style="color:#94a3b8;">Inactive &lt;30d: <span style="color:#64748b;">+0</span></div>
+                <div style="color:#94a3b8;">Pending &ge;10: <span style="color:#fbbf24;font-weight:700;">+15</span></div>
+                <div style="color:#94a3b8;">Velocity &gt;0: <span style="color:#64748b;">+0</span></div>
+                <div style="color:#94a3b8;">Deadline &le;90d: <span style="color:#fbbf24;font-weight:700;">+20</span></div>
+              </div>
+              <div class="ex-result-box yellow" style="margin-top:8px;font-size:13px;">
+                Score: <strong>35</strong> &mdash; Yellow
+              </div>
+            </div>
+
+            <div class="scenario-card" style="border-left:3px solid #e53e3e;">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#ef4444,#dc2626);">C</div>
+                Stalled Student
+              </div>
+              <div class="sc-row"><span class="label">Inactive days</span><span class="value">65</span></div>
+              <div class="sc-row"><span class="label">Pending records</span><span class="value">14</span></div>
+              <div class="sc-row"><span class="label">8-week velocity</span><span class="value">3 RSU</span></div>
+              <div class="sc-row"><span class="label">Days to deadline</span><span class="value">420</span></div>
+              <div style="border-top:1px solid rgba(148,163,184,.08);margin:8px 0;padding-top:8px;font-size:11px;">
+                <div style="color:#94a3b8;">Inactive &ge;30d: <span style="color:#fbbf24;font-weight:700;">+25</span></div>
+                <div style="color:#94a3b8;">Inactive &ge;60d: <span style="color:#fbbf24;font-weight:700;">+15</span></div>
+                <div style="color:#94a3b8;">Pending &ge;10: <span style="color:#fbbf24;font-weight:700;">+15</span></div>
+                <div style="color:#94a3b8;">Velocity &gt;0: <span style="color:#64748b;">+0</span></div>
+                <div style="color:#94a3b8;">Deadline &gt;90d: <span style="color:#64748b;">+0</span></div>
+              </div>
+              <div class="ex-result-box red" style="margin-top:8px;font-size:13px;">
+                Score: <strong>55</strong> &mdash; Orange
+              </div>
+            </div>
+          </div>
+
+          <div class="info-box">
+            <span class="icon">&#x2139;</span>
+            <span><strong>Student B</strong> has great velocity but a backlog + deadline pressure pushes them to Yellow. <strong>Student C</strong> has compounding inactivity penalties (25+15=40) plus a backlog (+15) = Orange, even though the deadline is far away. If velocity were exactly 0, that would add +25 more, pushing to Red (80).</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="pulse"></div></div>
+
+    <!-- ── STAGE 5: Recommendations ── -->
+    <div class="stage" onclick="toggleStage(this, event)">
+      <div class="stage-header">
+        <div class="stage-num s5">5</div>
+        <div class="stage-title-wrap">
+          <div class="stage-title">Explanations &amp; Recommendations</div>
+          <div class="stage-subtitle">What should you do? &mdash; Prioritized actions based on detected risks</div>
+        </div>
+        <div class="stage-toggle">&#x25B2;</div>
+      </div>
+      <div class="stage-body">
+        <p style="font-size:13px; color:#94a3b8; margin-bottom:14px;">
+          After computing all metrics, the Oracle generates <strong>triggered explanations</strong> (what's wrong) and <strong>ranked recommendations</strong> (what to do).
+        </p>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0;">
+          <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Explanations (Why)</div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
+              <div style="margin-bottom:6px;"><strong style="color:#f87171;">INACTIVE_30D</strong><br/>No progress in 30 days</div>
+              <div style="margin-bottom:6px;"><strong style="color:#f87171;">PENDING_BACKLOG</strong><br/>10+ unverified records</div>
+              <div style="margin-bottom:6px;"><strong style="color:#f87171;">LOW_VELOCITY_8W</strong><br/>Zero verified velocity in 8 weeks</div>
+              <div><strong style="color:#f87171;">PATIENT_STAGNATION</strong><br/>Delayed progress on N patient(s)</div>
+            </div>
+          </div>
+          <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;font-weight:700;color:#6ee7b7;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Recommendations (Do)</div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
+              <div style="margin-bottom:6px;"><strong style="color:#34d399;">Priority 1</strong><br/>Get pending work verified to lock in progress</div>
+              <div style="margin-bottom:6px;"><strong style="color:#34d399;">Priority 2</strong><br/>Start 1&ndash;2 cases this week to restore momentum</div>
+              <div><strong style="color:#34d399;">Priority 3</strong><br/>Review stagnant cases and finalize treatment plans</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <span class="icon">&#x2139;</span>
+          <span>Only <strong>triggered</strong> factors appear. If you have no backlog, that explanation won't show. Recommendations refresh on every recalculation.</span>
+        </div>
+
+        <!-- Concrete example: what each student sees -->
+        <div class="example-card" onclick="event.stopPropagation()">
+          <div class="ex-label"><span class="ex-badge">Example</span> What each student actually sees</div>
+
+          <div class="scenario-grid">
+            <!-- Student A: clean -->
+            <div class="scenario-card" style="border-left:3px solid #38a169;">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#3b82f6,#2563eb);">A</div>
+                Steady Worker
+              </div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Inactive: 2d | Pending: 3 | v_8w: 28</div>
+              <div style="margin-bottom:6px;">
+                <div style="font-size:10px;font-weight:700;color:#fca5a5;text-transform:uppercase;margin-bottom:3px;">Explanations</div>
+                <div style="font-size:11px;color:#64748b;font-style:italic;">None triggered</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;color:#6ee7b7;text-transform:uppercase;margin-bottom:3px;">Recommendations</div>
+                <div style="font-size:11px;color:#cbd5e1;">1. Get 3 pending records verified</div>
+              </div>
+            </div>
+
+            <!-- Student B: backlog -->
+            <div class="scenario-card" style="border-left:3px solid #d69e2e;">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706);">B</div>
+                Recent Burst
+              </div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Inactive: 5d | Pending: 12 | v_8w: 26</div>
+              <div style="margin-bottom:6px;">
+                <div style="font-size:10px;font-weight:700;color:#fca5a5;text-transform:uppercase;margin-bottom:3px;">Explanations</div>
+                <div style="font-size:11px;color:#fcd34d;">PENDING_VERIFICATION_BACKLOG</div>
+                <div style="font-size:10px;color:#94a3b8;">12 records awaiting instructor approval</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;color:#6ee7b7;text-transform:uppercase;margin-bottom:3px;">Recommendations</div>
+                <div style="font-size:11px;color:#cbd5e1;">1. Prioritize getting completed work verified to lock in progress</div>
+              </div>
+            </div>
+
+            <!-- Student C: multiple triggers -->
+            <div class="scenario-card" style="border-left:3px solid #e53e3e;">
+              <div class="sc-name">
+                <div class="sc-avatar" style="background:linear-gradient(135deg,#ef4444,#dc2626);">C</div>
+                Stalled Student
+              </div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Inactive: 65d | Pending: 14 | v_8w: 3</div>
+              <div style="margin-bottom:6px;">
+                <div style="font-size:10px;font-weight:700;color:#fca5a5;text-transform:uppercase;margin-bottom:3px;">Explanations</div>
+                <div style="font-size:11px;color:#fcd34d;">INACTIVE_30D</div>
+                <div style="font-size:10px;color:#94a3b8;margin-bottom:3px;">65 days since last activity</div>
+                <div style="font-size:11px;color:#fcd34d;">PENDING_VERIFICATION_BACKLOG</div>
+                <div style="font-size:10px;color:#94a3b8;">14 records awaiting approval</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;color:#6ee7b7;text-transform:uppercase;margin-bottom:3px;">Recommendations</div>
+                <div style="font-size:11px;color:#cbd5e1;margin-bottom:2px;">1. Get pending work verified</div>
+                <div style="font-size:11px;color:#cbd5e1;">2. Start 1&ndash;2 cases this week to restore momentum</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Summary ── -->
+  <div style="margin-top:40px;">
+    <h2 style="text-align:center; font-size:18px; font-weight:800; color:#c4b5fd; margin-bottom:20px;">Key Properties of the Oracle</h2>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="sc-icon">&#x1F9EE;</div>
+        <div class="sc-label">Method</div>
+        <div class="sc-value">Rule-Based</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Not ML/AI &mdash; structured math</div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-icon">&#x26A1;</div>
+        <div class="sc-label">Execution</div>
+        <div class="sc-value">Real-Time</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Recalculates on every record change</div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-icon">&#x1F50D;</div>
+        <div class="sc-label">Scope</div>
+        <div class="sc-value">Per Student</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Individual snapshot, no cohort comparison</div>
+      </div>
+      <div class="summary-card">
+        <div class="sc-icon">&#x1F6E1;</div>
+        <div class="sc-label">Storage</div>
+        <div class="sc-value">PostgreSQL</div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px;">oracle.student_progress_snapshots</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── When to trust it ── -->
+  <div style="margin-top:32px;">
+    <h2 style="text-align:center; font-size:18px; font-weight:800; color:#c4b5fd; margin-bottom:16px;">When to Trust the Oracle</h2>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div style="background:rgba(16,185,129,.06); border:1px solid rgba(16,185,129,.15); border-radius:10px; padding:14px;">
+        <div style="font-size:13px; font-weight:700; color:#6ee7b7; margin-bottom:8px;">High Trust</div>
+        <ul style="font-size:12px; color:#cbd5e1; list-style:none; line-height:1.8;">
+          <li>&#x2705; Active student, consistent completions</li>
+          <li>&#x2705; Near graduation deadline</li>
+          <li>&#x2705; Risk score trends over time</li>
+        </ul>
+      </div>
+      <div style="background:rgba(251,191,36,.06); border:1px solid rgba(251,191,36,.15); border-radius:10px; padding:14px;">
+        <div style="font-size:13px; font-weight:700; color:#fcd34d; margin-bottom:8px;">Use Caution</div>
+        <ul style="font-size:12px; color:#cbd5e1; list-style:none; line-height:1.8;">
+          <li>&#x26A0; First weeks with 1&ndash;2 records</li>
+          <li>&#x26A0; Returning after a long pause</li>
+          <li>&#x26A0; Requirements with default est_work_duration (1.0)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Oracle Analytics &mdash; DentRSU Clinic Progress Tracker &bull; Heuristic model, not AI &bull; Decision-support tool, not academic assessment
+</div>
+
+<script>
+/* ── Stage toggle ── */
+function toggleStage(el, e) {
+  if (e && (e.target.closest('.simulator') || e.target.closest('.walkthrough') || e.target.tagName === 'INPUT')) return;
+  el.classList.toggle('open');
+}
+
+/* ── Walkthrough stepper ── */
+let wtIdx = 0;
+function wtNav(dir) {
+  const steps = document.querySelectorAll('.wt-step');
+  const dots = document.querySelectorAll('#wt-dots .dot');
+  steps[wtIdx].classList.remove('active');
+  dots[wtIdx].classList.remove('active');
+  wtIdx = Math.max(0, Math.min(steps.length - 1, wtIdx + dir));
+  steps[wtIdx].classList.add('active');
+  dots[wtIdx].classList.add('active');
+  document.getElementById('wt-prev').disabled = wtIdx === 0;
+  document.getElementById('wt-next').disabled = wtIdx === steps.length - 1;
+}
+
+/* ── Forecast simulator ── */
+function updateSim() {
+  const ver = +document.getElementById('sim-ver').value;
+  const req = +document.getElementById('sim-req').value;
+  const v4 = +document.getElementById('sim-v4w').value;
+  const v8 = +document.getElementById('sim-v8w').value;
+  document.getElementById('sim-ver-val').textContent = ver;
+  document.getElementById('sim-req-val').textContent = req;
+  document.getElementById('sim-v4w-val').textContent = v4;
+  document.getElementById('sim-v8w-val').textContent = v8;
+
+  const vel = Math.max(v8 / 2, v4, 0);
+  const res = document.getElementById('sim-result');
+  const remaining = req - ver;
+  const pct = req > 0 ? Math.round(ver / req * 100) : 0;
+
+  if (vel === 0) {
+    res.innerHTML = '<div style="font-size:14px;">Velocity = 0 — Cannot forecast</div><div style="font-size:11px;opacity:.7;margin-top:4px;">Remaining: ' + remaining.toFixed(1) + ' weighted units (' + (100 - pct) + '% left)</div>';
+    res.style.background = 'rgba(239,68,68,.1)';
+    res.style.color = '#fca5a5';
+    return;
+  }
+  if (remaining <= 0) {
+    res.textContent = 'Already complete!';
+    res.style.background = 'rgba(16,185,129,.1)';
+    res.style.color = '#6ee7b7';
+    return;
+  }
+
+  const months = Math.ceil(remaining / vel);
+
+  const now = new Date();
+  const forecast = new Date(now.getFullYear(), now.getMonth() + months, 1);
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  res.innerHTML =
+    '<div style="font-size:12px;color:#94a3b8;margin-bottom:4px;">Monthly velocity: <strong style="color:#6ee7b7;">' + vel.toFixed(1) + '</strong> weighted units/mo &bull; Remaining: <strong style="color:#c4b5fd;">' + remaining.toFixed(1) + '</strong> (' + (100 - pct) + '%)</div>' +
+    '<div style="font-size:18px;font-weight:800;color:#e9d5ff;">' + months + ' month' + (months !== 1 ? 's' : '') + ' remaining</div>' +
+    '<div style="font-size:13px;color:#c4b5fd;margin-top:4px;">Estimated: <strong>' + monthNames[forecast.getMonth()] + ' ' + forecast.getFullYear() + '</strong></div>';
+  res.style.background = 'rgba(139,92,246,.1)';
+  res.style.color = '#c4b5fd';
+}
+updateSim();
+
+/* ── Risk gauge ── */
+function updateRisk() {
+  let score = 0;
+  document.querySelectorAll('.risk-cb').forEach(cb => {
+    if (cb.checked) score += +cb.dataset.pts;
+  });
+  score = Math.min(100, score);
+
+  const display = document.getElementById('risk-score-display');
+  const level = document.getElementById('risk-level-display');
+  const segs = document.querySelectorAll('#risk-gauge .segment');
+
+  display.textContent = score;
+
+  let lvl, color, bg, activeIdx;
+  if (score >= 75) { lvl = 'Red — Critical'; color = '#fca5a5'; bg = 'rgba(239,68,68,.15)'; activeIdx = 3; }
+  else if (score >= 50) { lvl = 'Orange — High Risk'; color = '#fdba74'; bg = 'rgba(221,107,32,.15)'; activeIdx = 2; }
+  else if (score >= 25) { lvl = 'Yellow — At Risk'; color = '#fcd34d'; bg = 'rgba(214,158,46,.15)'; activeIdx = 1; }
+  else { lvl = 'Green — On Track'; color = '#68d391'; bg = 'rgba(56,161,105,.15)'; activeIdx = 0; }
+
+  display.style.color = color;
+  level.textContent = lvl;
+  level.style.color = color;
+  level.style.background = bg;
+
+  segs.forEach((s, i) => {
+    s.classList.toggle('active', i <= activeIdx);
+  });
+}
+</script>
+</body>
+</html>

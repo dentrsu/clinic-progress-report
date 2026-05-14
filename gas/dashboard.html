@@ -388,8 +388,14 @@
                 <!-- Vault content -->
                 <template x-if="!inlineVaultLoading && !inlineVaultError && inlineVaultData">
                   <div class="p-4 space-y-4">
-                    <!-- Full vault link -->
-                    <div class="flex justify-end">
+                    <!-- Header: completion % + links -->
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-gray-600" x-text="inlineVaultData.name"></span>
+                        <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                              :class="(() => { const avg = Math.round(((inlineVaultData.rsu_completion_pct || 0) + (inlineVaultData.cda_completion_pct || 0)) / (inlineVaultData.cda_completion_pct > 0 ? 2 : 1)); return avg >= 100 ? 'bg-emerald-100 text-emerald-700' : avg >= 60 ? 'bg-blue-100 text-blue-700' : avg >= 30 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'; })()"
+                              x-text="(() => { const avg = Math.round(((inlineVaultData.rsu_completion_pct || 0) + (inlineVaultData.cda_completion_pct || 0)) / (inlineVaultData.cda_completion_pct > 0 ? 2 : 1)); return avg + '%'; })()"></span>
+                      </div>
                       <a :href="'<?= appUrl ?>?page=vault&student_id=' + s.student_id"
                          target="_blank"
                          class="inline-flex items-center gap-1.5 text-xs text-navy font-medium hover:underline">

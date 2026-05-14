@@ -5,7 +5,14 @@
       "Bash(awk '/^    function treatmentApp/,/^    }$/ {print NR\": \"$0}' \"/c/Users/oddha/OneDrive/Documents/Antigravity/clinic-progress-report/gas/treatment_plan.html\")",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -r \"treatment_records\" /c/Users/oddha/OneDrive/Documents/Antigravity/clinic-progress-report/migrations/*.sql)",
+      "Bash(grep -n \"function getSupabaseKey\\\\|var getSupabaseKey\" /c/Users/oddha/OneDrive/Documents/Antigravity/clinic-progress-report/gas/*.gs)",
+      "Bash(find:*)",
+      "Bash(grep -i \"division.*instructor\\\\|advisor\" /c/Users/oddha/OneDrive/Documents/Antigravity/clinic-progress-report/migrations/*.sql)",
+      "Bash(grep -r \"oracle\\\\|forecast\\\\|completion\" /c/Users/oddha/OneDrive/Documents/Antigravity/clinic-progress-report/gas/*.gs)",
+      "Bash(grep:*)"
     ]
   }
 }

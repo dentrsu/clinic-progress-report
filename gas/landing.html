@@ -395,6 +395,22 @@
             </a>
           </template>
 
+          <!-- Patient Management (external Apps Script deployment) -->
+          <a href="https://script.google.com/macros/s/AKfycbz_oJTb581EwWB_Dyf4rTWGt05oNSFjh51e1Kbb9jbRyHB5S4Dc5VKoGG5Rit1wXaDQ/exec"
+            target="_blank" rel="noopener"
+            title="Open the Patient Management app in a new tab"
+            class="flex items-center justify-center gap-2 w-full py-2.5 bg-white border border-gray-200 text-navy text-sm font-medium rounded-lg shadow-sm hover:bg-gray-50 hover:text-navy hover:scale-[1.02] transition-all relative">
+            <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2m-16 0H3m9-12h.01M9 12h6m-6 4h6" />
+            </svg>
+            Patient Management
+            <div class="absolute right-3 opacity-50"><svg class="w-4 h-4" fill="none" stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+              </svg></div>
+          </a>
+
           <!-- Verify Email Proof -->
           <template x-if="profile.role === 'admin' || profile.role === ''">
             <a href="<?= appUrl ?>?page=verify" target="_blank"

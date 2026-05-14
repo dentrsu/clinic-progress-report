@@ -243,6 +243,7 @@
       Home
     </a>
     <span class="nav-title">Oracle Analytics Guide</span>
+    <a href="<?= appUrl ?>?page=oracle-infographic" class="pdf-btn" style="text-decoration:none;background:#6b46c1;">Interactive Infographic</a>
     <button class="pdf-btn" onclick="window.print()">Save as PDF</button>
   </nav>
 
@@ -315,23 +316,23 @@
     <div class="section">
       <div class="part-banner">
         <span class="part-num">PART 2</span>
-        <h2>Verified Velocity (30-Day)</h2>
+        <h2>Completion Velocity (30-Day)</h2>
       </div>
-      <p style="font-size:12px;color:#4a5568;">Measures how many RSU units were officially verified within the last <strong>4 weeks</strong> and <strong>8 weeks</strong>.</p>
+      <p style="font-size:12px;color:#4a5568;">Measures how many RSU units were <strong>completed</strong> (or verified) within the last <strong>4 weeks</strong> and <strong>8 weeks</strong>. Records with status <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">verified</code>, <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">pending verification</code>, or <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">completed</code> all count toward velocity.</p>
 
       <div class="formula-box"><span class="cm">-- 4-week velocity (used as the displayed "30-Day" figure)</span>
 <span class="val">v_verified_4w</span> <span class="op">=</span> <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(rsu_units), <span class="val">0</span>)
-  <span class="kw">WHERE</span> status <span class="op">=</span> <span class="val">'verified'</span>
-    <span class="kw">AND</span> verified_at <span class="op">>=</span> <span class="fn">NOW</span>() <span class="op">-</span> interval <span class="val">'4 weeks'</span>
+  <span class="kw">WHERE</span> status <span class="kw">IN</span> (<span class="val">'verified'</span>, <span class="val">'pending verification'</span>, <span class="val">'completed'</span>)
+    <span class="kw">AND</span> <span class="fn">COALESCE</span>(completed_at, verified_at) <span class="op">>=</span> <span class="fn">NOW</span>() <span class="op">-</span> interval <span class="val">'4 weeks'</span>
 
 <span class="cm">-- 8-week velocity (used for forecast stability)</span>
 <span class="val">v_verified_8w</span> <span class="op">=</span> <span class="fn">COALESCE</span>(<span class="fn">SUM</span>(rsu_units), <span class="val">0</span>)
-  <span class="kw">WHERE</span> status <span class="op">=</span> <span class="val">'verified'</span>
-    <span class="kw">AND</span> verified_at <span class="op">>=</span> <span class="fn">NOW</span>() <span class="op">-</span> interval <span class="val">'8 weeks'</span></div>
+  <span class="kw">WHERE</span> status <span class="kw">IN</span> (<span class="val">'verified'</span>, <span class="val">'pending verification'</span>, <span class="val">'completed'</span>)
+    <span class="kw">AND</span> <span class="fn">COALESCE</span>(completed_at, verified_at) <span class="op">>=</span> <span class="fn">NOW</span>() <span class="op">-</span> interval <span class="val">'8 weeks'</span></div>
 
-      <h3>Why <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">verified_at</code> — not <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">created_at</code>?</h3>
+      <h3>Why <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">completed_at</code> — not <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">created_at</code> or <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">verified_at</code> alone?</h3>
       <p style="font-size:11px;color:#4a5568;margin-bottom:10px;">
-        A student may submit a record (create it) months before it gets verified. Using creation time would attribute progress to the past, making velocity appear zero even when recent approvals just happened. Verification time correctly marks the moment progress was <strong>officially confirmed</strong>.
+        A student may create a record months before it is completed. Using creation time would attribute progress to the past. Using only verification time penalises students who are waiting on instructor approval. <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:11px;">COALESCE(completed_at, verified_at)</code> uses the <strong>completion date first</strong>, falling back to verification date for older records that lack a completion timestamp. This way, velocity reflects when the student actually <strong>finished the work</strong>, not when the instructor got around to approving it.
       </p>
       <div class="callout warn">
         <strong>Known Limitation:</strong> Velocity tracks RSU units only — CDA units are excluded. Students in CDA-heavy divisions will see a lower velocity figure than their actual clinical output warrants.
@@ -347,7 +348,7 @@
         <span class="part-num">PART 3</span>
         <h2>Estimated Completion Date (Forecast)</h2>
       </div>
-      <p style="font-size:12px;color:#4a5568;">The Oracle asks: <em>"If you keep moving at your current verified speed, when will you reach 100%?"</em></p>
+      <p style="font-size:12px;color:#4a5568;">The Oracle asks: <em>"If you keep completing work at your current speed, when will you reach 100%?"</em></p>
 
       <h3 style="margin-top:8px;">Step-by-step calculation</h3>
       <div class="step-list" style="margin-top:10px;margin-bottom:14px;">
@@ -410,10 +411,13 @@
       </div>
 
       <div class="callout danger">
-        <strong>When "Analyzing..." appears:</strong> If no records have been verified in the last 4 or 8 weeks, monthly velocity is 0 and <em>no forecast can be generated</em>. Projecting with zero velocity would give infinity, which is meaningless — so the system stays silent until new data arrives.
+        <strong>When "Analyzing..." appears:</strong> If no records have been completed or verified in the last 4 or 8 weeks, monthly velocity is 0 and <em>no forecast can be generated</em>. Projecting with zero velocity would give infinity, which is meaningless — so the system stays silent until new data arrives.
       </div>
       <div class="callout warn">
-        <strong>Linear Projection Warning:</strong> The model assumes velocity stays constant. Real-world bursts, pauses, illness, or exam periods are not accounted for. The forecast is a planning aid, not a guarantee.
+        <strong>Linear Projection Warning:</strong> The model assumes completion velocity stays constant. Real-world bursts, pauses, illness, or exam periods are not accounted for. The forecast is a planning aid, not a guarantee.
+      </div>
+      <div class="callout info">
+        <strong>Progress vs. Velocity uses different scopes:</strong> The progress score (denominator) counts only <em>verified</em> records, while the velocity counts <em>completed + pending + verified</em> records. This means the forecast assumes you will keep completing work at the current pace <strong>and</strong> that completed work will eventually be verified.
       </div>
     </div>
 
@@ -565,7 +569,7 @@
         <div class="trust-card high">
           <h3>✅ High Trust Scenarios</h3>
           <ul>
-            <li>Active student with consistent monthly verifications</li>
+            <li>Active student with consistent monthly completions and verifications</li>
             <li>Student within 90 days of graduation deadline</li>
             <li>Multiple verified records across different divisions</li>
           </ul>
@@ -573,7 +577,7 @@
         <div class="trust-card medium">
           <h3>⚠️ Medium Trust — Use with Judgment</h3>
           <ul>
-            <li>Student returning after a long pause (velocity will recover slowly)</li>
+            <li>Student returning after a long pause (velocity recovers as soon as new records are completed)</li>
             <li>3–5 records total — too little data for a stable forecast</li>
             <li>Burst activity just before a deadline (velocity will spike, then drop)</li>
           </ul>
@@ -623,22 +627,22 @@
 
         <div class="faq-item">
           <p>Why does "Analyzing..." appear even though I have submitted records?</p>
-          <p>Only <strong>verified</strong> records contribute to velocity. If none of your submitted records have been approved by an instructor in the last 4–8 weeks, the Oracle has no verified velocity to work with and cannot compute a forecast. Ask your instructor to verify your pending records.</p>
+          <p>Velocity counts records that are <strong>completed, pending verification, or verified</strong>. If none of your records have reached at least "completed" status within the last 4–8 weeks, the Oracle has no velocity data to work with and cannot compute a forecast. Mark your finished work as completed or submit it for verification.</p>
         </div>
 
         <div class="faq-item">
-          <p>My velocity dropped after my instructor approved old records. Is that normal?</p>
-          <p>Yes. Velocity is based on <code>verified_at</code> — the date of approval. Old records approved recently count toward the current window, but only until they fall outside the 4/8-week window. Consistent submission and verification keeps velocity stable.</p>
+          <p>Does pending verification count toward velocity?</p>
+          <p>Yes. Records with status <code>completed</code>, <code>pending verification</code>, or <code>verified</code> all contribute to velocity. The time anchor is <code>completed_at</code> (when you finished the work), falling back to <code>verified_at</code> for older records. This means your velocity reflects your actual work pace without waiting for instructor approval.</p>
         </div>
 
         <div class="faq-item">
           <p>My score is 18% but I feel I've done much more work. Why?</p>
-          <p>The Progress Score only counts <strong>verified</strong> records, and the denominator includes all requirements in the system. Submit pending work for verification, and work across multiple requirements to improve the score.</p>
+          <p>The Progress Score only counts <strong>verified</strong> records, and the denominator includes all requirements in the system. Note that while velocity includes completed/pending work, the progress score is conservative — only locked-in verified records count. Submit pending work for verification to improve the score.</p>
         </div>
 
         <div class="faq-item">
           <p>The forecast date seems too far away. Can I change the model?</p>
-          <p>The forecast is driven entirely by your verified velocity. The fastest way to move the date closer is to get more records verified consistently each month. Administrators can adjust cohort deadlines, but the calculation model itself is fixed.</p>
+          <p>The forecast is driven by your completion velocity. The fastest way to move the date closer is to complete more records consistently each month and get them verified. Administrators can adjust cohort deadlines, but the calculation model itself is fixed.</p>
         </div>
 
         <div class="faq-item">

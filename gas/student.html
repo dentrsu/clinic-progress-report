@@ -283,7 +283,7 @@
 
       <!-- Footer: data source indicator -->
       <div class="px-6 py-3 bg-gray-50 rounded-b-2xl border-t border-gray-100 flex flex-col gap-3">
-        
+
         <!-- Admin Link -->
         <div x-show="profile.role === 'admin'" class="w-full">
            <a href="<?= ScriptApp.getService().getUrl() ?>?page=admin"
@@ -526,6 +526,18 @@
         <div x-show="!loadingPatients && myPatients.length === 0 && referredPatients.length === 0" class="text-center py-6 bg-white rounded-xl border border-gray-100 shadow-sm">
            <p class="text-sm text-gray-400">No patients assigned yet.</p>
         </div>
+
+        <!-- Patient Management (external Apps Script deployment) -->
+        <a href="https://script.google.com/macros/s/AKfycbz_oJTb581EwWB_Dyf4rTWGt05oNSFjh51e1Kbb9jbRyHB5S4Dc5VKoGG5Rit1wXaDQ/exec"
+           target="_blank" rel="noopener"
+           title="Open the Patient Management app in a new tab"
+           class="flex items-center justify-center gap-2 w-full py-2.5 bg-white border border-gray-200 text-navy text-sm font-medium rounded-xl shadow-sm hover:bg-navy hover:text-white hover:scale-[1.01] transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2m-16 0H3m9-12h.01M9 12h6m-6 4h6" />
+          </svg>
+          Patient Management
+        </a>
 
         <!-- HN Sync Strip -->
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
