@@ -1445,6 +1445,34 @@ var SupabaseProvider = (function () {
       return _delete("/rest/v1/announcements?id=eq." + encodeURIComponent(id));
     },
 
+    // ── Beta feedback ──────────────────────────────────────────────────────
+
+    /**
+     * Insert a beta feedback row. Returns the created row.
+     */
+    insertBetaFeedback: function (payload) {
+      var rows = _post("/rest/v1/beta_feedback", payload);
+      return rows && rows.length ? rows[0] : null;
+    },
+
+    /**
+     * List all beta feedback (admin), newest first.
+     */
+    listBetaFeedback: function () {
+      return _get(
+        "/rest/v1/beta_feedback?select=*&order=created_at.desc",
+      );
+    },
+
+    /**
+     * Delete a beta feedback row by id (admin).
+     */
+    deleteBetaFeedback: function (id) {
+      return _delete(
+        "/rest/v1/beta_feedback?id=eq." + encodeURIComponent(id),
+      );
+    },
+
     // ── Dashboard records ──────────────────────────────────────────────────
 
     listRecordsForDashboard: function (studentIds) {

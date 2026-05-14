@@ -838,6 +838,104 @@ function adminSetEmailResultMode(enabled) {
   return { success: true, emailResult: enabled };
 }
 
+// ─── Beta Feedback Survey ────────────────────────────────────────────────────
+
+/**
+ * Whether the in-app beta feedback widget is enabled. Defaults to true so the
+ * widget appears unless an admin explicitly turns it off. Public — any signed-in
+ * user can read so the widget knows whether to render.
+ */
+function getBetaFeedbackEnabled() {
+  var val = PropertiesService.getScriptProperties().getProperty(
+    "FEEDBACK_SURVEY_ENABLED",
+  );
+  return val !== "false";
+}
+
+/** Read beta feedback toggle (admin only). */
+function adminGetBetaFeedbackMode() {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (!profile.found || profile.role !== "admin")
+    throw new Error("Admin only.");
+  return { feedbackSurvey: getBetaFeedbackEnabled() };
+}
+
+/**
+ * Set beta feedback toggle (admin only).
+ * @param {boolean} enabled
+ */
+function adminSetBetaFeedbackMode(enabled) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (!profile.found || profile.role !== "admin")
+    throw new Error("Admin only.");
+  PropertiesService.getScriptProperties().setProperty(
+    "FEEDBACK_SURVEY_ENABLED",
+    enabled ? "true" : "false",
+  );
+  return { success: true, feedbackSurvey: enabled };
+}
+
+/**
+ * Submit a feedback row from the in-app widget. Caller (any signed-in user) is
+ * captured server-side, so the client cannot spoof identity. Silently no-ops
+ * when the survey is disabled — UI also hides itself.
+ * @param {{rating:number, comment?:string, page?:string, userAgent?:string}} payload
+ */
+function submitBetaFeedback(payload) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  if (!getBetaFeedbackEnabled())
+    return { success: false, disabled: true };
+
+  var rating = Number(payload && payload.rating);
+  if (!(rating >= 1 && rating <= 5))
+    throw new Error("Rating must be between 1 and 5.");
+
+  var profile = getUserProfile(user.email);
+  var row = {
+    user_email: user.email,
+    role: profile && profile.role ? profile.role : null,
+    page: payload && payload.page ? String(payload.page).slice(0, 200) : null,
+    rating: rating,
+    comment:
+      payload && payload.comment
+        ? String(payload.comment).slice(0, 4000)
+        : null,
+    user_agent:
+      payload && payload.userAgent
+        ? String(payload.userAgent).slice(0, 500)
+        : null,
+  };
+  var created = SupabaseProvider.insertBetaFeedback(row);
+  return { success: true, id: created && created.id };
+}
+
+/** List all beta feedback (admin only). */
+function adminListBetaFeedback() {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (!profile.found || profile.role !== "admin")
+    throw new Error("Admin only.");
+  return SupabaseProvider.listBetaFeedback() || [];
+}
+
+/** Delete a beta feedback row by id (admin only). */
+function adminDeleteBetaFeedback(id) {
+  var user = getCurrentUser();
+  if (!user.allowed) throw new Error("Access Denied");
+  var profile = getUserProfile(user.email);
+  if (!profile.found || profile.role !== "admin")
+    throw new Error("Admin only.");
+  if (!id) throw new Error("Feedback id required.");
+  SupabaseProvider.deleteBetaFeedback(id);
+  return { success: true };
+}
+
 // ─── Verification Secret ─────────────────────────────────────────────────────
 
 /**
