@@ -97,6 +97,22 @@ create table public.announcement_dismissals (
   primary key (user_email, announcement_id)
 );
 
+-- 1.3 Beta Feedback
+-- Captures UX/UI feedback submitted from the in-app floating widget.
+-- Admin can toggle the widget via the FEEDBACK_SURVEY_ENABLED Script Property.
+create table public.beta_feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_email text,
+  role text,                                  -- 'student' | 'instructor' | 'admin'
+  page text,                                  -- ?page=X value at time of submission
+  rating smallint not null check (rating between 1 and 5),
+  comment text,
+  user_agent text,
+  created_at timestamptz not null default now()
+);
+create index beta_feedback_created_at_idx on public.beta_feedback (created_at desc);
+alter table public.beta_feedback enable row level security;
+
 
 -- 1.1 Divisions
 create type public.clinic_type as enum ('main', 'rotate', 'N/A');

@@ -381,22 +381,6 @@
              </div>
            </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-               <!-- Birthdate -->
-               <div>
-                  <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-                    Birthdate <span class="text-navy ml-1" x-text="calculateAge(editingPatient.birthdate)"></span>
-                  </label>
-                  <input type="date" x-model="editingPatient.birthdate" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-               </div>
-             <!-- Tel -->
-             <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Tel</label>
-                <input type="text" x-model="editingPatient.tel" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-             </div>
-           </div>
-
-
             <!-- Note -->
             <div>
                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Note</label>
@@ -606,10 +590,7 @@
                          x-text="p.status">
                    </span>
                   </div>
-                  <div class="pl-2 flex justify-between items-center mb-2">
-                    <div class="text-xs text-gray-500 space-y-1">
-                       <p x-show="p.tel"><span class="font-medium text-gray-400">Tel:</span> <span x-text="p.tel"></span></p>
-                    </div>
+                  <div class="pl-2 flex justify-end items-center mb-2">
                     <!-- Toggle Switch -->
                     <div class="flex items-center gap-2" @click.stop>
                        <span class="text-[0.65rem] font-bold uppercase tracking-wide transition-colors" :class="p.is_completed_case ? 'text-emerald-600' : 'text-gray-400'">Complete Case</span>
@@ -654,11 +635,6 @@
                          x-text="p.status">
                    </span>
                  </div>
-                  <div class="pl-2 flex justify-between items-center mb-2">
-                    <div class="text-xs text-gray-500 space-y-1">
-                       <p x-show="p.tel"><span class="font-medium text-gray-400">Tel:</span> <span x-text="p.tel"></span></p>
-                    </div>
-                  </div>
                   <div class="pl-2 text-xs text-gray-500">
                     <div class="mt-2 text-[0.65rem] text-gold font-medium uppercase tracking-wide">
                        Referred Case

@@ -5346,36 +5346,6 @@ function studentListTypeOfCases() {
 }
 
 /**
- * Syncs patient data from a configured Google Sheet to the active data source.
- * (Admin only).
- */
-/**
- * Syncs patient data from a configured Google Sheet to the active data source.
- * (Admin only).
- */
-// Mirrors public.patient_status enum in Supabase. Keep in sync with
-// database-context.md → CREATE TYPE patient_status. Mismatches cause either
-// silent data corruption (unknown value resets row) or upsert failures
-// (value not in DB enum), so any change here MUST match the DB migration.
-var _PATIENT_VALID_STATUSES = [
-  "Waiting to Be Assigned",
-  "Active",
-  "Full Chart",
-  "Treatment Plan",
-  "First Treatment Plan",
-  "Treatment Plan Approved",
-  "Initial Treatment",
-  "Treatment in Progress",
-  "Completed Case",
-  "Inactive",
-  "Discharged",
-  "Orthodontic",
-  "Recall",
-  "Cancelled",
-  "Waiting in Recall Lists",
-];
-
-/**
  * Build a header→column-index map for the patient sheet and validate required
  * columns. Header matching is case-insensitive and trimmed. Throws if any
  * required header is missing — the error lists the headers actually found in
@@ -5392,15 +5362,16 @@ function _buildPatientSheetSchema(headers) {
     if (key) idx[key] = h;
   }
 
+  // Sync surface intentionally narrow: only HN/Name plus team-leader and
+  // student assignments come from the master sheet. Tel/Birthdate/Note are no
+  // longer synced — those live in the app and should not be overwritten by
+  // stale sheet values. Status is owned by the app post-creation; new HNs are
+  // seeded with "Full Chart" by the payload builder.
   var schema = {
     hn: { aliases: ["HN"], required: true },
     name: { aliases: ["Name"], required: true },
-    status: { aliases: ["Status"], required: true },
-    tel: { aliases: ["Tel"], required: false },
     tlEmail: { aliases: ["TeamLeaderEmail"], required: false },
     stEmail: { aliases: ["StudentEmail"], required: false },
-    birthdate: { aliases: ["Birthdate"], required: false },
-    note: { aliases: ["Note"], required: false },
   };
 
   var COL = {};
@@ -5443,14 +5414,12 @@ function _buildPatientSheetSchema(headers) {
 
 /**
  * Build a Supabase upsert payload for one patient row.
- * Empty-cell guard: blank name/tel/note/status cells are NOT included in the
- * payload, so existing DB values are preserved rather than reset.
- * Unknown status (non-empty cell whose value isn't in the DB enum) is also
- * skipped and recorded as a warning — never silently coerced to a default.
- * "Full Chart" from the sheet is suppressed (treated as if the cell were
- * empty) because it is the initial state for new records; writing it onto an
- * existing patient would regress them. The new-record default below still
- * sets "Full Chart" for first-time inserts that lack a valid sheet status.
+ * Sync surface is intentionally narrow: hn, name, team-leader assignment,
+ * student assignment. Tel/birthdate/note/status are NOT read from the sheet —
+ * those fields are owned by the app and would be clobbered by stale sheet
+ * values. The one exception is "Full Chart": first-time inserts (HN not yet
+ * in the DB) seed status="Full Chart" so new patients enter the workflow
+ * with the correct initial state.
  * Returns null if the row has no HN (caller should skip).
  */
 function _buildPatientPayloadFromRow(
@@ -5466,37 +5435,10 @@ function _buildPatientPayloadFromRow(
 
   var payload = { hn: hn, updated_at: new Date().toISOString() };
 
-  var rawStatus = String(row[COL.status] == null ? "" : row[COL.status]).trim();
-  if (rawStatus !== "") {
-    var status = _PATIENT_VALID_STATUSES.find(function (s) {
-      return s.toLowerCase() === rawStatus.toLowerCase();
-    });
-    if (status) {
-      // "Full Chart" is reserved for the new-record default path; never
-      // propagated from sheet → DB on update. This avoids regressing a
-      // patient whose chart has progressed but whose sheet row is stale.
-      if (status !== "Full Chart") {
-        payload.status = status;
-      }
-    } else {
-      if (!stats.warnings) stats.warnings = [];
-      if (stats.warnings.length < 10)
-        stats.warnings.push(
-          "Unknown status for HN " + hn + ': "' + rawStatus + '" — field skipped, DB value preserved',
-        );
-    }
-  }
-
-  // First-time-only default: if this HN isn't in the DB yet AND no valid
-  // status survived the block above (empty cell, unknown value, or the
-  // suppressed "Full Chart" case), seed the new row with "Full Chart".
+  // First-time-only default: brand-new HNs are seeded with "Full Chart".
   // existingHnSet === null means pre-load failed → skip the default
   // (graceful degradation rather than guessing wrong).
-  if (
-    payload.status === undefined &&
-    existingHnSet &&
-    !existingHnSet[hn]
-  ) {
+  if (existingHnSet && !existingHnSet[hn]) {
     payload.status = "Full Chart";
   }
 
@@ -5506,13 +5448,6 @@ function _buildPatientPayloadFromRow(
     if (v !== "") payload[field] = v;
   }
   setIfPresent("name", COL.name);
-  setIfPresent("tel", COL.tel);
-  setIfPresent("note", COL.note);
-
-  if (COL.birthdate !== undefined) {
-    var bd = row[COL.birthdate];
-    if (bd instanceof Date) payload.birthdate = bd;
-  }
 
   if (COL.tlEmail !== undefined) {
     var tlEmail = String(row[COL.tlEmail] == null ? "" : row[COL.tlEmail])

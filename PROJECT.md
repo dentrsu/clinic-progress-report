@@ -58,6 +58,7 @@ A dedicated interface for administrators to manage users.
   - **Academic ID Support**: Manage Real-world Student IDs.
   - **Verify Hash Tab**: Validate student verification proof hashes (HMAC-SHA256).
   - **Email Send Controls**: Separate toggles for verification request emails (to instructors) and verification result emails (to students).
+  - **Beta Feedback Survey**: Toggle the in-app floating feedback widget on/off. Feedback tab shows total + average rating, rating distribution, role/rating filters, and per-row delete.
   - System Health Check.
 - **Nightly Backup**: All Supabase tables are automatically synced to Google Sheets at midnight via a GAS time-based trigger.
 - **Patient Synchronization**:
@@ -127,6 +128,7 @@ clinic-progress-report/
 │   ├── admin.html              # Admin console
 │   ├── treatment_plan.html     # Treatment plan page
 │   ├── requirement_vault.html  # Student requirement vault
+│   ├── feedback_widget.html    # Beta feedback floating widget (included by user-facing pages)
 │   └── styles.html             # Shared CSS design tokens
 ├── database-context.md         # Database schema documentation
 └── table-order-and-constraints.md  # Table DDL reference
