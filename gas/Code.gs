@@ -5639,6 +5639,12 @@ function adminSyncPatients() {
       } catch (rowErr) {
         Logger.log("Error processing row " + (i + 1) + ": " + rowErr.message);
         stats.errors++;
+        if (!stats.supabaseErrors) stats.supabaseErrors = [];
+        if (stats.supabaseErrors.length < 10)
+          stats.supabaseErrors.push(
+            "Row " + (i + 1) + (hn ? " (HN " + hn + ")" : "") + ": " +
+              String(rowErr.message).substring(0, 200),
+          );
       }
     }
 
@@ -5829,6 +5835,12 @@ function adminSyncSelectedPatients(hnList) {
       } catch (rowErr) {
         Logger.log("Error processing row " + (i + 1) + ": " + rowErr.message);
         stats.errors++;
+        if (!stats.supabaseErrors) stats.supabaseErrors = [];
+        if (stats.supabaseErrors.length < 10)
+          stats.supabaseErrors.push(
+            "Row " + (i + 1) + (hn ? " (HN " + hn + ")" : "") + ": " +
+              String(rowErr.message).substring(0, 200),
+          );
       }
     }
 

@@ -2733,7 +2733,8 @@
         },
 
         syncSelectedPatients() {
-          const hnList = this.parsedHns;
+          // Unwrap Alpine proxy — google.script.run silently drops proxied arrays
+          const hnList = JSON.parse(JSON.stringify(this.parsedHns));
           if (!hnList || hnList.length === 0) return;
           this.syncingSelected = true;
           this.syncSelectedResult = null;
@@ -2926,7 +2927,8 @@
         },
 
         syncSelectedInstructors() {
-          const emails = this.parsedInstructorEmails;
+          // Unwrap Alpine proxy — google.script.run silently drops proxied arrays
+          const emails = JSON.parse(JSON.stringify(this.parsedInstructorEmails));
           if (emails.length === 0) return;
           
           this.syncingSelectedInstructors = true;

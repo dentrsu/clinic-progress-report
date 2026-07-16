@@ -1300,6 +1300,22 @@
                 return;
               }
 
+              // Nothing actually written (e.g. HN not found in master sheet,
+              // or Supabase write failed) — report the server's warning
+              // instead of a false success.
+              const updatedCount = res.stats ? (res.stats.updated || 0) : 0;
+              if (updatedCount === 0) {
+                this.hnSyncing = false;
+                this.hnSyncResult = {
+                  type: 'error',
+                  message: res.warning
+                    || (res.stats && res.stats.errors > 0
+                        ? 'No patients were updated — a database write error occurred. Please contact admin.'
+                        : 'No patients were updated — HN not found in the master sheet.')
+                };
+                return;
+              }
+
               // Step 2: Re-fetch fresh patient list to check assignment
               google.script.run
                 .withSuccessHandler((freshData) => {
@@ -1323,22 +1339,31 @@
 
                   if (unmatched.length === 0) {
                     // All HNs are now in the user's own patient list
-                    this.hnSyncResult = {
-                      type: 'success',
-                      message: `✓ ${matched.length} patient(s) synced and updated in your list.`
-                    };
-                    setTimeout(() => { this.hnSyncInput = ''; this.hnSyncResult = null; }, 5000);
+                    if (res.warning) {
+                      this.hnSyncResult = {
+                        type: 'warning',
+                        message: `✓ ${matched.length} patient(s) updated in your list, with warnings: ${res.warning}`
+                      };
+                    } else {
+                      this.hnSyncResult = {
+                        type: 'success',
+                        message: `✓ ${matched.length} patient(s) synced and updated in your list.`
+                      };
+                      setTimeout(() => { this.hnSyncInput = ''; this.hnSyncResult = null; }, 5000);
+                    }
                   } else if (matched.length > 0) {
                     // Partial — some matched, some didn't
                     this.hnSyncResult = {
                       type: 'warning',
-                      message: `Synced ${hnList.length} patient(s). ${matched.length} updated in your list. ${unmatched.length} not displayed — still unassigned or assigned to another student: ${unmatched.join(', ')}`
+                      message: `Synced ${updatedCount} patient(s). ${matched.length} updated in your list. ${unmatched.length} not displayed — still unassigned or assigned to another student: ${unmatched.join(', ')}`
+                        + (res.warning ? ` (${res.warning})` : '')
                     };
                   } else {
                     // None matched this student
                     this.hnSyncResult = {
                       type: 'warning',
-                      message: `Sync successful (${hnList.length} patient(s) updated in database), but not displayed — still unassigned or assigned to another student.`
+                      message: `Sync successful (${updatedCount} patient(s) updated in database), but not displayed — still unassigned or assigned to another student.`
+                        + (res.warning ? ` (${res.warning})` : '')
                     };
                   }
                 })
