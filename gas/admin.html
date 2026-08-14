@@ -677,6 +677,22 @@
        </div>
     </div>
 
+    <!-- Users: archived toggle -->
+    <div x-show="!loading && activeTab === 'users'" class="flex items-center justify-between gap-4 mb-3 px-1 animate-fade-in">
+       <p class="text-xs text-gray-500">
+         <span x-show="!showArchivedUsers">Showing current users. Graduated accounts are retained for 5 years but hidden.</span>
+         <span x-show="showArchivedUsers">Showing all users, including graduated accounts.</span>
+         <span class="text-gray-400" x-text="'(' + filteredUsers.length + ')'"></span>
+       </p>
+       <button @click="toggleArchivedUsers()" :disabled="loading"
+               title="Graduated accounts stay in the database for the 5-year retention period. Turn this on to look them up."
+               class="shrink-0 flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50"
+               :class="showArchivedUsers ? 'bg-navy border-navy text-white' : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'">
+         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+         <span x-text="showArchivedUsers ? 'Graduated: shown' : 'Graduated: hidden'"></span>
+       </button>
+    </div>
+
     <!-- Users Table -->
     <div x-show="!loading && activeTab === 'users'" class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
       <table class="w-full text-left border-collapse">
@@ -2413,9 +2429,11 @@
         // Students Data
         students: [],
         filteredStudents: [],
-        // Graduated students are kept for the 5-year retention window but hidden
-        // by default, so the list stays a fixed size as cohorts accumulate.
+        // Graduated students/users are kept for the 5-year retention window but
+        // hidden by default, so these lists stay a fixed size as cohorts
+        // accumulate year on year.
         showArchivedStudents: false,
+        showArchivedUsers: false,
 
         // Treatment Phases Data
         phases: [],
@@ -3194,9 +3212,15 @@
             return;
           }
           const q = this.search.toLowerCase();
-          this.filteredUsers = this.users.filter(u => 
-            (u.name && u.name.toLowerCase().includes(q)) || 
-            (u.email && u.email.toLowerCase().includes(q))
+          this.filteredUsers = this.users.filter(u =>
+            (u.name && u.name.toLowerCase().includes(q)) ||
+            (u.email && u.email.toLowerCase().includes(q)) ||
+            // students(academic_id) is joined in for exactly this, but was
+            // never wired into the search. PostgREST returns the embed as an
+            // array for a to-many relation and an object for a to-one, so
+            // handle both shapes.
+            (u.students && [].concat(u.students).some(s =>
+              s && s.academic_id && s.academic_id.toLowerCase().includes(q)))
           );
         },
 
@@ -3404,7 +3428,12 @@
               console.error(err); // Log silently, alert on specific action?
               this.loading = false;
             })
-            .adminListUsers();
+            .adminListUsers(this.showArchivedUsers);
+        },
+
+        toggleArchivedUsers() {
+          this.showArchivedUsers = !this.showArchivedUsers;
+          this.loadUsers();
         },
 
         loadStudents() {

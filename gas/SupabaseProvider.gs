@@ -361,14 +361,31 @@ var SupabaseProvider = (function () {
      * List all users with optional search/filter.
      * @returns {Array}
      */
-    listUsers: function () {
-      // Returns all users, ordered by created_at desc
-      // Join with students to get academic_id for student users
-      var select = "*,students(academic_id)";
-      return _getCached(
-        "/rest/v1/users?select=" + select + "&order=created_at.desc",
-        600,
-      );
+    /**
+     * Returns users ordered by created_at desc, joined with students to get
+     * academic_id for student users.
+     *
+     * Columns are listed explicitly rather than using `select=*`; the `profile`
+     * jsonb column is read nowhere in the app and is unbounded in size.
+     *
+     * NOTE the default: unlike listStudents(), archived users are INCLUDED
+     * unless the caller opts out. Most callers use this to resolve an email to
+     * a user_id (the sync routines, adminDeleteUser). Hiding archived users
+     * from those lookups would make a returning graduate look like a new
+     * account and trigger a duplicate createAuthUser for an email that already
+     * exists. Only the Admin Console user list opts out.
+     *
+     * @param {Object} [opts] {excludeArchived: boolean}
+     * @returns {Array}
+     */
+    listUsers: function (opts) {
+      opts = opts || {};
+      var select = "user_id,email,name,role,status,students(academic_id)";
+      var path =
+        "/rest/v1/users?select=" + select + "&order=created_at.desc";
+      if (opts.excludeArchived) path += "&status=neq.graduated";
+
+      return _getCached(path, 600);
     },
 
     deleteUser: function (userId) {

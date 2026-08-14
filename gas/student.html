@@ -1183,17 +1183,12 @@
         },
 
         getStudentYear() {
-           if (!this.profile.first_clinic_year) return '-';
-           const now = new Date();
-           const currentYear = now.getFullYear();
-           const month = now.getMonth(); // 0-based
-           const date = now.getDate();
-           
-           // If current month is between mid Aug (15th) to Dec
-           const isSecondHalf = (month > 7) || (month === 7 && date >= 15);
-           const offset = isSecondHalf ? 5 : 4;
-           
-           return currentYear - parseInt(this.profile.first_clinic_year) + offset;
+           // Computed by the server (_calculateStudentYear) so this obeys the
+           // ACADEMIC_YEAR_CUTOFF Script Property. This used to be derived here
+           // from a hardcoded 15 Aug rollover, which disagreed with the date
+           // the rest of the system used.
+           const year = this.profile.calculated_year;
+           return (year === null || year === undefined) ? '-' : year;
         },
 
         getTeamLeaderName() {

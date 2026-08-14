@@ -4694,6 +4694,13 @@ function getUserProfile(email) {
         profile.student_id = student.student_id;
         profile.academic_id = student.academic_id; // Added for display
         profile.first_clinic_year = student.first_clinic_year;
+        // Computed server-side so every surface obeys ACADEMIC_YEAR_CUTOFF.
+        // landing.html and student.html used to derive this in the browser
+        // from their own hardcoded rollover date, which disagreed with the
+        // server. Null when first_clinic_year is unknown.
+        profile.calculated_year = _calculateStudentYear(
+          student.first_clinic_year,
+        );
         profile.floor_id = student.floor_id || null;
         profile.unit_id = student.unit_id || null;
 
@@ -4981,9 +4988,11 @@ function _assertAnyUser() {
 /**
  * List all users (Admin only).
  */
-function adminListUsers() {
+function adminListUsers(includeArchived) {
   _assertAdmin();
-  return SupabaseProvider.listUsers() || [];
+  return (
+    SupabaseProvider.listUsers({ excludeArchived: !includeArchived }) || []
+  );
 }
 
 /**
