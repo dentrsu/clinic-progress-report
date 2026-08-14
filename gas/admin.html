@@ -590,8 +590,8 @@
           
           <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
              <div>
-                <h3 class="text-sm font-bold text-gray-800">Clear Inactive Students</h3>
-                <p class="text-xs text-gray-500 mt-1 max-w-md">Clear the local active status of students not found or not marked as 'Active' in the Master Sheet. Excludes admin student.</p>
+                <h3 class="text-sm font-bold text-gray-800">Archive Departed Students</h3>
+                <p class="text-xs text-gray-500 mt-1 max-w-md">Students missing from the Master Sheet are archived as graduated; those present but not 'Active' are set to inactive. Records are kept, never deleted. Excludes admin student.</p>
              </div>
              <div class="flex flex-col items-end gap-2">
                 <button @click="clearInactiveStudents()" :disabled="syncing || clearing"
@@ -605,6 +605,22 @@
                 </div>
              </div>
           </div>
+       </div>
+
+       <!-- Archived toggle -->
+       <div class="flex items-center justify-between gap-4 mb-3 px-1">
+          <p class="text-xs text-gray-500">
+            <span x-show="!showArchivedStudents">Showing current students. Graduated students are retained for 5 years but hidden.</span>
+            <span x-show="showArchivedStudents">Showing all students, including graduated.</span>
+            <span class="text-gray-400" x-text="'(' + filteredStudents.length + ')'"></span>
+          </p>
+          <button @click="toggleArchivedStudents()" :disabled="loading"
+                  title="Graduated students stay in the database for the 5-year retention period. Turn this on to look them up."
+                  class="shrink-0 flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50"
+                  :class="showArchivedStudents ? 'bg-navy border-navy text-white' : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+            <span x-text="showArchivedStudents ? 'Graduated: shown' : 'Graduated: hidden'"></span>
+          </button>
        </div>
 
        <!-- Table -->
@@ -2397,6 +2413,9 @@
         // Students Data
         students: [],
         filteredStudents: [],
+        // Graduated students are kept for the 5-year retention window but hidden
+        // by default, so the list stays a fixed size as cohorts accumulate.
+        showArchivedStudents: false,
 
         // Treatment Phases Data
         phases: [],
@@ -2847,7 +2866,7 @@
         },
         
         clearInactiveStudents() {
-          this.confirmMessage = "This will clear the active status for all local students not found or inactive in the Master Sheet. Continue?";
+          this.confirmMessage = "Students missing from the Master Sheet will be archived as 'graduated' (records kept for the 5-year retention period, hidden from instructor views and all counts). Students present but not active will be set to 'inactive'. No records are deleted. Continue?";
           this.confirmCallback = () => {
              this._executeClearInactiveStudents();
           };
@@ -2864,7 +2883,7 @@
               this.clearing = false;
               this.clearResult = res;
               if (res.success) {
-                this.clearResultMessage = `Processed: ${res.stats.processed}, Cleared: ${res.stats.cleared}, Skipped: ${res.stats.skipped}`;
+                this.clearResultMessage = `Processed: ${res.stats.processed}, Archived (graduated): ${res.stats.graduated}, Set inactive: ${res.stats.deactivated}, Skipped: ${res.stats.skipped}`;
                 if (res.stats.cleared > 0) {
                     this.loadStudents(); // Refresh the list to reflect cleared statuses
                 }
@@ -3400,7 +3419,12 @@
                console.error("Failed to load students", err);
                this.loading = false;
             })
-            .adminListStudents();
+            .adminListStudents(this.showArchivedStudents);
+        },
+
+        toggleArchivedStudents() {
+          this.showArchivedStudents = !this.showArchivedStudents;
+          this.loadStudents();
         },
 
         loadDivisions() {

@@ -1205,11 +1205,46 @@ var SupabaseProvider = (function () {
 
       return this.createStudent(payload);
     },
-    listStudents: function () {
-      return _getCached(
-        "/rest/v1/students?select=*,users(name,email,status),floors(label)",
-        600,
-      );
+    /**
+     * List students for admin/dashboard views.
+     *
+     * Columns are listed explicitly rather than using `select=*`: the nine
+     * per-division instructor UUIDs are not rendered anywhere in these views
+     * and roughly doubled the payload. That matters because CacheService
+     * silently refuses to store an item over ~100KB, which would drop the
+     * 10-minute cache without any error.
+     *
+     * Graduated students are excluded by default. They are retained for five
+     * years, so this set would otherwise grow by a whole cohort every year.
+     *
+     * @param {boolean} [includeArchived] include status = 'graduated'
+     * @returns {Array}
+     */
+    listStudents: function (includeArchived) {
+      var select = [
+        "student_id",
+        "user_id",
+        "academic_id",
+        "first_clinic_year",
+        "floor_id",
+        "unit_id",
+        "team_leader_1_id",
+        "team_leader_2_id",
+        "status",
+        "archived_at",
+        "forecast_completion_date",
+        "forecast_at",
+        "users(name,email,status)",
+        "floors(label)",
+      ].join(",");
+
+      var path =
+        "/rest/v1/students?select=" +
+        select +
+        "&order=academic_id.asc.nullslast";
+      if (!includeArchived) path += "&status=neq.graduated";
+
+      return _getCached(path, 600);
     },
 
     /**

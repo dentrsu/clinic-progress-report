@@ -3590,13 +3590,6 @@ function instructorGetTeamStudents() {
   if (!instructorId) return [];
   var students = SupabaseProvider.listStudentsByTeamLeader(instructorId) || [];
 
-  var today = new Date();
-  var currentYear = today.getFullYear();
-
-  // Cutoff is Aug 20 (Month is 0-indexed, so August is 7)
-  var isNewAcademicYear =
-    today.getMonth() > 7 || (today.getMonth() === 7 && today.getDate() >= 20);
-
   var instructorsCache = SupabaseProvider.listInstructors() || [];
   function getTeamLeaderName(id) {
     if (!id) return "-";
@@ -3619,13 +3612,12 @@ function instructorGetTeamStudents() {
     var s = students[i];
     if (!s.first_clinic_year) continue;
 
-    var studentYears;
-    if (isNewAcademicYear) {
-      studentYears = currentYear - s.first_clinic_year + 5;
-    } else {
-      studentYears = currentYear - s.first_clinic_year + 4;
-    }
+    // Departed students (graduated / withdrawn) are retained in the database
+    // for 5 years but must never reach an instructor's screen or headcount.
+    // Filtered server-side so their data is not shipped to the browser at all.
+    if (!_isActiveUserStatus(s.status)) continue;
 
+    var studentYears = _calculateStudentYear(s.first_clinic_year);
     s.calculated_year = studentYears;
 
     // Filter logic
@@ -3681,11 +3673,6 @@ function adminGetAllStudents() {
 
   var students = SupabaseProvider.listStudents() || [];
 
-  var today = new Date();
-  var currentYear = today.getFullYear();
-  var isNewAcademicYear =
-    today.getMonth() > 7 || (today.getMonth() === 7 && today.getDate() >= 20);
-
   var instructorsCache = SupabaseProvider.listInstructors() || [];
   function getTeamLeaderName(id) {
     if (!id) return "-";
@@ -3702,25 +3689,13 @@ function adminGetAllStudents() {
     return "Unknown";
   }
 
-  // Accept "active" and any "active+N" variation (case-insensitive).
-  function isActiveStatus(status) {
-    var s = String(status || "active")
-      .trim()
-      .toLowerCase();
-    return s === "active" || /^active\+\d+$/.test(s);
-  }
-
   var out = [];
   for (var i = 0; i < students.length; i++) {
     var s = students[i];
-    if (!isActiveStatus(s.status)) continue;
+    if (!_isActiveUserStatus(s.status)) continue;
 
-    var calcYear = "-";
-    if (s.first_clinic_year) {
-      calcYear = isNewAcademicYear
-        ? currentYear - s.first_clinic_year + 5
-        : currentYear - s.first_clinic_year + 4;
-    }
+    var calcYear = _calculateStudentYear(s.first_clinic_year);
+    if (calcYear === null) calcYear = "-";
 
     var uObj = s.user || s.users || {};
     var fObj = s.floor || s.floors || {};
@@ -3783,13 +3758,6 @@ function advisorGetAdvisees() {
       instructorId,
     ) || [];
 
-  var today = new Date();
-  var currentYear = today.getFullYear();
-
-  // Cutoff is Aug 20 (Month is 0-indexed, so August is 7)
-  var isNewAcademicYear =
-    today.getMonth() > 7 || (today.getMonth() === 7 && today.getDate() >= 20);
-
   var instructorsCache = SupabaseProvider.listInstructors() || [];
   function getTeamLeaderName(id) {
     if (!id) return "-";
@@ -3810,14 +3778,13 @@ function advisorGetAdvisees() {
 
   for (var i = 0; i < students.length; i++) {
     var s = students[i];
-    var studentYears = "-";
-    if (s.first_clinic_year) {
-      if (isNewAcademicYear) {
-        studentYears = currentYear - s.first_clinic_year + 5;
-      } else {
-        studentYears = currentYear - s.first_clinic_year + 4;
-      }
-    }
+
+    // Same retention rule as instructorGetTeamStudents: archived students stay
+    // in the database but are never returned to an advisor.
+    if (!_isActiveUserStatus(s.status)) continue;
+
+    var studentYears = _calculateStudentYear(s.first_clinic_year);
+    if (studentYears === null) studentYears = "-";
 
     // Format for frontend
     formatted.push({
@@ -3972,30 +3939,21 @@ function advisorGetDashboardData(viewMode, divisionCode) {
         profile.instructor_id,
       ) || []
     ).filter(function (s) {
-      return (s.status || "active").toLowerCase().includes("active");
+      return _isActiveUserStatus(s.status);
     });
   } else {
     // Whole-division view: include ALL active students, even those without a
     // <div>_instructor_id assigned or any treatment records yet. Division
     // requirements act as the baseline; students with no records render as 0%.
     rawStudents = (SupabaseProvider.listStudents() || []).filter(function (s) {
-      return (s.status || "active").toLowerCase().includes("active");
+      return _isActiveUserStatus(s.status);
     });
   }
 
   // 2. Format students + compute year (same logic as advisorGetAdvisees)
-  var today = new Date();
-  var yr = today.getFullYear();
-  var isNewAY =
-    today.getMonth() > 7 || (today.getMonth() === 7 && today.getDate() >= 20);
-
   var students = rawStudents.map(function (s) {
-    var calcYear = "-";
-    if (s.first_clinic_year) {
-      calcYear = isNewAY
-        ? yr - s.first_clinic_year + 5
-        : yr - s.first_clinic_year + 4;
-    }
+    var calcYear = _calculateStudentYear(s.first_clinic_year);
+    if (calcYear === null) calcYear = "-";
     var uObj = s.user || s.users || {};
     var fObj = s.floor || s.floors || {};
     return {
@@ -4184,11 +4142,6 @@ function instructorGetPendingVerifications() {
   if (records.length === 0) return [];
 
   // 2. Group records by student
-  var today = new Date();
-  var currentYear = today.getFullYear();
-  var isNewAY =
-    today.getMonth() > 7 || (today.getMonth() === 7 && today.getDate() >= 20);
-
   var studentMap = {};
 
   records.forEach(function (rec) {
@@ -4196,11 +4149,7 @@ function instructorGetPendingVerifications() {
     if (!studentMap[stuId]) {
       var stu = rec.student || {};
       var user = stu.user || {};
-      var yr = stu.first_clinic_year
-        ? isNewAY
-          ? currentYear - stu.first_clinic_year + 5
-          : currentYear - stu.first_clinic_year + 4
-        : null;
+      var yr = _calculateStudentYear(stu.first_clinic_year);
       studentMap[stuId] = {
         student_id: stuId,
         academic_id: stu.academic_id || "",
@@ -4274,11 +4223,6 @@ function adminGetAllPendingVerifications() {
   var records = SupabaseProvider.listAllPendingRecords() || [];
   if (records.length === 0) return [];
 
-  var today = new Date();
-  var currentYear = today.getFullYear();
-  var isNewAY =
-    today.getMonth() > 7 || (today.getMonth() === 7 && today.getDate() >= 20);
-
   var studentMap = {};
 
   records.forEach(function (rec) {
@@ -4286,11 +4230,7 @@ function adminGetAllPendingVerifications() {
     if (!studentMap[stuId]) {
       var stu = rec.student || {};
       var user = stu.user || {};
-      var yr = stu.first_clinic_year
-        ? isNewAY
-          ? currentYear - stu.first_clinic_year + 5
-          : currentYear - stu.first_clinic_year + 4
-        : null;
+      var yr = _calculateStudentYear(stu.first_clinic_year);
       studentMap[stuId] = {
         student_id: stuId,
         academic_id: stu.academic_id || "",
@@ -4719,13 +4659,11 @@ function getUserProfile(email) {
       return { found: false, reason: "user_not_found" };
     }
 
-    // Check active status
-    var statusStr = user.status ? String(user.status).toLowerCase().trim() : "";
-    var isUserActive =
-      statusStr === "active" ||
-      (statusStr.includes("active") && !statusStr.includes("inactive"));
+    // Check active status. A blank status no longer passes this gate: archived
+    // students are retained for 5 years but must not be able to sign in.
+    var isUserActive = _isActiveUserStatus(user.status);
 
-    if (user.status && !isUserActive) {
+    if (!isUserActive) {
       return {
         found: true,
         active: false,
@@ -4863,6 +4801,127 @@ function adminSetMaintenanceMode(enabled) {
   _assertAdmin();
   // Maintenance mode removed — always connected to Supabase
   return { success: true, mode: false };
+}
+
+/**
+ * The nine per-division instructor columns on public.students. Populated by
+ * the Master Sheet sync; not editable from the Admin Console form.
+ */
+var DIVISION_INSTRUCTOR_COLUMNS = [
+  "oper_instructor_id",
+  "endo_instructor_id",
+  "perio_instructor_id",
+  "prosth_instructor_id",
+  "diag_instructor_id",
+  "radio_instructor_id",
+  "sur_instructor_id",
+  "ortho_instructor_id",
+  "pedo_instructor_id",
+];
+
+/**
+ * Academic-year rollover date, as MM-DD. Before this date a student is still
+ * counted in last year's cohort; on or after it everyone moves up one year.
+ *
+ * Override without redeploying by setting the Script Property
+ * ACADEMIC_YEAR_CUTOFF (e.g. "08-14"). An invalid value is logged and ignored
+ * in favour of this default, so a typo can never silently shift every
+ * student's year.
+ */
+var ACADEMIC_YEAR_CUTOFF_DEFAULT = "08-14";
+
+/** Memoised for the lifetime of one execution — this is read on every page. */
+var _academicYearCutoffMemo = null;
+
+/**
+ * @param {string} value MM-DD
+ * @returns {?{month: number, day: number}} null when unparseable
+ */
+function _parseAcademicYearCutoff(value) {
+  var m = /^(\d{1,2})-(\d{1,2})$/.exec(String(value || "").trim());
+  if (!m) return null;
+  var month = parseInt(m[1], 10);
+  var day = parseInt(m[2], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return { month: month, day: day };
+}
+
+/**
+ * @returns {{month: number, day: number}} 1-indexed month
+ */
+function _getAcademicYearCutoff() {
+  if (_academicYearCutoffMemo) return _academicYearCutoffMemo;
+
+  var raw = "";
+  try {
+    raw =
+      PropertiesService.getScriptProperties().getProperty(
+        "ACADEMIC_YEAR_CUTOFF",
+      ) || "";
+  } catch (e) {
+    raw = "";
+  }
+
+  var parsed = _parseAcademicYearCutoff(raw);
+  if (!parsed) {
+    if (raw) {
+      Logger.log(
+        "Invalid ACADEMIC_YEAR_CUTOFF '" +
+          raw +
+          "' (expected MM-DD). Falling back to " +
+          ACADEMIC_YEAR_CUTOFF_DEFAULT,
+      );
+    }
+    parsed = _parseAcademicYearCutoff(ACADEMIC_YEAR_CUTOFF_DEFAULT);
+  }
+
+  _academicYearCutoffMemo = parsed;
+  return parsed;
+}
+
+/**
+ * Has the academic year already rolled over on the given date?
+ * @param {Date} [today]
+ * @returns {boolean}
+ */
+function _isNewAcademicYear(today) {
+  var cutoff = _getAcademicYearCutoff();
+  var d = today || new Date();
+  var month = d.getMonth() + 1; // getMonth() is 0-indexed; the property is not
+  return month > cutoff.month || (month === cutoff.month && d.getDate() >= cutoff.day);
+}
+
+/**
+ * Clinical year for a student (4, 5, ...).
+ *
+ * @param {number} firstClinicYear
+ * @param {Date} [today]
+ * @returns {?number} null when firstClinicYear is missing — callers decide how
+ *   to render that (some show "-", some pass null through).
+ */
+function _calculateStudentYear(firstClinicYear, today) {
+  if (!firstClinicYear) return null;
+  var d = today || new Date();
+  return d.getFullYear() - firstClinicYear + (_isNewAcademicYear(d) ? 5 : 4);
+}
+
+/**
+ * Single source of truth for "is this user/student still active?".
+ *
+ * Empty, null and unrecognised statuses count as INACTIVE. Archived students
+ * (graduated / withdrawn) are kept in the database for the 5-year retention
+ * window, so a missing status must never fall back to "active" — that is what
+ * used to leak departed students into instructor views and headcounts.
+ *
+ * Accepts suffixed values such as "active+1" (repeat year).
+ *
+ * @param {string} status
+ * @returns {boolean}
+ */
+function _isActiveUserStatus(status) {
+  if (!status) return false;
+  var s = String(status).trim().toLowerCase();
+  return s.indexOf("active") !== -1 && s.indexOf("inactive") === -1;
 }
 
 /**
@@ -5048,9 +5107,9 @@ function adminDeleteAnnouncement(id) {
 /**
  * List all students (Admin only).
  */
-function adminListStudents() {
+function adminListStudents(includeArchived) {
   _assertAdmin();
-  return SupabaseProvider.listStudents() || [];
+  return SupabaseProvider.listStudents(!!includeArchived) || [];
 }
 
 /**
@@ -5163,7 +5222,7 @@ function adminUpdateUser(userId, form) {
       var s = SupabaseProvider.getStudentByUserId(userId);
       if (s) {
         // Update existing student record
-        SupabaseProvider.updateStudent(s.student_id, {
+        var studentUpdate = {
           academic_id: form.academic_id
             ? String(form.academic_id).trim()
             : null,
@@ -5176,18 +5235,21 @@ function adminUpdateUser(userId, form) {
           team_leader_2_id: form.team_leader_2_id
             ? form.team_leader_2_id
             : null,
-          oper_instructor_id: form.oper_instructor_id || null,
-          endo_instructor_id: form.endo_instructor_id || null,
-          perio_instructor_id: form.perio_instructor_id || null,
-          prosth_instructor_id: form.prosth_instructor_id || null,
-          diag_instructor_id: form.diag_instructor_id || null,
-          radio_instructor_id: form.radio_instructor_id || null,
-          sur_instructor_id: form.sur_instructor_id || null,
-          ortho_instructor_id: form.ortho_instructor_id || null,
-          pedo_instructor_id: form.pedo_instructor_id || null,
           status: form.status,
           updated_at: new Date().toISOString(),
+        };
+
+        // Division instructors are assigned by the Master Sheet sync, not by
+        // this form. Only write them when the caller actually supplied the
+        // key — blindly sending `form.x || null` wiped all nine assignments
+        // for any caller whose payload did not carry them.
+        DIVISION_INSTRUCTOR_COLUMNS.forEach(function (col) {
+          if (Object.prototype.hasOwnProperty.call(form, col)) {
+            studentUpdate[col] = form[col] || null;
+          }
         });
+
+        SupabaseProvider.updateStudent(s.student_id, studentUpdate);
       } else {
         // Create new student record (Role Migration)
         SupabaseProvider.createStudent({
@@ -6196,10 +6258,7 @@ function adminSyncStudents(targetEmail) {
       if (filterEmail) {
         if (pEmail === filterEmail) eligibleRows++;
       } else {
-        var pActive =
-          pStatus === "active" ||
-          (pStatus.includes("active") && !pStatus.includes("inactive"));
-        if (pActive && pEmail) eligibleRows++;
+        if (_isActiveUserStatus(pStatus) && pEmail) eligibleRows++;
       }
     }
 
@@ -6245,13 +6304,11 @@ function adminSyncStudents(targetEmail) {
         // 0. If targeting a specific student, skip non-matching rows
         if (filterEmail && email !== filterEmail) continue;
 
-        // 1. Filter: Sync only Active (skip when targeting specific student)
-        if (!filterEmail) {
-          var isStudentActive =
-            statusRaw === "active" ||
-            (statusRaw.includes("active") && !statusRaw.includes("inactive"));
-          if (!isStudentActive) continue;
-        }
+        // 1. Filter: a full sync only touches Active rows. A targeted sync
+        //    still processes the row, but must carry the sheet's real status
+        //    through to the payload below instead of forcing "active".
+        var isStudentActive = _isActiveUserStatus(statusRaw);
+        if (!filterEmail && !isStudentActive) continue;
 
         if (!email) {
           stats.warnings.push("Row " + (i + 1) + ": Missing email");
@@ -6275,10 +6332,14 @@ function adminSyncStudents(targetEmail) {
         );
 
         // 2. Upsert User
+        // Same normalisation as students.status below, so the two tables can
+        // never disagree and no raw sheet text reaches the user_status enum.
+        var syncedStatus = isStudentActive ? statusRaw : "inactive";
+
         var userRecord = SupabaseProvider.upsertUser(email, {
           name: name,
           role: "student",
-          status: String(statusRaw || "").toLowerCase(),
+          status: syncedStatus,
         });
 
         if (!userRecord || !userRecord.user_id) {
@@ -6306,7 +6367,10 @@ function adminSyncStudents(targetEmail) {
           unit_id: unitId,
           team_leader_1_id: tl1Id,
           team_leader_2_id: tl2Id,
-          status: "active",
+          // Keep students.status in step with the sheet instead of forcing
+          // "active" (which used to flip inactive students back on a targeted
+          // sync and silently flattened suffixed values such as "active+1").
+          status: syncedStatus,
           updated_at: new Date().toISOString(),
         };
         // Merge division instructor IDs
@@ -6420,6 +6484,8 @@ function adminClearInactiveStudents() {
     var stats = {
       processed: localStudents.length,
       cleared: 0,
+      graduated: 0,
+      deactivated: 0,
       skipped: 0,
     };
 
@@ -6433,46 +6499,63 @@ function adminClearInactiveStudents() {
         return;
       }
 
+      var inSheet = Object.prototype.hasOwnProperty.call(
+        sheetStatusMap,
+        stuEmail,
+      );
       var sheetStatus = sheetStatusMap[stuEmail];
+      var isSheetActive = _isActiveUserStatus(sheetStatus);
 
-      // Determine if active in sheet
-      var isSheetActive = false;
-      if (sheetStatus) {
-        isSheetActive =
-          sheetStatus === "active" ||
-          (sheetStatus.includes("active") && !sheetStatus.includes("inactive"));
+      if (isSheetActive) {
+        stats.skipped++; // Still enrolled and active, leave untouched
+        return;
       }
 
-      // If not found in sheet or not active in sheet, clear their status locally
-      if (!isSheetActive) {
-        // Check if it's already cleared to avoid unnecessary API calls
-        var needsUpdate = false;
+      // Two distinct outcomes, previously collapsed into a single blank status:
+      //   - absent from the Master Sheet  -> left the programme (graduated /
+      //     withdrawn). Archive them and stamp archived_at so the 5-year
+      //     retention window can be measured later.
+      //   - present but not active        -> temporary leave / repeating year.
+      //     Mark inactive; a later sync flips them back to active on its own.
+      // Records are never deleted — retention is handled by archived_at.
+      var targetStatus = inSheet ? "inactive" : "graduated";
+      var needsUpdate = false;
 
-        if (studentUser.status !== "" && studentUser.status !== null) {
-          SupabaseProvider.updateUser(studentUser.user_id, { status: "" });
+      if (studentUser.status !== targetStatus) {
+        SupabaseProvider.updateUser(studentUser.user_id, {
+          status: targetStatus,
+        });
+        needsUpdate = true;
+      }
+
+      // We must update the `students` table as well because `status` exists there too.
+      var studentRec = SupabaseProvider.getStudentByUserId(studentUser.user_id);
+      if (studentRec) {
+        var studentPatch = {};
+        if (studentRec.status !== targetStatus) {
+          studentPatch.status = targetStatus;
+        }
+        // Stamp the archive date once and never overwrite it — the retention
+        // clock must start at the first archive, not at every re-run.
+        if (targetStatus === "graduated" && !studentRec.archived_at) {
+          studentPatch.archived_at = new Date().toISOString();
+        }
+        if (Object.keys(studentPatch).length > 0) {
+          studentPatch.updated_at = new Date().toISOString();
+          SupabaseProvider.updateStudent(studentRec.student_id, studentPatch);
           needsUpdate = true;
         }
+      }
 
-        // We must update the `students` table as well because `status` exists there too.
-        var studentRec = SupabaseProvider.getStudentByUserId(
-          studentUser.user_id,
-        );
-        if (
-          studentRec &&
-          studentRec.status !== "" &&
-          studentRec.status !== null
-        ) {
-          SupabaseProvider.updateStudent(studentRec.student_id, { status: "" });
-          needsUpdate = true;
-        }
-
-        if (needsUpdate) {
-          stats.cleared++;
+      if (needsUpdate) {
+        stats.cleared++;
+        if (targetStatus === "graduated") {
+          stats.graduated++;
         } else {
-          stats.skipped++; // Already cleared
+          stats.deactivated++;
         }
       } else {
-        stats.skipped++; // Active in sheet, skip
+        stats.skipped++; // Already archived
       }
     });
 

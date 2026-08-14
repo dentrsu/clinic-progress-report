@@ -234,6 +234,7 @@ In the Apps Script editor (`script.google.com`), go to **Project Settings → Sc
 | `FALLBACK_SHEET_ID`   | Google Spreadsheet ID for fallback            |
 | `PATIENT_SHEET_ID`    | Google Sheet ID containing patient master records |
 | `VERIFICATION_SECRET` | Random secret for verification hash (SHA-256) |
+| `ACADEMIC_YEAR_CUTOFF` | *(optional)* Academic-year rollover as `MM-DD`, e.g. `08-14`. Students move up one clinical year on this date. Defaults to `08-14`; an invalid value is logged and ignored. |
 
 > ⚠️ **Never commit keys to version control.** They live only in Script Properties.
 
