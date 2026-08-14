@@ -612,9 +612,10 @@
           <p class="text-xs text-gray-500">
             <span x-show="!showArchivedStudents">Showing current students. Graduated students are retained for 5 years but hidden.</span>
             <span x-show="showArchivedStudents">Showing all students, including graduated.</span>
-            <span class="text-gray-400" x-text="'(' + filteredStudents.length + ')'"></span>
+            <span class="text-gray-400" x-show="!listRefreshing" x-text="'(' + filteredStudents.length + ')'"></span>
+            <span class="text-gray-400" x-show="listRefreshing">updating…</span>
           </p>
-          <button @click="toggleArchivedStudents()" :disabled="loading"
+          <button @click="toggleArchivedStudents()" :disabled="loading || listRefreshing"
                   title="Graduated students stay in the database for the 5-year retention period. Turn this on to look them up."
                   class="shrink-0 flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50"
                   :class="showArchivedStudents ? 'bg-navy border-navy text-white' : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'">
@@ -678,13 +679,14 @@
     </div>
 
     <!-- Users: archived toggle -->
-    <div x-show="!loading && activeTab === 'users'" class="flex items-center justify-between gap-4 mb-3 px-1 animate-fade-in">
+    <div x-show="(!loading || listRefreshing) && activeTab === 'users'" class="flex items-center justify-between gap-4 mb-3 px-1 animate-fade-in">
        <p class="text-xs text-gray-500">
          <span x-show="!showArchivedUsers">Showing current users. Graduated accounts are retained for 5 years but hidden.</span>
          <span x-show="showArchivedUsers">Showing all users, including graduated accounts.</span>
-         <span class="text-gray-400" x-text="'(' + filteredUsers.length + ')'"></span>
+         <span class="text-gray-400" x-show="!listRefreshing" x-text="'(' + filteredUsers.length + ')'"></span>
+         <span class="text-gray-400" x-show="listRefreshing">updating…</span>
        </p>
-       <button @click="toggleArchivedUsers()" :disabled="loading"
+       <button @click="toggleArchivedUsers()" :disabled="loading || listRefreshing"
                title="Graduated accounts stay in the database for the 5-year retention period. Turn this on to look them up."
                class="shrink-0 flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50"
                :class="showArchivedUsers ? 'bg-navy border-navy text-white' : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'">
@@ -709,6 +711,7 @@
             <tr class="hover:bg-gray-50/50 transition">
               <td class="px-6 py-4">
                 <div class="font-medium text-navy" x-text="user.name || 'Unknown'"></div>
+                <div class="text-xs text-navy-light font-mono" x-show="userAcademicId(user)" x-text="userAcademicId(user)"></div>
                 <div class="text-xs text-gray-500" x-text="user.email"></div>
               </td>
               <td class="px-6 py-4">
@@ -2434,6 +2437,9 @@
         // accumulate year on year.
         showArchivedStudents: false,
         showArchivedUsers: false,
+        // In-place list refresh: keeps the tab rendered instead of falling back
+        // to the full-page spinner, so the toggle stays on screen.
+        listRefreshing: false,
 
         // Treatment Phases Data
         phases: [],
@@ -3216,11 +3222,8 @@
             (u.name && u.name.toLowerCase().includes(q)) ||
             (u.email && u.email.toLowerCase().includes(q)) ||
             // students(academic_id) is joined in for exactly this, but was
-            // never wired into the search. PostgREST returns the embed as an
-            // array for a to-many relation and an object for a to-one, so
-            // handle both shapes.
-            (u.students && [].concat(u.students).some(s =>
-              s && s.academic_id && s.academic_id.toLowerCase().includes(q)))
+            // never wired into the search.
+            this.userAcademicId(u).toLowerCase().includes(q)
           );
         },
 
@@ -3417,43 +3420,60 @@
             .adminGetInitData();
         },
 
-        loadUsers() {
-          this.loading = true;
+        // `silent` refreshes the list in place instead of swapping the whole
+        // tab for the global spinner — otherwise the toggle button that was
+        // just clicked disappears mid-click.
+        loadUsers(silent) {
+          if (silent) this.listRefreshing = true;
+          else this.loading = true;
           google.script.run
             .withSuccessHandler(data => {
               this.users = data;
               this.loading = false;
+              this.listRefreshing = false;
             })
             .withFailureHandler(err => {
               console.error(err); // Log silently, alert on specific action?
               this.loading = false;
+              this.listRefreshing = false;
             })
             .adminListUsers(this.showArchivedUsers);
         },
 
         toggleArchivedUsers() {
           this.showArchivedUsers = !this.showArchivedUsers;
-          this.loadUsers();
+          this.loadUsers(true);
         },
 
-        loadStudents() {
-          this.loading = true;
+        // PostgREST returns an embedded to-many relation as an array and a
+        // to-one as an object; accept both.
+        userAcademicId(u) {
+          if (!u || !u.students) return '';
+          const s = [].concat(u.students)[0];
+          return (s && s.academic_id) ? s.academic_id : '';
+        },
+
+        loadStudents(silent) {
+          if (silent) this.listRefreshing = true;
+          else this.loading = true;
           google.script.run
             .withSuccessHandler(data => {
               this.students = data;
               this.filteredStudents = data; // Init filtered
               this.loading = false;
+              this.listRefreshing = false;
             })
             .withFailureHandler(err => {
                console.error("Failed to load students", err);
                this.loading = false;
+               this.listRefreshing = false;
             })
             .adminListStudents(this.showArchivedStudents);
         },
 
         toggleArchivedStudents() {
           this.showArchivedStudents = !this.showArchivedStudents;
-          this.loadStudents();
+          this.loadStudents(true);
         },
 
         loadDivisions() {
